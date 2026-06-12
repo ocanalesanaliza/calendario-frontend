@@ -241,6 +241,17 @@
 }
 
 
+/* ── Error message ── */
+.login-error {
+  color: #ef4444;
+  font-size: 0.85rem;
+  text-align: center;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+}
+
 /* ── Responsive ── */
 @media (max-width: 480px) {
   .login-card {

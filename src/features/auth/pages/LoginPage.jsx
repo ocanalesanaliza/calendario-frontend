@@ -1,15 +1,31 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { login } from '../services/authService'
 import './LoginPage.css'
 
 function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const navigate = useNavigate()
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    // TODO: implementar lógica de autenticación
-    console.log({ email, password })
+    setError('')
+    setLoading(true)
+    try {
+      const data = await login(email, password)
+      localStorage.setItem('access', data.access)
+      localStorage.setItem('refresh', data.refresh)
+      localStorage.setItem('perfil', JSON.stringify(data.perfil))
+      navigate('/')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -99,8 +115,10 @@ function LoginPage() {
             <a href="#" className="forgot-link">¿Olvidaste tu contraseña?</a>
           </div>
 
-          <button type="submit" className="login-btn">
-            Iniciar sesión
+          {error && <p className="login-error">{error}</p>}
+
+          <button type="submit" className="login-btn" disabled={loading}>
+            {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </button>
         </form>
 
