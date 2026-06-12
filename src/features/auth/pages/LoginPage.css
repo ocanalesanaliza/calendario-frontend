@@ -1,0 +1,250 @@
+/* ── Reset & base ── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Layout wrapper ── */
+.login-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f2f5;
+  padding: 1.5rem;
+  position: relative;
+  overflow: hidden;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* ── Decorative blobs ── */
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.18;
+  pointer-events: none;
+}
+.blob-1 {
+  width: 400px;
+  height: 400px;
+  background: #6c63ff;
+  top: -100px;
+  left: -100px;
+}
+.blob-2 {
+  width: 350px;
+  height: 350px;
+  background: #4a90e2;
+  bottom: -80px;
+  right: -80px;
+}
+
+/* ── Card ── */
+.login-card {
+  position: relative;
+  z-index: 1;
+  background: #ffffff;
+  border: 1px solid #e2e6ea;
+  border-radius: 24px;
+  padding: 2.75rem 2.5rem;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Brand / Logo ── */
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 2rem;
+  gap: 0.5rem;
+}
+
+.login-icon {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, #6c63ff, #48cae4);
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(108, 99, 255, 0.5);
+  margin-bottom: 0.25rem;
+}
+
+.login-icon svg {
+  width: 32px;
+  height: 32px;
+  color: #fff;
+}
+
+.login-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1a1d23;
+  letter-spacing: -0.5px;
+}
+
+.login-subtitle {
+  font-size: 0.875rem;
+  color: #8a92a0;
+}
+
+/* ── Form ── */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #4a5568;
+  letter-spacing: 0.3px;
+}
+
+/* ── Input ── */
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 14px;
+  width: 17px;
+  height: 17px;
+  color: #b0b8c4;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.input-wrapper input {
+  width: 100%;
+  padding: 0.75rem 2.75rem 0.75rem 2.75rem;
+  background: #f7f8fa;
+  border: 1px solid #dde1e7;
+  border-radius: 12px;
+  color: #1a1d23;
+  font-size: 0.9375rem;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.input-wrapper input::placeholder {
+  color: #b0b8c4;
+}
+
+.input-wrapper input:focus {
+  border-color: #6c63ff;
+  background: rgba(108, 99, 255, 0.1);
+  box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.2);
+}
+
+/* ── Toggle password ── */
+.toggle-password {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  color: #b0b8c4;
+  transition: color 0.2s;
+}
+
+.toggle-password:hover {
+  color: #6c63ff;
+}
+
+.toggle-password svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* ── Options row ── */
+.form-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: -0.25rem;
+}
+
+.remember-me {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+.remember-me input[type='checkbox'] {
+  accent-color: #6c63ff;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.forgot-link {
+  font-size: 0.8125rem;
+  color: #6c63ff;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.forgot-link:hover {
+  color: #4a3fd4;
+}
+
+/* ── Submit button ── */
+.login-btn {
+  margin-top: 0.5rem;
+  width: 100%;
+  padding: 0.85rem;
+  background: linear-gradient(135deg, #6c63ff, #4a90e2);
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 4px 18px rgba(108, 99, 255, 0.45);
+}
+
+.login-btn:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(108, 99, 255, 0.55);
+}
+
+.login-btn:active {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .login-card {
+    padding: 2rem 1.5rem;
+    border-radius: 20px;
+  }
+}
