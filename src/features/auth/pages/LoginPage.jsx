@@ -20,7 +20,11 @@ function LoginPage() {
       localStorage.setItem('access', data.access)
       localStorage.setItem('refresh', data.refresh)
       localStorage.setItem('perfil', JSON.stringify(data.perfil))
-      navigate('/')
+      if (data.perfil.debe_cambiar_password) {
+        navigate('/cambiar-password')
+      } else {
+        navigate('/')
+      }
     } catch (err) {
       setError(err.message)
     } finally {
