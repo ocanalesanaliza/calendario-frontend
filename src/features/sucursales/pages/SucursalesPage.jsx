@@ -429,7 +429,7 @@ function TareasSucursalModal({ sucursal, onClose }) {
   const [tareasSucursal, setTareasSucursal] = useState([])
   const [catalogo, setCatalogo] = useState([])
   const [loading, setLoading] = useState(true)
-  const [form, setForm] = useState({ id_tarea: '', hora: '', jornada: 'manana', peso: '' })
+  const [form, setForm] = useState({ id_tarea: '', hora: '', jornada: 'manana' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -457,9 +457,8 @@ function TareasSucursalModal({ sucursal, onClose }) {
     setError('')
     try {
       const body = { id_tarea: Number(form.id_tarea), hora: form.hora, jornada: form.jornada }
-      if (form.peso) body.peso = form.peso
       await createTareaSucursal(sucursal.id_sucursal, body)
-      setForm({ id_tarea: '', hora: '', jornada: 'manana', peso: '' })
+      setForm({ id_tarea: '', hora: '', jornada: 'manana' })
       await loadData()
     } catch (err) {
       setError(err.message)
@@ -497,7 +496,7 @@ function TareasSucursalModal({ sucursal, onClose }) {
                   <div className="tareas-suc-meta">
                     <span className="badge badge-tipo">{JORNADA_LABEL[ts.jornada] ?? ts.jornada}</span>
                     <span className="tareas-suc-hora">{ts.hora}</span>
-                    <span className="tareas-suc-peso">Peso: {ts.peso}</span>
+                    <span className="tareas-suc-peso">Peso: {ts.tarea?.peso ?? ts.peso ?? '—'}</span>
                   </div>
                 </div>
                 {ts.activa && (
@@ -524,7 +523,7 @@ function TareasSucursalModal({ sucursal, onClose }) {
               ))}
             </select>
           </div>
-          <div className="form-row-3">
+          <div className="form-row">
             <div className="form-group">
               <label>Jornada</label>
               <select value={form.jornada} onChange={set('jornada')}>
@@ -535,10 +534,6 @@ function TareasSucursalModal({ sucursal, onClose }) {
             <div className="form-group">
               <label>Hora</label>
               <input type="time" value={form.hora} onChange={set('hora')} required />
-            </div>
-            <div className="form-group">
-              <label>Peso <span className="label-optional">(opt.)</span></label>
-              <input type="number" step="0.01" min="0" placeholder="3.00" value={form.peso} onChange={set('peso')} />
             </div>
           </div>
           {error && <p className="modal-error">{error}</p>}

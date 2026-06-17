@@ -142,7 +142,6 @@ export default function PlantillaDetallePage() {
                 <th>Jornada</th>
                 <th>Hora sugerida</th>
                 <th>Peso</th>
-                <th>Rendimiento</th>
                 <th>Estado</th>
                 <th>Acciones</th>
               </tr>
@@ -157,12 +156,7 @@ export default function PlantillaDetallePage() {
                     </span>
                   </td>
                   <td>{pt.hora_sugerida ?? <span className="td-empty">—</span>}</td>
-                  <td>{pt.peso_base}</td>
-                  <td>
-                    <span className={`badge ${pt.cuenta_en_rendimiento ? 'badge-green' : 'badge-gray'}`}>
-                      {pt.cuenta_en_rendimiento ? 'Sí' : 'No'}
-                    </span>
-                  </td>
+                  <td>{pt.tarea?.peso ?? <span className="td-empty">—</span>}</td>
                   <td>
                     <span className={`badge ${pt.activa ? 'badge-green' : 'badge-red'}`}>
                       {pt.activa ? 'Activa' : 'Inactiva'}
@@ -318,8 +312,6 @@ function TareaModal({ inicial, onSubmit, onClose }) {
     jornada: inicial?.jornada ?? 'manana',
     hora_sugerida: inicial?.hora_sugerida ?? '',
     aplica_ambas_jornadas: inicial?.aplica_ambas_jornadas ?? false,
-    peso_base: inicial?.peso_base ?? '1.00',
-    cuenta_en_rendimiento: inicial?.cuenta_en_rendimiento ?? true,
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -374,22 +366,10 @@ function TareaModal({ inicial, onSubmit, onClose }) {
             <input type="time" value={form.hora_sugerida} onChange={set('hora_sugerida')} />
           </div>
         </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Peso base</label>
-            <input type="number" step="0.01" min="0" value={form.peso_base} onChange={set('peso_base')} required />
-          </div>
-        </div>
-        <div className="form-checks">
-          <label className="check-label">
-            <input type="checkbox" checked={form.aplica_ambas_jornadas} onChange={setCheck('aplica_ambas_jornadas')} />
-            Aplica ambas jornadas
-          </label>
-          <label className="check-label">
-            <input type="checkbox" checked={form.cuenta_en_rendimiento} onChange={setCheck('cuenta_en_rendimiento')} />
-            Cuenta en rendimiento
-          </label>
-        </div>
+        <label className="check-label" style={{ marginTop: '0.25rem' }}>
+          <input type="checkbox" checked={form.aplica_ambas_jornadas} onChange={setCheck('aplica_ambas_jornadas')} />
+          Aplica ambas jornadas
+        </label>
         {error && <p className="modal-error">{error}</p>}
         <div className="modal-footer">
           <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>

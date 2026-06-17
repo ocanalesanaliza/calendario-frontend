@@ -134,14 +134,14 @@
 
 .input-wrapper input {
   width: 100%;
-  padding: 0.75rem 2.75rem 0.75rem 2.75rem;
-  background: #f7f8fa;
+  padding: 0.75rem 2.75rem 0.75rem 1rem;
+  background: #ffffff;
   border: 1px solid #dde1e7;
   border-radius: 12px;
   color: #1a1d23;
   font-size: 0.9375rem;
   outline: none;
-  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  transition: border-color 0.2s;
 }
 
 .input-wrapper input::placeholder {
@@ -150,8 +150,6 @@
 
 .input-wrapper input:focus {
   border-color: #6c63ff;
-  background: rgba(108, 99, 255, 0.1);
-  box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.2);
 }
 
 /* ── Toggle password ── */

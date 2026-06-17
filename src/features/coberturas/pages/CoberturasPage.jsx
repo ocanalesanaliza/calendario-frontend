@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { getCoberturas, createCobertura, activarCobertura, cancelarCobertura, completarCobertura } from '../services/coberturasService'
 import { getUsuarios } from '../../usuarios/services/usuariosService'
 import { getSucursales } from '../../sucursales/services/sucursalesService'
+import Toast from '../../../components/Toast/Toast'
 import './CoberturasPage.css'
 
 const ESTADO_BADGE = {
@@ -23,6 +24,9 @@ export default function CoberturasPage() {
   const [loading, setLoading]       = useState(true)
   const [filtroEstado, setFiltroEstado] = useState('')
   const [modal, setModal]           = useState(null)
+  const [toast, setToast]           = useState(null)
+
+  const showToast = (message, type = 'error') => setToast({ message, type })
 
   useEffect(() => { loadData() }, [filtroEstado])
 
@@ -46,7 +50,7 @@ export default function CoberturasPage() {
       if (accion === 'completar') await completarCobertura(id)
       await loadData()
     } catch (err) {
-      alert(err.message)
+      showToast(err.message)
     }
   }
 
@@ -54,6 +58,7 @@ export default function CoberturasPage() {
     await createCobertura(form)
     await loadData()
     setModal(null)
+    showToast('Cobertura creada correctamente', 'success')
   }
 
   return (
@@ -147,7 +152,19 @@ export default function CoberturasPage() {
       )}
 
       {modal?.type === 'crear' && (
-        <CoberturaModal onSubmit={handleCreate} onClose={() => setModal(null)} />
+        <CoberturaModal
+          onSubmit={handleCreate}
+          onClose={() => setModal(null)}
+          showToast={showToast}
+        />
+      )}
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   )
@@ -173,7 +190,7 @@ function ModalWrapper({ title, onClose, children }) {
   )
 }
 
-function CoberturaModal({ onSubmit, onClose }) {
+function CoberturaModal({ onSubmit, onClose, showToast }) {
   const [usuarios, setUsuarios]     = useState([])
   const [sucursales, setSucursales] = useState([])
   const [form, setForm] = useState({
@@ -184,7 +201,6 @@ function CoberturaModal({ onSubmit, onClose }) {
     jornada:  'dia_completo',
     motivo:   '',
   })
-  const [error, setError]   = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -197,7 +213,6 @@ function CoberturaModal({ onSubmit, onClose }) {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setError('')
     setLoading(true)
     try {
       const body = {
@@ -210,7 +225,7 @@ function CoberturaModal({ onSubmit, onClose }) {
       if (form.id_usuario_titular) body.id_usuario_titular = Number(form.id_usuario_titular)
       await onSubmit(body)
     } catch (err) {
-      setError(err.message)
+      showToast(err.message)
     } finally {
       setLoading(false)
     }
@@ -266,7 +281,6 @@ function CoberturaModal({ onSubmit, onClose }) {
           <label>Motivo <span className="label-optional">(opcional)</span></label>
           <input type="text" value={form.motivo} onChange={set('motivo')} placeholder="ej. descanso dominical" />
         </div>
-        {error && <p className="modal-error">{error}</p>}
         <div className="modal-footer">
           <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
           <button type="submit" className="btn-primary" disabled={loading}>
