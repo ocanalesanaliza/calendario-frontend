@@ -45,3 +45,17 @@ export async function desactivarUsuario(id) {
   if (!res.ok) throw new Error(data.detail || 'Error al desactivar usuario')
   return data
 }
+
+export async function getUsuario(id) {
+  const res = await apiRequest(`/api/usuarios/${id}/`)
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.detail || 'Error al cargar usuario')
+  return data.usuario
+}
+
+export async function resetPasswordUsuario(id) {
+  const res = await apiRequest(`/api/usuarios/${id}/reset-password/`, { method: 'POST' })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.detail || 'Error al resetear contraseña')
+  return data
+}

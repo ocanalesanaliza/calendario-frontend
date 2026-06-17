@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { changePassword } from '../services/authService'
+import { useAuth } from '../context/AuthContext'
 import './ChangePasswordPage.css'
 
 function ChangePasswordPage() {
@@ -9,6 +10,7 @@ function ChangePasswordPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const { updatePerfil } = useAuth()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -16,7 +18,7 @@ function ChangePasswordPage() {
     setLoading(true)
     try {
       const data = await changePassword(currentPassword, newPassword)
-      localStorage.setItem('perfil', JSON.stringify(data.perfil))
+      updatePerfil(data.perfil)
       navigate('/')
     } catch (err) {
       setError(err.message)

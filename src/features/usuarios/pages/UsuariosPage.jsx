@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getUsuarios, createUsuario, updateUsuario, cambiarSucursal, desactivarUsuario } from '../services/usuariosService'
+import { getUsuarios, createUsuario, updateUsuario, cambiarSucursal, desactivarUsuario, resetPasswordUsuario } from '../services/usuariosService'
 import { getSucursales } from '../../sucursales/services/sucursalesService'
 import './UsuariosPage.css'
 
@@ -46,6 +46,12 @@ export default function UsuariosPage() {
     await desactivarUsuario(id)
     await loadData()
     closeModal()
+  }
+
+  async function handleResetPassword(id) {
+    const data = await resetPasswordUsuario(id)
+    await loadData()
+    setModal({ type: 'password', password: data.password_temporal, nombre: data.usuario.nombre })
   }
 
   return (
@@ -111,6 +117,16 @@ export default function UsuariosPage() {
                       </button>
                       <button
                         className="action-btn"
+                        title="Resetear contraseña"
+                        onClick={() => setModal({ type: 'reset', usuario: u })}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                          <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                        </svg>
+                      </button>
+                      <button
+                        className="action-btn"
                         title="Cambiar sucursal"
                         onClick={() => setModal({ type: 'sucursal', usuario: u })}
                       >
@@ -169,6 +185,14 @@ export default function UsuariosPage() {
         <DesactivarModal
           usuario={modal.usuario}
           onConfirm={() => handleDesactivar(modal.usuario.id_usuario)}
+          onClose={closeModal}
+        />
+      )}
+
+      {modal?.type === 'reset' && (
+        <ResetModal
+          usuario={modal.usuario}
+          onConfirm={() => handleResetPassword(modal.usuario.id_usuario)}
           onClose={closeModal}
         />
       )}
@@ -390,6 +414,34 @@ function DesactivarModal({ usuario, onConfirm, onClose }) {
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
           <button className="btn-danger" onClick={handleConfirm} disabled={loading}>
             {loading ? 'Desactivando...' : 'Desactivar'}
+          </button>
+        </div>
+      </div>
+    </ModalWrapper>
+  )
+}
+
+function ResetModal({ usuario, onConfirm, onClose }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError]     = useState('')
+
+  async function handleConfirm() {
+    setLoading(true)
+    try { await onConfirm() }
+    catch (err) { setError(err.message); setLoading(false) }
+  }
+
+  return (
+    <ModalWrapper title="Resetear contraseña" onClose={onClose}>
+      <div className="modal-form">
+        <p className="modal-confirm-text">
+          Se generará una nueva contraseña temporal para <strong>{usuario.nombre}</strong>. El usuario deberá cambiarla al iniciar sesión.
+        </p>
+        {error && <p className="modal-error">{error}</p>}
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn-primary" onClick={handleConfirm} disabled={loading}>
+            {loading ? 'Procesando...' : 'Resetear'}
           </button>
         </div>
       </div>

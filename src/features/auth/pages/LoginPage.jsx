@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { login } from '../services/authService'
+import { useAuth } from '../context/AuthContext'
 import './LoginPage.css'
 
 function LoginPage() {
@@ -10,6 +11,7 @@ function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const { setAuthData } = useAuth()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -17,9 +19,7 @@ function LoginPage() {
     setLoading(true)
     try {
       const data = await login(email, password)
-      localStorage.setItem('access', data.access)
-      localStorage.setItem('refresh', data.refresh)
-      localStorage.setItem('perfil', JSON.stringify(data.perfil))
+      setAuthData(data.access, data.refresh, data.perfil)
       if (data.perfil.debe_cambiar_password) {
         navigate('/cambiar-password')
       } else {

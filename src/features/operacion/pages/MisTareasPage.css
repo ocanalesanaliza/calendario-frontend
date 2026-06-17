@@ -1,0 +1,248 @@
+.mis-tareas-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.page-header h1 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 0.15rem;
+}
+
+.page-header p { font-size: 0.85rem; color: #64748b; }
+
+.fecha-picker {
+  padding: 0.5rem 0.75rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #1e293b;
+  outline: none;
+  transition: border-color 0.2s;
+  background: #fff;
+}
+
+.fecha-picker:focus { border-color: #6366f1; }
+
+/* ── Stats ── */
+.stats-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.85rem 1.25rem;
+  border-radius: 10px;
+  min-width: 88px;
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-top: 0.2rem;
+}
+
+/* ── Jornada tabs ── */
+.jornada-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.jornada-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1.2rem;
+  background: none;
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.jornada-tab:hover { color: #1e293b; }
+.jornada-tab.active { color: #6366f1; border-color: #6366f1; font-weight: 600; }
+
+.tab-count {
+  background: #e0e7ff;
+  color: #6366f1;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+}
+
+/* ── States ── */
+.loading-state, .empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+/* ── Task cards ── */
+.tareas-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 0.85rem;
+}
+
+.tarea-card {
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: border-color 0.2s;
+}
+
+.tarea-card.estado-disponible { border-color: #86efac; }
+.tarea-card.estado-registrada  { border-color: #93c5fd; }
+.tarea-card.estado-cerrada     { border-color: #fca5a5; }
+
+.tarea-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.tarea-card-info { flex: 1; }
+
+.tarea-card-nombre {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 0.2rem;
+}
+
+.tarea-card-hora {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+/* ── Badges ── */
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge-green  { background: #dcfce7; color: #166534; }
+.badge-blue   { background: #dbeafe; color: #1d4ed8; }
+.badge-red    { background: #fee2e2; color: #991b1b; }
+.badge-yellow { background: #fef9c3; color: #854d0e; }
+.badge-tipo   { background: #f1f5f9; color: #475569; }
+
+/* ── Register panel ── */
+.btn-registrar {
+  padding: 0.45rem 0.9rem;
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: background 0.15s;
+}
+
+.btn-registrar:hover { background: #4f46e5; }
+
+.registrar-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.notas-input {
+  padding: 0.45rem 0.7rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 7px;
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.2s;
+  color: #1e293b;
+}
+
+.notas-input:focus { border-color: #6366f1; }
+
+.reg-error {
+  font-size: 0.8rem;
+  color: #ef4444;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+}
+
+.registrar-actions {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.btn-primary-sm {
+  padding: 0.35rem 0.8rem;
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-primary-sm:hover:not(:disabled) { background: #4f46e5; }
+.btn-primary-sm:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn-secondary-sm {
+  padding: 0.35rem 0.8rem;
+  background: #f1f5f9;
+  color: #334155;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-secondary-sm:hover { background: #e2e8f0; }
+
+.motivo-label {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  text-transform: capitalize;
+}

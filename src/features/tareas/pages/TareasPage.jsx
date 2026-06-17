@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getTareas, createTarea, updateTarea, desactivarTarea } from '../services/tareasService'
+import { getTareas, createTarea, updateTarea, desactivarTarea, getSubtareas, createSubtarea, updateSubtarea, desactivarSubtarea } from '../services/tareasService'
 import './TareasPage.css'
 
 const RECURRENCIA_LABEL = {
@@ -137,6 +137,12 @@ export default function TareasPage() {
                   </td>
                   <td>
                     <div className="row-actions">
+                      <button className="action-btn" title="Subtareas" onClick={() => setModal({ type: 'subtareas', tarea: t })}>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+                          <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+                        </svg>
+                      </button>
                       <button className="action-btn" title="Editar" onClick={() => setModal({ type: 'editar', tarea: t })}>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -169,16 +175,19 @@ export default function TareasPage() {
       {modal?.type === 'desactivar' && (
         <DesactivarModal nombre={modal.tarea.nombre} onConfirm={() => handleDesactivar(modal.tarea.id_tarea)} onClose={() => setModal(null)} />
       )}
+      {modal?.type === 'subtareas' && (
+        <SubtareasModal tarea={modal.tarea} onClose={() => setModal(null)} />
+      )}
     </div>
   )
 }
 
 /* ── Modales ── */
 
-function ModalWrapper({ title, onClose, children }) {
+function ModalWrapper({ title, onClose, children, wide }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className={`modal${wide ? ' modal-wide' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{title}</h2>
           <button className="modal-close" onClick={onClose}>
@@ -290,6 +299,165 @@ function DesactivarModal({ nombre, onConfirm, onClose }) {
             {loading ? 'Desactivando...' : 'Desactivar'}
           </button>
         </div>
+      </div>
+    </ModalWrapper>
+  )
+}
+
+function SubtareasModal({ tarea, onClose }) {
+  const [subtareas, setSubtareas] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [editando, setEditando] = useState(null)
+  const [nuevaNombre, setNuevaNombre] = useState('')
+  const [nuevoOrden, setNuevoOrden] = useState('')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => { loadSubtareas() }, [])
+
+  async function loadSubtareas() {
+    setLoading(true)
+    try {
+      const data = await getSubtareas(tarea.id_tarea, { incluir_inactivas: true })
+      setSubtareas(data)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleCreate(e) {
+    e.preventDefault()
+    if (!nuevaNombre.trim()) return
+    setSaving(true)
+    setError('')
+    try {
+      const body = { nombre: nuevaNombre.trim() }
+      if (nuevoOrden) body.orden = parseInt(nuevoOrden)
+      await createSubtarea(tarea.id_tarea, body)
+      setNuevaNombre('')
+      setNuevoOrden('')
+      await loadSubtareas()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleEdit(id) {
+    setSaving(true)
+    setError('')
+    try {
+      const body = { nombre: editando.nombre }
+      if (editando.orden !== '') body.orden = parseInt(editando.orden)
+      await updateSubtarea(tarea.id_tarea, id, body)
+      setEditando(null)
+      await loadSubtareas()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDesactivar(id) {
+    setSaving(true)
+    setError('')
+    try {
+      await desactivarSubtarea(tarea.id_tarea, id)
+      await loadSubtareas()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <ModalWrapper title={`Subtareas — ${tarea.nombre}`} onClose={onClose} wide>
+      <div className="modal-form">
+        {loading ? (
+          <p className="empty-state-sm">Cargando subtareas...</p>
+        ) : subtareas.length === 0 ? (
+          <p className="empty-state-sm">Sin subtareas aún.</p>
+        ) : (
+          <div className="subtareas-list">
+            {subtareas.map((st) => (
+              <div key={st.id_subtarea} className={`subtarea-row${!st.activa ? ' subtarea-inactiva' : ''}`}>
+                {editando?.id === st.id_subtarea ? (
+                  <div className="subtarea-edit-inline">
+                    <input
+                      className="subtarea-input"
+                      value={editando.nombre}
+                      onChange={(e) => setEditando((x) => ({ ...x, nombre: e.target.value }))}
+                      autoFocus
+                    />
+                    <input
+                      className="subtarea-input-sm"
+                      type="number"
+                      min="1"
+                      placeholder="Orden"
+                      value={editando.orden}
+                      onChange={(e) => setEditando((x) => ({ ...x, orden: e.target.value }))}
+                    />
+                    <button className="action-btn action-btn-success" title="Guardar" onClick={() => handleEdit(st.id_subtarea)} disabled={saving}>
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </button>
+                    <button className="action-btn" title="Cancelar" onClick={() => setEditando(null)}>
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <span className="subtarea-orden">{st.orden}.</span>
+                    <span className="subtarea-nombre">{st.nombre}</span>
+                    {!st.activa && <span className="badge badge-red">Inactiva</span>}
+                    <div className="row-actions">
+                      {st.activa && (
+                        <button className="action-btn" title="Editar" onClick={() => setEditando({ id: st.id_subtarea, nombre: st.nombre, orden: st.orden ?? '' })}>
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                          </svg>
+                        </button>
+                      )}
+                      {st.activa && (
+                        <button className="action-btn action-btn-danger" title="Desactivar" onClick={() => handleDesactivar(st.id_subtarea)} disabled={saving}>
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        <form onSubmit={handleCreate} className="subtarea-nueva-form">
+          <div className="form-row">
+            <div className="form-group">
+              <label>Nueva subtarea</label>
+              <input type="text" placeholder="Nombre" value={nuevaNombre} onChange={(e) => setNuevaNombre(e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label>Orden <span className="label-optional">(opcional)</span></label>
+              <input type="number" min="1" placeholder="auto" value={nuevoOrden} onChange={(e) => setNuevoOrden(e.target.value)} />
+            </div>
+          </div>
+          {error && <p className="modal-error">{error}</p>}
+          <div className="modal-footer">
+            <button type="button" className="btn-secondary" onClick={onClose}>Cerrar</button>
+            <button type="submit" className="btn-primary" disabled={saving}>
+              {saving ? 'Guardando...' : 'Agregar subtarea'}
+            </button>
+          </div>
+        </form>
       </div>
     </ModalWrapper>
   )

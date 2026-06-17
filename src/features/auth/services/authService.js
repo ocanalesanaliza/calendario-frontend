@@ -14,6 +14,13 @@ export async function login(email, password) {
   return data
 }
 
+export async function getMe() {
+  const res = await apiRequest('/api/auth/me/')
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.detail || 'Error al obtener perfil')
+  return data
+}
+
 export async function changePassword(current_password, new_password) {
   const res = await apiRequest('/api/auth/change-password/', {
     method: 'POST',

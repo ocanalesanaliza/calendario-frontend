@@ -1,15 +1,17 @@
 import { useState, useRef, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../features/auth/context/AuthContext'
 import './Layout.css'
 
 function Layout() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
   const navigate = useNavigate()
+  const { perfil, logout } = useAuth()
 
-  const perfil = JSON.parse(localStorage.getItem('perfil') || '{}')
-  const esGerenteArea = perfil.type === 'gerente_area'
-  const esAdmin = perfil.es_admin_maestro === true
+  const esGerenteArea  = perfil?.type === 'gerente_area'
+  const esSucursal     = perfil?.type === 'gerente_sucursal'
+  const esAdmin        = perfil?.es_admin_maestro === true
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -22,9 +24,7 @@ function Layout() {
   }, [])
 
   function handleLogout() {
-    localStorage.removeItem('access')
-    localStorage.removeItem('refresh')
-    localStorage.removeItem('perfil')
+    logout()
     navigate('/Login')
   }
 
@@ -59,9 +59,9 @@ function Layout() {
               aria-expanded={dropdownOpen}
             >
               <div className="user-avatar">
-                {perfil.nombre ? perfil.nombre.charAt(0).toUpperCase() : 'U'}
+                {perfil?.nombre ? perfil.nombre.charAt(0).toUpperCase() : 'U'}
               </div>
-              <span className="user-name">{perfil.nombre || 'Usuario'}</span>
+              <span className="user-name">{perfil?.nombre || 'Usuario'}</span>
               <svg
                 className={`chevron ${dropdownOpen ? 'open' : ''}`}
                 xmlns="http://www.w3.org/2000/svg"
@@ -154,6 +154,56 @@ function Layout() {
                 Gerentes de área
               </NavLink>
             )}
+
+            {esSucursal && (
+              <NavLink to="/mis-tareas" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 11l3 3L22 4"/>
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                </svg>
+                Mis tareas
+              </NavLink>
+            )}
+
+            <NavLink to="/almuerzos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
+                <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
+                <line x1="6" y1="1" x2="6" y2="4"/>
+                <line x1="10" y1="1" x2="10" y2="4"/>
+                <line x1="14" y1="1" x2="14" y2="4"/>
+              </svg>
+              Almuerzo
+            </NavLink>
+
+            {(esGerenteArea || esAdmin) && (
+              <NavLink to="/coberturas" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="16 18 22 12 16 6"/>
+                  <polyline points="8 6 2 12 8 18"/>
+                </svg>
+                Coberturas
+              </NavLink>
+            )}
+
+            {(esGerenteArea || esAdmin) && (
+              <NavLink to="/dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/>
+                  <rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>
+                </svg>
+                Dashboard
+              </NavLink>
+            )}
+
+            <NavLink to="/rendimiento" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="20" x2="18" y2="10"/>
+                <line x1="12" y1="20" x2="12" y2="4"/>
+                <line x1="6"  y1="20" x2="6"  y2="14"/>
+              </svg>
+              Rendimiento
+            </NavLink>
           </nav>
         </aside>
 
