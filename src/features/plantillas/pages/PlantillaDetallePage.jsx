@@ -311,8 +311,9 @@ function EditarPlantillaModal({ plantilla, onSubmit, onClose }) {
   )
 }
 
-const HORAS_MANANA = Array.from({ length: 6 }, (_, i) => String(i + 6).padStart(2, '0') + ':00')   // 06:00–11:00
-const HORAS_TARDE  = Array.from({ length: 8 }, (_, i) => String(i + 12).padStart(2, '0') + ':00')  // 12:00–19:00
+// Mañana: 06:00–11:00 | Tarde: 12:00–19:00 (rangos separados, sin solapamiento)
+const HORAS_MANANA = ['06:00','07:00','08:00','09:00','10:00','11:00']
+const HORAS_TARDE  = ['12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00']
 
 function normalizarHora(hora) {
   if (!hora) return ''
