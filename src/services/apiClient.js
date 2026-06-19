@@ -14,7 +14,6 @@ function processQueue(error, token = null) {
 function logout() {
   localStorage.removeItem('access')
   localStorage.removeItem('refresh')
-  localStorage.removeItem('perfil')
   window.location.href = '/Login'
 }
 

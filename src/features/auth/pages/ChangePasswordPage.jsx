@@ -10,7 +10,7 @@ function ChangePasswordPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
-  const { updatePerfil } = useAuth()
+  const { setAuthData } = useAuth()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -18,7 +18,7 @@ function ChangePasswordPage() {
     setLoading(true)
     try {
       const data = await changePassword(currentPassword, newPassword)
-      updatePerfil(data.perfil)
+      setAuthData(data.access, data.refresh)
       navigate('/')
     } catch (err) {
       setError(err.message)

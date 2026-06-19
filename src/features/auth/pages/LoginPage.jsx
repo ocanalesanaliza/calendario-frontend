@@ -19,9 +19,9 @@ function LoginPage() {
     setLoading(true)
     try {
       const data = await login(email, password)
-      const perfil = decodeToken(data.access).perfil
-      setAuthData(data.access, data.refresh, perfil)
-      if (perfil.debe_cambiar_password) {
+      setAuthData(data.access, data.refresh)
+      const claims = decodeToken(data.access)
+      if (claims.perfil?.debe_cambiar_password) {
         navigate('/cambiar-password')
       } else {
         navigate('/')

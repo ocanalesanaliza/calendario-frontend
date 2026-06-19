@@ -1,38 +1,34 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useMemo, useState } from 'react'
+import { decodeToken } from '../services/authService'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [perfil, setPerfil] = useState(() => {
+  const [accessToken, setAccessToken] = useState(() => localStorage.getItem('access'))
+
+  const perfil = useMemo(() => {
+    if (!accessToken) return null
     try {
-      const raw = localStorage.getItem('perfil')
-      return raw ? JSON.parse(raw) : null
+      return decodeToken(accessToken).perfil
     } catch {
       return null
     }
-  })
+  }, [accessToken])
 
-  function setAuthData(access, refresh, perfilData) {
+  function setAuthData(access, refresh) {
     localStorage.setItem('access', access)
     localStorage.setItem('refresh', refresh)
-    localStorage.setItem('perfil', JSON.stringify(perfilData))
-    setPerfil(perfilData)
-  }
-
-  function updatePerfil(perfilData) {
-    localStorage.setItem('perfil', JSON.stringify(perfilData))
-    setPerfil(perfilData)
+    setAccessToken(access)
   }
 
   function logout() {
     localStorage.removeItem('access')
     localStorage.removeItem('refresh')
-    localStorage.removeItem('perfil')
-    setPerfil(null)
+    setAccessToken(null)
   }
 
   return (
-    <AuthContext.Provider value={{ perfil, setAuthData, updatePerfil, logout }}>
+    <AuthContext.Provider value={{ perfil, setAuthData, logout }}>
       {children}
     </AuthContext.Provider>
   )
