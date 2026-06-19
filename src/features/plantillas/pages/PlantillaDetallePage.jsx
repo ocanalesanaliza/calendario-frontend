@@ -311,7 +311,8 @@ function EditarPlantillaModal({ plantilla, onSubmit, onClose }) {
   )
 }
 
-const HORAS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0') + ':00')
+const HORAS_MANANA = Array.from({ length: 6 }, (_, i) => String(i + 6).padStart(2, '0') + ':00')   // 06:00–11:00
+const HORAS_TARDE  = Array.from({ length: 8 }, (_, i) => String(i + 12).padStart(2, '0') + ':00')  // 12:00–19:00
 
 function normalizarHora(hora) {
   if (!hora) return ''
@@ -323,9 +324,9 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
   const [form, setForm] = useState({
     id_tarea: inicial?.tarea?.id_tarea ?? '',
     jornada: inicial?.jornada ?? 'manana',
-    hora_sugerida: normalizarHora(inicial?.hora_sugerida),
-    hora_manana: '',
-    hora_tarde: '',
+    hora_sugerida: normalizarHora(inicial?.hora_sugerida) || (inicial?.jornada === 'tarde' ? HORAS_TARDE[0] : HORAS_MANANA[0]),
+    hora_manana: HORAS_MANANA[0],
+    hora_tarde: HORAS_TARDE[0],
     aplica_ambas_jornadas: inicial?.aplica_ambas_jornadas ?? false,
   })
   const [error, setError] = useState('')
@@ -336,7 +337,19 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
   }, [])
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
-  const setCheck = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.checked }))
+  const setCheck = (k) => (e) => {
+    const checked = e.target.checked
+    setForm((f) => ({ ...f, [k]: checked }))
+  }
+
+  function handleJornadaChange(e) {
+    const jornada = e.target.value
+    setForm((f) => ({
+      ...f,
+      jornada,
+      hora_sugerida: jornada === 'tarde' ? HORAS_TARDE[0] : HORAS_MANANA[0],
+    }))
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -380,6 +393,8 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
     }
   }
 
+  const horasSingle = form.jornada === 'tarde' ? HORAS_TARDE : HORAS_MANANA
+
   return (
     <ModalWrapper title={inicial ? 'Editar tarea' : 'Agregar tarea'} onClose={onClose}>
       <form className="modal-form" onSubmit={handleSubmit}>
@@ -401,17 +416,15 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
         {form.aplica_ambas_jornadas ? (
           <div className="form-row" style={{ marginTop: '0.75rem' }}>
             <div className="form-group">
-              <label>Hora mañana <span className="label-optional">(opcional)</span></label>
-              <select value={form.hora_manana} onChange={set('hora_manana')}>
-                <option value="">Sin hora</option>
-                {HORAS.map((h) => <option key={h} value={h}>{h}</option>)}
+              <label>Hora mañana</label>
+              <select value={form.hora_manana} onChange={set('hora_manana')} required>
+                {HORAS_MANANA.map((h) => <option key={h} value={h}>{h}</option>)}
               </select>
             </div>
             <div className="form-group">
-              <label>Hora tarde <span className="label-optional">(opcional)</span></label>
-              <select value={form.hora_tarde} onChange={set('hora_tarde')}>
-                <option value="">Sin hora</option>
-                {HORAS.map((h) => <option key={h} value={h}>{h}</option>)}
+              <label>Hora tarde</label>
+              <select value={form.hora_tarde} onChange={set('hora_tarde')} required>
+                {HORAS_TARDE.map((h) => <option key={h} value={h}>{h}</option>)}
               </select>
             </div>
           </div>
@@ -419,16 +432,15 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
           <div className="form-row" style={{ marginTop: '0.75rem' }}>
             <div className="form-group">
               <label>Jornada</label>
-              <select value={form.jornada} onChange={set('jornada')} required>
+              <select value={form.jornada} onChange={handleJornadaChange} required>
                 <option value="manana">Mañana</option>
                 <option value="tarde">Tarde</option>
               </select>
             </div>
             <div className="form-group">
-              <label>Hora sugerida <span className="label-optional">(opcional)</span></label>
-              <select value={form.hora_sugerida} onChange={set('hora_sugerida')}>
-                <option value="">Sin hora</option>
-                {HORAS.map((h) => <option key={h} value={h}>{h}</option>)}
+              <label>Hora sugerida</label>
+              <select value={form.hora_sugerida} onChange={set('hora_sugerida')} required>
+                {horasSingle.map((h) => <option key={h} value={h}>{h}</option>)}
               </select>
             </div>
           </div>
