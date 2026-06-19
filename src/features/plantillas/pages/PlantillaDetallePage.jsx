@@ -38,7 +38,12 @@ export default function PlantillaDetallePage() {
   }
 
   async function handleAddTarea(form) {
-    await addTarea(id, form)
+    if (form.aplica_ambas_jornadas) {
+      await addTarea(id, { id_tarea: form.id_tarea, jornada: 'manana', hora_sugerida: form.hora_manana || null, aplica_ambas_jornadas: false })
+      await addTarea(id, { id_tarea: form.id_tarea, jornada: 'tarde', hora_sugerida: form.hora_tarde || null, aplica_ambas_jornadas: false })
+    } else {
+      await addTarea(id, form)
+    }
     await loadData()
     setModal(null)
   }
@@ -319,6 +324,8 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
     id_tarea: inicial?.tarea?.id_tarea ?? '',
     jornada: inicial?.jornada ?? 'manana',
     hora_sugerida: normalizarHora(inicial?.hora_sugerida),
+    hora_manana: '',
+    hora_tarde: '',
     aplica_ambas_jornadas: inicial?.aplica_ambas_jornadas ?? false,
   })
   const [error, setError] = useState('')
@@ -337,25 +344,35 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
 
     if (!inicial) {
       const idTarea = Number(form.id_tarea)
-      const duplicada = tareasActivas.some((pt) => {
-        if (pt.tarea?.id_tarea !== idTarea) return false
-        if (pt.aplica_ambas_jornadas || form.aplica_ambas_jornadas) return true
-        return pt.jornada === form.jornada
-      })
-      if (duplicada) {
-        setError('Esta tarea ya está agregada en esta jornada.')
-        return
+      if (form.aplica_ambas_jornadas) {
+        const mananaOcupada = tareasActivas.some((pt) => pt.tarea?.id_tarea === idTarea && (pt.jornada === 'manana' || pt.aplica_ambas_jornadas))
+        const tardeOcupada  = tareasActivas.some((pt) => pt.tarea?.id_tarea === idTarea && (pt.jornada === 'tarde'  || pt.aplica_ambas_jornadas))
+        if (mananaOcupada || tardeOcupada) {
+          const cuales = [mananaOcupada && 'mañana', tardeOcupada && 'tarde'].filter(Boolean).join(' y ')
+          setError(`Esta tarea ya está agregada en la jornada de ${cuales}.`)
+          return
+        }
+      } else {
+        const duplicada = tareasActivas.some((pt) =>
+          pt.tarea?.id_tarea === idTarea && (pt.aplica_ambas_jornadas || pt.jornada === form.jornada)
+        )
+        if (duplicada) {
+          setError('Esta tarea ya está agregada en esta jornada.')
+          return
+        }
       }
     }
 
     setLoading(true)
     try {
-      const body = {
-        ...form,
+      await onSubmit({
         id_tarea: Number(form.id_tarea),
+        jornada: form.jornada,
         hora_sugerida: form.hora_sugerida || null,
-      }
-      await onSubmit(body)
+        hora_manana: form.hora_manana || null,
+        hora_tarde: form.hora_tarde || null,
+        aplica_ambas_jornadas: form.aplica_ambas_jornadas,
+      })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -375,26 +392,48 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
             ))}
           </select>
         </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Jornada</label>
-            <select value={form.jornada} onChange={set('jornada')} required>
-              <option value="manana">Mañana</option>
-              <option value="tarde">Tarde</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Hora sugerida <span className="label-optional">(opcional)</span></label>
-            <select value={form.hora_sugerida} onChange={set('hora_sugerida')}>
-              <option value="">Sin hora</option>
-              {HORAS.map((h) => <option key={h} value={h}>{h}</option>)}
-            </select>
-          </div>
-        </div>
+
         <label className="check-label" style={{ marginTop: '0.25rem' }}>
-          <input type="checkbox" checked={form.aplica_ambas_jornadas} onChange={setCheck('aplica_ambas_jornadas')} />
+          <input type="checkbox" checked={form.aplica_ambas_jornadas} onChange={setCheck('aplica_ambas_jornadas')} disabled={!!inicial} />
           Aplica ambas jornadas
         </label>
+
+        {form.aplica_ambas_jornadas ? (
+          <div className="form-row" style={{ marginTop: '0.75rem' }}>
+            <div className="form-group">
+              <label>Hora mañana <span className="label-optional">(opcional)</span></label>
+              <select value={form.hora_manana} onChange={set('hora_manana')}>
+                <option value="">Sin hora</option>
+                {HORAS.map((h) => <option key={h} value={h}>{h}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Hora tarde <span className="label-optional">(opcional)</span></label>
+              <select value={form.hora_tarde} onChange={set('hora_tarde')}>
+                <option value="">Sin hora</option>
+                {HORAS.map((h) => <option key={h} value={h}>{h}</option>)}
+              </select>
+            </div>
+          </div>
+        ) : (
+          <div className="form-row" style={{ marginTop: '0.75rem' }}>
+            <div className="form-group">
+              <label>Jornada</label>
+              <select value={form.jornada} onChange={set('jornada')} required>
+                <option value="manana">Mañana</option>
+                <option value="tarde">Tarde</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Hora sugerida <span className="label-optional">(opcional)</span></label>
+              <select value={form.hora_sugerida} onChange={set('hora_sugerida')}>
+                <option value="">Sin hora</option>
+                {HORAS.map((h) => <option key={h} value={h}>{h}</option>)}
+              </select>
+            </div>
+          </div>
+        )}
+
         {error && <p className="modal-error">{error}</p>}
         <div className="modal-footer">
           <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
