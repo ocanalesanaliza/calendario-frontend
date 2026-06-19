@@ -4,7 +4,10 @@ import { decodeToken } from '../services/authService'
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [accessToken, setAccessToken] = useState(() => localStorage.getItem('access'))
+  const [accessToken, setAccessToken] = useState(() => {
+    localStorage.removeItem('perfil')
+    return localStorage.getItem('access')
+  })
 
   const perfil = useMemo(() => {
     if (!accessToken) return null
