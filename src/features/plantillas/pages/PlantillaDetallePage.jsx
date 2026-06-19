@@ -214,6 +214,7 @@ export default function PlantillaDetallePage() {
 
       {modal?.type === 'agregar-tarea' && (
         <TareaModal
+          tareasActivas={tareasActivas}
           onSubmit={handleAddTarea}
           onClose={() => setModal(null)}
         />
@@ -305,12 +306,19 @@ function EditarPlantillaModal({ plantilla, onSubmit, onClose }) {
   )
 }
 
-function TareaModal({ inicial, onSubmit, onClose }) {
+const HORAS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0') + ':00')
+
+function normalizarHora(hora) {
+  if (!hora) return ''
+  return hora.slice(0, 2) + ':00'
+}
+
+function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
   const [catalogoTareas, setCatalogoTareas] = useState([])
   const [form, setForm] = useState({
     id_tarea: inicial?.tarea?.id_tarea ?? '',
     jornada: inicial?.jornada ?? 'manana',
-    hora_sugerida: inicial?.hora_sugerida ?? '',
+    hora_sugerida: normalizarHora(inicial?.hora_sugerida),
     aplica_ambas_jornadas: inicial?.aplica_ambas_jornadas ?? false,
   })
   const [error, setError] = useState('')
@@ -326,6 +334,20 @@ function TareaModal({ inicial, onSubmit, onClose }) {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+
+    if (!inicial) {
+      const idTarea = Number(form.id_tarea)
+      const duplicada = tareasActivas.some((pt) => {
+        if (pt.tarea?.id_tarea !== idTarea) return false
+        if (pt.aplica_ambas_jornadas || form.aplica_ambas_jornadas) return true
+        return pt.jornada === form.jornada
+      })
+      if (duplicada) {
+        setError('Esta tarea ya está agregada en esta jornada.')
+        return
+      }
+    }
+
     setLoading(true)
     try {
       const body = {
@@ -363,7 +385,10 @@ function TareaModal({ inicial, onSubmit, onClose }) {
           </div>
           <div className="form-group">
             <label>Hora sugerida <span className="label-optional">(opcional)</span></label>
-            <input type="time" value={form.hora_sugerida} onChange={set('hora_sugerida')} />
+            <select value={form.hora_sugerida} onChange={set('hora_sugerida')}>
+              <option value="">Sin hora</option>
+              {HORAS.map((h) => <option key={h} value={h}>{h}</option>)}
+            </select>
           </div>
         </div>
         <label className="check-label" style={{ marginTop: '0.25rem' }}>
