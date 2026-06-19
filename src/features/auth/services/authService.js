@@ -2,6 +2,11 @@ import { apiRequest } from '../../../services/apiClient'
 
 const BASE_URL = import.meta.env.VITE_API_URL
 
+export function decodeToken(token) {
+  const payload = token.split('.')[1]
+  return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')))
+}
+
 export async function login(email, password) {
   const res = await fetch(`${BASE_URL}/api/auth/login/`, {
     method: 'POST',
@@ -11,13 +16,6 @@ export async function login(email, password) {
 
   const data = await res.json()
   if (!res.ok) throw new Error(data.detail || 'Error al iniciar sesión')
-  return data
-}
-
-export async function getMe() {
-  const res = await apiRequest('/api/auth/me/')
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.detail || 'Error al obtener perfil')
   return data
 }
 

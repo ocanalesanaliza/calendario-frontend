@@ -252,6 +252,15 @@
 .modal-wide { max-width: 580px; }
 .modal-xl   { max-width: 680px; }
 
+.modal-success {
+  font-size: 0.85rem;
+  color: #166534;
+  background: #dcfce7;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+}
+
 .empty-state-sm {
   text-align: center;
   padding: 1.25rem;

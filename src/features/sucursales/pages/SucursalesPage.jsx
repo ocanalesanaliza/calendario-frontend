@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react'
 import {
   getSucursales, createSucursal, updateSucursal, desactivarSucursal,
   getHorarios, saveHorarios, updateHorario,
-  getTareasSucursal, createTareaSucursal, desactivarTareaSucursal,
+  getTareasSucursal,
 } from '../services/sucursalesService'
 import { getGerentes } from '../../gerentes/services/gerentesService'
-import { getTareas } from '../../tareas/services/tareasService'
+import { getPlantillas, asignarSucursales } from '../../plantillas/services/plantillasService'
 import { useAuth } from '../../auth/context/AuthContext'
 import './SucursalesPage.css'
 
@@ -129,7 +129,7 @@ export default function SucursalesPage() {
                           <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                         </svg>
                       </button>
-                      <button className="action-btn" title="Tareas asignadas" onClick={() => setModal({ type: 'tareas', sucursal: s })}>
+                      <button className="action-btn" title="Asignar plantilla" onClick={() => setModal({ type: 'plantilla', sucursal: s })}>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
                           <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
@@ -178,8 +178,8 @@ export default function SucursalesPage() {
       {modal?.type === 'horarios' && (
         <HorariosModal sucursal={modal.sucursal} onClose={() => setModal(null)} />
       )}
-      {modal?.type === 'tareas' && (
-        <TareasSucursalModal sucursal={modal.sucursal} onClose={() => setModal(null)} />
+      {modal?.type === 'plantilla' && (
+        <PlantillaModal sucursal={modal.sucursal} onClose={() => setModal(null)} />
       )}
     </div>
   )
@@ -425,40 +425,45 @@ function HorariosModal({ sucursal, onClose }) {
   )
 }
 
-function TareasSucursalModal({ sucursal, onClose }) {
-  const [tareasSucursal, setTareasSucursal] = useState([])
-  const [catalogo, setCatalogo] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [form, setForm] = useState({ id_tarea: '', hora: '', jornada: 'manana' })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+function PlantillaModal({ sucursal, onClose }) {
+  const [plantillas, setPlantillas]     = useState([])
+  const [tareas, setTareas]             = useState([])
+  const [loading, setLoading]           = useState(true)
+  const [idPlantilla, setIdPlantilla]   = useState('')
+  const [fechaInicio, setFechaInicio]   = useState('')
+  const [saving, setSaving]             = useState(false)
+  const [error, setError]               = useState('')
+  const [success, setSuccess]           = useState('')
 
   useEffect(() => { loadData() }, [])
 
   async function loadData() {
     setLoading(true)
     try {
-      const [ts, cat] = await Promise.all([
+      const [p, t] = await Promise.all([
+        getPlantillas(),
         getTareasSucursal(sucursal.id_sucursal),
-        getTareas(),
       ])
-      setTareasSucursal(ts)
-      setCatalogo(cat.filter((t) => t.activa))
+      setPlantillas(p.filter((p) => p.activa))
+      setTareas(t)
     } finally {
       setLoading(false)
     }
   }
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
-
-  async function handleCreate(e) {
+  async function handleAsignar(e) {
     e.preventDefault()
+    if (!idPlantilla) return
     setSaving(true)
     setError('')
+    setSuccess('')
     try {
-      const body = { id_tarea: Number(form.id_tarea), hora: form.hora, jornada: form.jornada }
-      await createTareaSucursal(sucursal.id_sucursal, body)
-      setForm({ id_tarea: '', hora: '', jornada: 'manana' })
+      const body = { id_sucursal: sucursal.id_sucursal }
+      if (fechaInicio) body.fecha_inicio = fechaInicio
+      await asignarSucursales(idPlantilla, body)
+      setSuccess('Plantilla asignada correctamente.')
+      setIdPlantilla('')
+      setFechaInicio('')
       await loadData()
     } catch (err) {
       setError(err.message)
@@ -467,83 +472,62 @@ function TareasSucursalModal({ sucursal, onClose }) {
     }
   }
 
-  async function handleDesactivar(id) {
-    setSaving(true)
-    setError('')
-    try {
-      await desactivarTareaSucursal(sucursal.id_sucursal, id)
-      await loadData()
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setSaving(false)
-    }
-  }
+  const tareasActivas = tareas.filter((t) => t.activa)
 
   return (
-    <ModalWrapper title={`Tareas — ${sucursal.nombre}`} onClose={onClose} wide>
+    <ModalWrapper title={`Plantilla — ${sucursal.nombre}`} onClose={onClose} wide>
       <div className="modal-form">
-        {loading ? (
-          <p className="empty-state-sm">Cargando...</p>
-        ) : tareasSucursal.length === 0 ? (
-          <p className="empty-state-sm">Sin tareas asignadas.</p>
-        ) : (
-          <div className="tareas-suc-list">
-            {tareasSucursal.map((ts) => (
-              <div key={ts.id_sucursal_tarea} className={`tareas-suc-row${!ts.activa ? ' inactiva' : ''}`}>
-                <div className="tareas-suc-info">
-                  <span className="tareas-suc-nombre">{ts.tarea?.nombre}</span>
-                  <div className="tareas-suc-meta">
-                    <span className="badge badge-tipo">{JORNADA_LABEL[ts.jornada] ?? ts.jornada}</span>
-                    <span className="tareas-suc-hora">{ts.hora}</span>
-                    <span className="tareas-suc-peso">Peso: {ts.tarea?.peso ?? ts.peso ?? '—'}</span>
-                  </div>
-                </div>
-                {ts.activa && (
-                  <button className="action-btn action-btn-danger" title="Desactivar" onClick={() => handleDesactivar(ts.id_sucursal_tarea)} disabled={saving}>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
-                    </svg>
-                  </button>
-                )}
-                {!ts.activa && <span className="badge badge-red">Inactiva</span>}
-              </div>
-            ))}
-          </div>
-        )}
 
-        <form onSubmit={handleCreate} className="tareas-suc-form">
-          <p className="form-section-title">Asignar nueva tarea</p>
-          <div className="form-group">
-            <label>Tarea</label>
-            <select value={form.id_tarea} onChange={set('id_tarea')} required>
-              <option value="">Seleccionar tarea</option>
-              {catalogo.map((t) => (
-                <option key={t.id_tarea} value={t.id_tarea}>{t.nombre}</option>
-              ))}
-            </select>
-          </div>
+        <form onSubmit={handleAsignar}>
+          <p className="form-section-title">Asignar plantilla</p>
           <div className="form-row">
-            <div className="form-group">
-              <label>Jornada</label>
-              <select value={form.jornada} onChange={set('jornada')}>
-                <option value="manana">Mañana</option>
-                <option value="tarde">Tarde</option>
+            <div className="form-group" style={{ flex: 2 }}>
+              <label>Plantilla</label>
+              <select value={idPlantilla} onChange={(e) => setIdPlantilla(e.target.value)} required>
+                <option value="">Seleccionar plantilla</option>
+                {plantillas.map((p) => (
+                  <option key={p.id_plantilla} value={p.id_plantilla}>
+                    {p.nombre}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="form-group">
-              <label>Hora</label>
-              <input type="time" value={form.hora} onChange={set('hora')} required />
+              <label>Fecha inicio <span className="label-optional">(opc.)</span></label>
+              <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
             </div>
           </div>
-          {error && <p className="modal-error">{error}</p>}
-          <div className="modal-footer">
+          {error   && <p className="modal-error">{error}</p>}
+          {success && <p className="modal-success">{success}</p>}
+          <div className="modal-footer" style={{ paddingTop: 0 }}>
             <button type="button" className="btn-secondary" onClick={onClose}>Cerrar</button>
-            <button type="submit" className="btn-primary" disabled={saving}>
-              {saving ? 'Guardando...' : 'Asignar tarea'}
+            <button type="submit" className="btn-primary" disabled={saving || !idPlantilla}>
+              {saving ? 'Asignando...' : 'Asignar plantilla'}
             </button>
           </div>
         </form>
+
+        {loading ? (
+          <p className="empty-state-sm">Cargando tareas...</p>
+        ) : tareasActivas.length > 0 && (
+          <>
+            <p className="form-section-title">Tareas activas ({tareasActivas.length})</p>
+            <div className="tareas-suc-list">
+              {tareasActivas.map((ts) => (
+                <div key={ts.id_sucursal_tarea} className="tareas-suc-row">
+                  <div className="tareas-suc-info">
+                    <span className="tareas-suc-nombre">{ts.tarea?.nombre}</span>
+                    <div className="tareas-suc-meta">
+                      <span className="badge badge-tipo">{JORNADA_LABEL[ts.jornada] ?? ts.jornada}</span>
+                      <span className="tareas-suc-hora">{ts.hora}</span>
+                      <span className="tareas-suc-peso">Peso: {ts.tarea?.peso ?? '—'}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </ModalWrapper>
   )

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { login } from '../services/authService'
+import { login, decodeToken } from '../services/authService'
 import { useAuth } from '../context/AuthContext'
 import './LoginPage.css'
 
@@ -19,8 +19,9 @@ function LoginPage() {
     setLoading(true)
     try {
       const data = await login(email, password)
-      setAuthData(data.access, data.refresh, data.perfil)
-      if (data.perfil.debe_cambiar_password) {
+      const perfil = decodeToken(data.access).perfil
+      setAuthData(data.access, data.refresh, perfil)
+      if (perfil.debe_cambiar_password) {
         navigate('/cambiar-password')
       } else {
         navigate('/')
