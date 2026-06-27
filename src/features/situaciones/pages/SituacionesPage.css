@@ -1,0 +1,62 @@
+.situaciones-page {
+  max-width: 1100px;
+}
+
+.situaciones-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.situaciones-table th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  background: #f8fafc;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.situaciones-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+  vertical-align: middle;
+}
+
+.situaciones-table tr:last-child td {
+  border-bottom: none;
+}
+
+.situaciones-table tr.row-inactive td {
+  opacity: 0.5;
+}
+
+.td-notas {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.dias-rango-info {
+  font-size: 0.82rem;
+  color: #6366f1;
+  font-weight: 500;
+  margin: -0.25rem 0 0.5rem;
+}
+
+.modal-warn-text {
+  font-size: 0.85rem;
+  color: #b45309;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  margin-top: 0.5rem;
+}

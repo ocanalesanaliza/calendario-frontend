@@ -126,7 +126,7 @@ export default function TareasPage() {
               {filtradas.map((t) => (
                 <tr key={t.id_tarea}>
                   <td className="td-nombre">{t.nombre}</td>
-                  <td><span className="badge badge-tipo">{RECURRENCIA_LABEL[t.tipo_recurrencia] ?? t.tipo_recurrencia}</span></td>
+                  <td><span className="badge badge-tipo">{t.recurrencia_label ?? RECURRENCIA_LABEL[t.tipo_recurrencia] ?? t.tipo_recurrencia}</span></td>
                   <td><span className="peso-val">{t.peso}</span></td>
                   <td>{t.es_recordatorio ? <span className="badge badge-blue">Sí</span> : <span className="td-no">No</span>}</td>
                   <td>{t.bloquea_jornada_posterior ? <span className="badge badge-yellow">Sí</span> : <span className="td-no">No</span>}</td>

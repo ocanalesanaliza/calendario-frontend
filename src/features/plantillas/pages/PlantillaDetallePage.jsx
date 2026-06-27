@@ -144,6 +144,7 @@ export default function PlantillaDetallePage() {
             <thead>
               <tr>
                 <th>Tarea</th>
+                <th>Recurrencia</th>
                 <th>Jornada</th>
                 <th>Hora sugerida</th>
                 <th>Peso</th>
@@ -155,6 +156,7 @@ export default function PlantillaDetallePage() {
               {[...tareasActivas, ...tareasInactivas].map((pt) => (
                 <tr key={pt.id_plantilla_tarea} className={!pt.activa ? 'row-inactive' : ''}>
                   <td className="td-nombre">{pt.tarea?.nombre ?? '—'}</td>
+                  <td><span className="badge badge-tipo">{pt.tarea?.recurrencia_label ?? '—'}</span></td>
                   <td>
                     <span className={`badge ${pt.jornada === 'manana' ? 'badge-blue' : 'badge-orange'}`}>
                       {JORNADA_LABEL[pt.jornada] ?? pt.jornada}
@@ -404,7 +406,9 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
           <select value={form.id_tarea} onChange={set('id_tarea')} required disabled={!!inicial}>
             <option value="">Seleccionar tarea</option>
             {catalogoTareas.map((t) => (
-              <option key={t.id_tarea} value={t.id_tarea}>{t.nombre}</option>
+              <option key={t.id_tarea} value={t.id_tarea}>
+                {t.nombre}{t.recurrencia_label ? ` — ${t.recurrencia_label}` : ''}
+              </option>
             ))}
           </select>
         </div>

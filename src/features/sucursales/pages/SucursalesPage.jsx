@@ -521,6 +521,9 @@ function PlantillaModal({ sucursal, onClose }) {
                       <span className="badge badge-tipo">{JORNADA_LABEL[ts.jornada] ?? ts.jornada}</span>
                       <span className="tareas-suc-hora">{ts.hora}</span>
                       <span className="tareas-suc-peso">Peso: {ts.tarea?.peso ?? '—'}</span>
+                      {ts.tarea?.recurrencia_label && (
+                        <span className="badge badge-tipo">{ts.tarea.recurrencia_label}</span>
+                      )}
                     </div>
                   </div>
                 </div>

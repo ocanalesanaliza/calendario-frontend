@@ -1,7 +1,8 @@
 import { apiRequest } from '../../../services/apiClient'
 
-export async function getUsuarios() {
-  const res = await apiRequest('/api/usuarios/')
+export async function getUsuarios(params = {}) {
+  const query = new URLSearchParams(params).toString()
+  const res = await apiRequest(`/api/usuarios/${query ? `?${query}` : ''}`)
   const data = await res.json()
   if (!res.ok) throw new Error(data.detail || 'Error al cargar usuarios')
   return data.results

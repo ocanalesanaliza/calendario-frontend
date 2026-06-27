@@ -105,7 +105,7 @@ function Layout() {
       <div className="layout-body">
         {/* Sidebar */}
         <aside className="sidebar">
-          <nav className="sidebar-nav">
+          <nav className="sidebar-nav" style={{ flex: 1 }}>
             <NavLink to="/tareas" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 11l3 3L22 4" />
@@ -207,7 +207,30 @@ function Layout() {
               </svg>
               Rendimiento
             </NavLink>
+
+            {(esGerenteArea || esAdmin) && (
+              <NavLink to="/situaciones" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="12"/>
+                  <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                Situaciones especiales
+              </NavLink>
+            )}
           </nav>
+
+          <div className="sidebar-footer">
+            <div className="sidebar-user-avatar">
+              {perfil?.nombre ? perfil.nombre.charAt(0).toUpperCase() : 'U'}
+            </div>
+            <div className="sidebar-user-info">
+              <span className="sidebar-user-name">{perfil?.nombre || 'Usuario'}</span>
+              <span className="sidebar-user-role">
+                {esAdmin ? 'Admin maestro' : esGerenteArea ? 'Gerente de área' : 'Gerente de sucursal'}
+              </span>
+            </div>
+          </div>
         </aside>
 
         {/* Contenido principal */}

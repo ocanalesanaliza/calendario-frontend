@@ -14,6 +14,7 @@ import AlmuerzosPage from "./features/almuerzos/pages/AlmuerzosPage";
 import CoberturasPage from "./features/coberturas/pages/CoberturasPage";
 import DashboardPage from "./features/dashboard/pages/DashboardPage";
 import RendimientoPage from "./features/rendimiento/pages/RendimientoPage";
+import SituacionesPage from "./features/situaciones/pages/SituacionesPage";
 import Layout from "./components/Layout/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -50,6 +51,7 @@ function App() {
           <Route path="/coberturas" element={<CoberturasPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/rendimiento" element={<RendimientoPage />} />
+          <Route path="/situaciones" element={<SituacionesPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
