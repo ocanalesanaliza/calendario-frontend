@@ -246,3 +246,79 @@
   color: #94a3b8;
   text-transform: capitalize;
 }
+
+/* ── Trabajo de campo ── */
+.campo-solicitudes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.campo-solicitud-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: #fffbeb;
+  border: 1.5px solid #fde68a;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+}
+
+.campo-solicitud-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
+.campo-solicitud-info svg { flex-shrink: 0; margin-top: 2px; stroke: #b45309; }
+
+.campo-solicitud-titulo {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #92400e;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.campo-solicitud-meta {
+  font-size: 0.78rem;
+  color: #a16207;
+  margin-top: 0.2rem;
+}
+
+.campo-solicitud-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.btn-aceptar {
+  padding: 0.4rem 0.9rem;
+  background: #22c55e;
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-aceptar:hover { background: #16a34a; }
+.btn-aceptar:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn-rechazar {
+  padding: 0.4rem 0.9rem;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 7px;
+  font-size: 0.84rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-rechazar:hover { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; }
+.btn-rechazar:disabled { opacity: 0.6; cursor: not-allowed; }
+

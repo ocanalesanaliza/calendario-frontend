@@ -32,9 +32,21 @@ export default function SucursalesPage() {
     }
   }
 
-  async function handleCreate(form) {
-    await createSucursal(form)
+  async function handleCreate(form, idPlantilla, fechaPlantilla) {
+    const resp = await createSucursal(form)
     await loadData()
+    if (idPlantilla) {
+      const idSucursal = resp?.sucursal?.id_sucursal ?? resp?.id_sucursal
+      if (idSucursal) {
+        try {
+          const body = { id_sucursal: idSucursal }
+          if (fechaPlantilla) body.fecha_inicio = fechaPlantilla
+          await asignarSucursales(idPlantilla, body)
+        } catch {
+          // sucursal creada; asignación de plantilla falló silenciosamente
+        }
+      }
+    }
     setModal(null)
   }
 
@@ -158,7 +170,7 @@ export default function SucursalesPage() {
       )}
 
       {modal?.type === 'crear' && (
-        <SucursalModal esAdmin={esAdmin} onSubmit={handleCreate} onClose={() => setModal(null)} />
+        <SucursalModal esAdmin={esAdmin} conPlantilla onSubmit={handleCreate} onClose={() => setModal(null)} />
       )}
       {modal?.type === 'editar' && (
         <SucursalModal
@@ -205,19 +217,23 @@ function ModalWrapper({ title, onClose, children, wide, xl }) {
   )
 }
 
-function SucursalModal({ esAdmin, inicial, onSubmit, onClose }) {
+function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
   const [gerentes, setGerentes] = useState([])
+  const [plantillas, setPlantillas] = useState([])
   const [form, setForm] = useState({
     nombre:          inicial?.nombre ?? '',
     codigo:          inicial?.codigo ?? '',
     id_gerente_area: inicial?.gerente_area?.id_gerente_area ?? '',
   })
-  const [error, setError] = useState('')
+  const [idPlantilla, setIdPlantilla]   = useState('')
+  const [fechaPlantilla, setFechaPlantilla] = useState('')
+  const [error, setError]   = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (esAdmin) getGerentes().then(setGerentes).catch(() => {})
-  }, [esAdmin])
+    if (conPlantilla) getPlantillas().then((p) => setPlantillas(p.filter((x) => x.activa))).catch(() => {})
+  }, [esAdmin, conPlantilla])
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
@@ -228,7 +244,7 @@ function SucursalModal({ esAdmin, inicial, onSubmit, onClose }) {
     try {
       const body = { nombre: form.nombre, codigo: form.codigo }
       if (esAdmin && form.id_gerente_area) body.id_gerente_area = Number(form.id_gerente_area)
-      await onSubmit(body)
+      await onSubmit(body, idPlantilla ? Number(idPlantilla) : null, fechaPlantilla || null)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -257,6 +273,29 @@ function SucursalModal({ esAdmin, inicial, onSubmit, onClose }) {
               ))}
             </select>
           </div>
+        )}
+        {conPlantilla && plantillas.length > 0 && (
+          <>
+            <hr className="modal-divider" />
+            <p className="form-section-label">Plantilla inicial <span className="label-optional">(opc.)</span></p>
+            <div className="form-row">
+              <div className="form-group" style={{ flex: 2 }}>
+                <label>Plantilla</label>
+                <select value={idPlantilla} onChange={(e) => setIdPlantilla(e.target.value)}>
+                  <option value="">Sin plantilla</option>
+                  {plantillas.map((p) => (
+                    <option key={p.id_plantilla} value={p.id_plantilla}>{p.nombre}</option>
+                  ))}
+                </select>
+              </div>
+              {idPlantilla && (
+                <div className="form-group">
+                  <label>Fecha inicio</label>
+                  <input type="date" value={fechaPlantilla} onChange={(e) => setFechaPlantilla(e.target.value)} />
+                </div>
+              )}
+            </div>
+          </>
         )}
         {error && <p className="modal-error">{error}</p>}
         <div className="modal-footer">

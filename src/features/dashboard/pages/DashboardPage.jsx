@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getDashboardOperativo } from '../services/dashboardService'
+import { createTrabajoCampo, cancelarTrabajoCampo } from '../../trabajosCampo/services/trabajosCampoService'
 import './DashboardPage.css'
 
 const PRESENCIA_BADGE = {
@@ -25,14 +26,15 @@ export default function DashboardPage() {
   const [buscar, setBuscar]         = useState('')
   const [filtroOp, setFiltroOp]     = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
+  const [modalCampo, setModalCampo] = useState(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
       const params = {}
-      if (fecha)       params.fecha             = fecha
-      if (buscar)      params.buscar            = buscar
-      if (filtroOp)    params.estado_operativo  = filtroOp
+      if (fecha)        params.fecha            = fecha
+      if (buscar)       params.buscar           = buscar
+      if (filtroOp)     params.estado_operativo = filtroOp
       if (filtroEstado) params.estado           = filtroEstado
       const data = await getDashboardOperativo(params)
       setResults(data.results ?? [])
@@ -43,6 +45,15 @@ export default function DashboardPage() {
   }, [fecha, buscar, filtroOp, filtroEstado])
 
   useEffect(() => { loadData() }, [loadData])
+
+  async function handleCancelarCampo(idTrabajoCampo) {
+    try {
+      await cancelarTrabajoCampo(idTrabajoCampo)
+      await loadData()
+    } catch (err) {
+      alert(err.message)
+    }
+  }
 
   return (
     <div className="dashboard-page">
@@ -103,18 +114,35 @@ export default function DashboardPage() {
       ) : (
         <div className="dashboard-grid">
           {results.map((u, i) => (
-            <UserCard key={i} user={u} />
+            <UserCard
+              key={i}
+              user={u}
+              fechaDashboard={fecha}
+              onCrearCampo={(idUsuario) => setModalCampo({ idUsuario, nombreUsuario: u.nombre_usuario })}
+              onCancelarCampo={handleCancelarCampo}
+            />
           ))}
         </div>
+      )}
+
+      {modalCampo && (
+        <TrabajoCampoModal
+          idUsuario={modalCampo.idUsuario}
+          nombreUsuario={modalCampo.nombreUsuario}
+          fechaDashboard={fecha}
+          onClose={() => setModalCampo(null)}
+          onSuccess={() => { setModalCampo(null); loadData() }}
+        />
       )}
     </div>
   )
 }
 
-function UserCard({ user }) {
+function UserCard({ user, fechaDashboard, onCrearCampo, onCancelarCampo }) {
   const presencia  = PRESENCIA_BADGE[user.estado]
   const score      = parseFloat(user.rendimiento_hoy ?? 0)
   const colorClass = LABEL_COLOR[user.estado_operativo_label] ?? 'estado-sin'
+  const campo      = user.trabajo_campo_pendiente
 
   return (
     <div className={`user-card ${colorClass}`}>
@@ -131,6 +159,28 @@ function UserCard({ user }) {
         )}
       </div>
 
+      {campo && (
+        <div className="campo-banner">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+          <span>
+            Trabajo de campo — {campo.jornada === 'manana' ? 'Mañana' : 'Tarde'}
+            {campo.motivo ? ` · ${campo.motivo}` : ''}
+          </span>
+          {campo.estado === 'pendiente' && (
+            <button
+              className="campo-cancel-btn"
+              title="Cancelar solicitud"
+              onClick={() => onCancelarCampo(campo.id_trabajo_campo)}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="user-card-bottom">
         <div className="estado-op-label">
           <span className={`dot dot-${colorClass}`} />
@@ -145,6 +195,85 @@ function UserCard({ user }) {
           </div>
           <span className="score-pct">{score.toFixed(0)}%</span>
         </div>
+        {!campo && user.sucursal && (
+          <button
+            className="btn-campo"
+            onClick={() => onCrearCampo(user.id_usuario ?? user.usuario_id)}
+          >
+            Trabajo de campo
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function TrabajoCampoModal({ idUsuario, nombreUsuario, fechaDashboard, onClose, onSuccess }) {
+  const hoy = new Date().toISOString().slice(0, 10)
+  const [form, setForm] = useState({
+    fecha:   fechaDashboard || hoy,
+    jornada: 'manana',
+    motivo:  '',
+  })
+  const [loading, setLoading] = useState(false)
+  const [error, setError]     = useState('')
+
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      await createTrabajoCampo({
+        id_usuario: idUsuario,
+        fecha:      form.fecha,
+        jornada:    form.jornada,
+        motivo:     form.motivo || undefined,
+      })
+      onSuccess()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Trabajo de campo — {nombreUsuario}</h2>
+          <button className="modal-close" onClick={onClose}>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <form className="modal-form" onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label>Fecha</label>
+            <input type="date" value={form.fecha} onChange={set('fecha')} required />
+          </div>
+          <div className="form-group">
+            <label>Jornada</label>
+            <select value={form.jornada} onChange={set('jornada')} required>
+              <option value="manana">Mañana</option>
+              <option value="tarde">Tarde</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Motivo <span className="label-optional">(opc.)</span></label>
+            <input type="text" value={form.motivo} onChange={set('motivo')} placeholder="ej. Visita externa aprobada" />
+          </div>
+          {error && <p className="modal-error">{error}</p>}
+          <div className="modal-footer">
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn-primary" disabled={loading}>
+              {loading ? 'Enviando...' : 'Solicitar trabajo de campo'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   )

@@ -405,3 +405,17 @@
 }
 
 .action-btn-success:hover { background: #dcfce7; color: #16a34a; }
+
+.modal-divider {
+  border: none;
+  border-top: 1px solid #f1f5f9;
+  margin: 0.25rem 0;
+}
+
+.form-section-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

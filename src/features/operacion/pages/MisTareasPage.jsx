@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getMisTareas, registrarTarea } from '../services/operacionService'
+import { getTrabajosCampo, aceptarTrabajoCampo, rechazarTrabajoCampo } from '../../trabajosCampo/services/trabajosCampoService'
 import './MisTareasPage.css'
 
 const ESTADO_BADGE = {
@@ -20,8 +21,10 @@ export default function MisTareasPage() {
   const [savingId, setSavingId] = useState(null)
   const [regError, setRegError] = useState('')
   const [fecha, setFecha]       = useState('')
+  const [trabajosCampo, setTrabajosCampo] = useState([])
+  const [campoAction, setCampoAction]     = useState(null)
 
-  useEffect(() => { loadTareas() }, [fecha])
+  useEffect(() => { loadTareas(); loadTrabajosCampo() }, [fecha])
 
   async function loadTareas() {
     setLoading(true)
@@ -34,6 +37,41 @@ export default function MisTareasPage() {
       }
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadTrabajosCampo() {
+    try {
+      const params = { estado: 'pendiente' }
+      if (fecha) params.fecha = fecha
+      const res = await getTrabajosCampo(params)
+      setTrabajosCampo(res.results ?? [])
+    } catch {
+      setTrabajosCampo([])
+    }
+  }
+
+  async function handleAceptarCampo(id) {
+    setCampoAction(id)
+    try {
+      await aceptarTrabajoCampo(id)
+      await Promise.all([loadTareas(), loadTrabajosCampo()])
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setCampoAction(null)
+    }
+  }
+
+  async function handleRechazarCampo(id) {
+    setCampoAction(id)
+    try {
+      await rechazarTrabajoCampo(id)
+      await loadTrabajosCampo()
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setCampoAction(null)
     }
   }
 
@@ -95,6 +133,47 @@ export default function MisTareasPage() {
           {resumen.bloqueadas > 0 && (
             <StatCard label="Bloqueadas" value={resumen.bloqueadas} color="gray" />
           )}
+        </div>
+      )}
+
+      {trabajosCampo.length > 0 && (
+        <div className="campo-solicitudes">
+          {trabajosCampo.map((tc) => (
+            <div key={tc.id_trabajo_campo} className="campo-solicitud-card">
+              <div className="campo-solicitud-info">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                  <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+                <div>
+                  <p className="campo-solicitud-titulo">
+                    Solicitud de trabajo de campo
+                    <span className="badge badge-yellow">Pendiente</span>
+                  </p>
+                  <p className="campo-solicitud-meta">
+                    {tc.fecha} · {tc.jornada === 'manana' ? 'Mañana' : 'Tarde'}
+                    {tc.motivo ? ` · ${tc.motivo}` : ''}
+                  </p>
+                </div>
+              </div>
+              <div className="campo-solicitud-actions">
+                <button
+                  className="btn-rechazar"
+                  disabled={campoAction === tc.id_trabajo_campo}
+                  onClick={() => handleRechazarCampo(tc.id_trabajo_campo)}
+                >
+                  Rechazar
+                </button>
+                <button
+                  className="btn-aceptar"
+                  disabled={campoAction === tc.id_trabajo_campo}
+                  onClick={() => handleAceptarCampo(tc.id_trabajo_campo)}
+                >
+                  Aceptar
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
