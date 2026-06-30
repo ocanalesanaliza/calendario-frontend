@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { getUsuarios, createUsuario, updateUsuario, cambiarSucursal, desactivarUsuario, resetPasswordUsuario } from '../services/usuariosService'
 import { getSucursales } from '../../sucursales/services/sucursalesService'
 import './UsuariosPage.css'
@@ -212,7 +212,7 @@ export default function UsuariosPage() {
 
 function ModalWrapper({ title, onClose, children }) {
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{title}</h2>

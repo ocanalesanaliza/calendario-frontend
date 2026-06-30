@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import {
   getSucursales, createSucursal, updateSucursal, desactivarSucursal,
   getHorarios, saveHorarios, updateHorario,
@@ -201,7 +201,7 @@ export default function SucursalesPage() {
 
 function ModalWrapper({ title, onClose, children, wide, xl }) {
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className={`modal${wide ? ' modal-wide' : ''}${xl ? ' modal-xl' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{title}</h2>

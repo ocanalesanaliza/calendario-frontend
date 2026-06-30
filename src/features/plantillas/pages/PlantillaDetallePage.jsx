@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getPlantilla, updatePlantilla, desactivarPlantilla, addTarea, updateTarea, desactivarTarea, asignarSucursales } from '../services/plantillasService'
 import { getTareas } from '../../tareas/services/tareasService'
@@ -258,7 +258,7 @@ export default function PlantillaDetallePage() {
 
 function ModalWrapper({ title, onClose, children }) {
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{title}</h2>

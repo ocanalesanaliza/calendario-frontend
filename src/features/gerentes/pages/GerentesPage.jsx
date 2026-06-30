@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { getGerentes, createGerente, updateGerente, desactivarGerente, resetPasswordGerente } from '../services/gerentesService'
 import './GerentesPage.css'
 
@@ -177,7 +177,7 @@ export default function GerentesPage() {
 
 function ModalWrapper({ title, onClose, children }) {
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{title}</h2>

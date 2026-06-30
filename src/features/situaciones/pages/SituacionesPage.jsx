@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { getSituaciones, crearSituacion, desactivarSituacion } from '../services/situacionesService'
 import { getUsuarios } from '../../usuarios/services/usuariosService'
 import './SituacionesPage.css'
@@ -157,7 +157,7 @@ export default function SituacionesPage() {
 
 function ModalWrapper({ title, onClose, children }) {
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{title}</h2>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+﻿import { useState, useEffect, useCallback } from 'react'
 import { getDashboardOperativo } from '../services/dashboardService'
 import { createTrabajoCampo, cancelarTrabajoCampo } from '../../trabajosCampo/services/trabajosCampoService'
 import './DashboardPage.css'
@@ -9,13 +9,17 @@ const PRESENCIA_BADGE = {
 }
 
 const LABEL_COLOR = {
-  'Jornada mañana':   'estado-manana',
-  'Jornada tarde':    'estado-tarde',
-  'Cambio jornada':   'estado-cambio',
-  'Antes apertura':   'estado-antes',
-  'Cerrado':          'estado-cerrado',
-  'Sucursal cerrada': 'estado-cerrado',
-  'Sin sucursal':     'estado-sin',
+  'Jornada manana':      'estado-manana',
+  'Jornada mañana':      'estado-manana',
+  'Jornada tarde':       'estado-tarde',
+  'Cambio de jornada':   'estado-cambio',
+  'Cambio jornada':      'estado-cambio',
+  'Antes de apertura':   'estado-antes',
+  'Antes apertura':      'estado-antes',
+  'Cerrado':             'estado-cerrado',
+  'Sucursal cerrada hoy':'estado-cerrado',
+  'Sucursal cerrada':    'estado-cerrado',
+  'Sin sucursal':        'estado-sin',
 }
 
 export default function DashboardPage() {
@@ -240,7 +244,7 @@ function TrabajoCampoModal({ idUsuario, nombreUsuario, fechaDashboard, onClose, 
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Trabajo de campo — {nombreUsuario}</h2>

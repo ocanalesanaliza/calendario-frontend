@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import {
   getRendimientoDiario,
   getRendimientoMensual,
@@ -360,7 +360,7 @@ function AjusteModal({ titulo, descripcion, accion, onConfirm, onClose }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{titulo}</h2>

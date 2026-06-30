@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { getCoberturas, createCobertura, activarCobertura, cancelarCobertura, completarCobertura } from '../services/coberturasService'
 import { getUsuarios } from '../../usuarios/services/usuariosService'
 import { getSucursales } from '../../sucursales/services/sucursalesService'
@@ -174,7 +174,7 @@ export default function CoberturasPage() {
 
 function ModalWrapper({ title, onClose, children }) {
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{title}</h2>

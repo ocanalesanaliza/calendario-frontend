@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { getTareas, createTarea, updateTarea, desactivarTarea, getSubtareas, createSubtarea, updateSubtarea, desactivarSubtarea } from '../services/tareasService'
 import './TareasPage.css'
 
@@ -186,7 +186,7 @@ export default function TareasPage() {
 
 function ModalWrapper({ title, onClose, children, wide }) {
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className={`modal${wide ? ' modal-wide' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{title}</h2>
