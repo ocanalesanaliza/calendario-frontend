@@ -1,5 +1,19 @@
 import { apiRequest } from '../../../services/apiClient'
 
+function _parsearError(detail) {
+  if (!detail) return 'Error desconocido'
+  if (typeof detail === 'string') return detail
+  if (typeof detail === 'object') {
+    return Object.entries(detail)
+      .map(([campo, msgs]) => {
+        const texto = Array.isArray(msgs) ? msgs.join(', ') : String(msgs)
+        return `${campo}: ${texto}`
+      })
+      .join(' | ')
+  }
+  return String(detail)
+}
+
 const BASE_URL = import.meta.env.VITE_API_URL
 
 export async function generarReporteJson(body) {
@@ -8,7 +22,7 @@ export async function generarReporteJson(body) {
     body: JSON.stringify({ ...body, formato: 'json' }),
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail))
+  if (!res.ok) throw new Error(_parsearError(data.detail))
   return data
 }
 
@@ -24,7 +38,7 @@ export async function generarReportePdf(body) {
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    throw new Error(typeof data.detail === 'string' ? data.detail : 'Error al generar PDF')
+    throw new Error(_parsearError(data.detail) || 'Error al generar PDF')
   }
   const blob = await res.blob()
   const disposition = res.headers.get('Content-Disposition') || ''

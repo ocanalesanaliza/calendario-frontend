@@ -5,9 +5,12 @@ import { generarReporteJson, generarReportePdf } from '../services/reportesServi
 import './ReportesPage.css'
 
 const hoy = new Date()
-const HOY_STR = hoy.toISOString().slice(0, 10)
 const ANIO_ACTUAL = hoy.getFullYear()
 const MES_ACTUAL = hoy.getMonth() + 1
+// semanal: default a hace 7 días para que el rango completo sea pasado
+const hace7 = new Date(hoy)
+hace7.setDate(hace7.getDate() - 7)
+const HACE7_STR = hace7.toISOString().slice(0, 10)
 
 const MESES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -33,7 +36,7 @@ export default function ReportesPage() {
   const esAdmin = perfil?.es_admin_maestro === true
 
   const [tipo, setTipo]                   = useState('semanal')
-  const [fechaInicio, setFechaInicio]     = useState(HOY_STR)
+  const [fechaInicio, setFechaInicio]     = useState(HACE7_STR)
   const [anio, setAnio]                   = useState(ANIO_ACTUAL)
   const [mes, setMes]                     = useState(MES_ACTUAL)
   const [idGerenteArea, setIdGerenteArea] = useState('')
