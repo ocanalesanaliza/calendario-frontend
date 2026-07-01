@@ -261,7 +261,7 @@ export default function PlantillaDetallePage() {
 function ModalWrapper({ title, onClose, children }) {
   return (
     <div className="modal-overlay">
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="detalle-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{title}</h2>
           <button className="modal-close" onClick={onClose}>

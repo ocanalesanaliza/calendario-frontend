@@ -178,9 +178,9 @@
   display: flex; align-items: center; justify-content: center;
   z-index: 200; padding: 0.5rem;
 }
-.modal {
+.detalle-modal {
   background: #fff; border-radius: 14px;
-  width: 100%; max-width: 1200px;
+  width: 90%; max-width: 600px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.12);
   animation: modalIn 0.18s ease;
   max-height: 95vh;
