@@ -38,11 +38,13 @@ export default function PlantillaDetallePage() {
   }
 
   async function handleAddTarea(form) {
-    if (form.aplica_ambas_jornadas) {
-      await addTarea(id, { id_tarea: form.id_tarea, jornada: 'manana', hora_sugerida: form.hora_manana || null, aplica_ambas_jornadas: false })
-      await addTarea(id, { id_tarea: form.id_tarea, jornada: 'tarde', hora_sugerida: form.hora_tarde || null, aplica_ambas_jornadas: false })
-    } else {
-      await addTarea(id, form)
+    for (const id_tarea of form.ids_tareas) {
+      if (form.aplica_ambas_jornadas) {
+        await addTarea(id, { id_tarea, jornada: 'manana', hora_sugerida: form.hora_manana || null, aplica_ambas_jornadas: false })
+        await addTarea(id, { id_tarea, jornada: 'tarde', hora_sugerida: form.hora_tarde || null, aplica_ambas_jornadas: false })
+      } else {
+        await addTarea(id, { id_tarea, jornada: form.jornada, hora_sugerida: form.hora_sugerida || null, aplica_ambas_jornadas: false })
+      }
     }
     await loadData()
     setModal(null)
@@ -324,8 +326,9 @@ function normalizarHora(hora) {
 
 function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
   const [catalogoTareas, setCatalogoTareas] = useState([])
+  const [seleccionadas, setSeleccionadas] = useState([])
+  const [buscar, setBuscar] = useState('')
   const [form, setForm] = useState({
-    id_tarea: inicial?.tarea?.id_tarea ?? '',
     jornada: inicial?.jornada ?? 'manana',
     hora_sugerida: normalizarHora(inicial?.hora_sugerida) || (inicial?.jornada === 'tarde' ? HORAS_TARDE[0] : HORAS_MANANA[0]),
     hora_manana: HORAS_MANANA[0],
@@ -339,56 +342,69 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
     getTareas().then(setCatalogoTareas).catch(() => {})
   }, [])
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
-  const setCheck = (k) => (e) => {
-    const checked = e.target.checked
-    setForm((f) => ({ ...f, [k]: checked }))
+  useEffect(() => {
+    if (inicial) return
+    setSeleccionadas((prev) =>
+      prev.filter((idTarea) => !calcDuplicada(idTarea, form.aplica_ambas_jornadas, form.jornada))
+    )
+  }, [form.aplica_ambas_jornadas, form.jornada])
+
+  function calcDuplicada(idTarea, ambas, jornada) {
+    if (ambas) {
+      return (
+        tareasActivas.some((pt) => pt.tarea?.id_tarea === idTarea && (pt.jornada === 'manana' || pt.aplica_ambas_jornadas)) ||
+        tareasActivas.some((pt) => pt.tarea?.id_tarea === idTarea && (pt.jornada === 'tarde'  || pt.aplica_ambas_jornadas))
+      )
+    }
+    return tareasActivas.some((pt) => pt.tarea?.id_tarea === idTarea && (pt.aplica_ambas_jornadas || pt.jornada === jornada))
   }
+
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+  const setCheck = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.checked }))
 
   function handleJornadaChange(e) {
     const jornada = e.target.value
-    setForm((f) => ({
-      ...f,
-      jornada,
-      hora_sugerida: jornada === 'tarde' ? HORAS_TARDE[0] : HORAS_MANANA[0],
-    }))
+    setForm((f) => ({ ...f, jornada, hora_sugerida: jornada === 'tarde' ? HORAS_TARDE[0] : HORAS_MANANA[0] }))
   }
+
+  function toggleTarea(idTarea) {
+    setSeleccionadas((prev) =>
+      prev.includes(idTarea) ? prev.filter((id) => id !== idTarea) : [...prev, idTarea]
+    )
+  }
+
+  const tareasFiltradas = catalogoTareas.filter((t) =>
+    t.nombre.toLowerCase().includes(buscar.toLowerCase())
+  )
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
-
-    if (!inicial) {
-      const idTarea = Number(form.id_tarea)
-      if (form.aplica_ambas_jornadas) {
-        const mananaOcupada = tareasActivas.some((pt) => pt.tarea?.id_tarea === idTarea && (pt.jornada === 'manana' || pt.aplica_ambas_jornadas))
-        const tardeOcupada  = tareasActivas.some((pt) => pt.tarea?.id_tarea === idTarea && (pt.jornada === 'tarde'  || pt.aplica_ambas_jornadas))
-        if (mananaOcupada || tardeOcupada) {
-          const cuales = [mananaOcupada && 'mañana', tardeOcupada && 'tarde'].filter(Boolean).join(' y ')
-          setError(`Esta tarea ya está agregada en la jornada de ${cuales}.`)
-          return
-        }
-      } else {
-        const duplicada = tareasActivas.some((pt) =>
-          pt.tarea?.id_tarea === idTarea && (pt.aplica_ambas_jornadas || pt.jornada === form.jornada)
-        )
-        if (duplicada) {
-          setError('Esta tarea ya está agregada en esta jornada.')
-          return
-        }
-      }
+    if (!inicial && seleccionadas.length === 0) {
+      setError('Selecciona al menos una tarea.')
+      return
     }
-
     setLoading(true)
     try {
-      await onSubmit({
-        id_tarea: Number(form.id_tarea),
-        jornada: form.jornada,
-        hora_sugerida: form.hora_sugerida || null,
-        hora_manana: form.hora_manana || null,
-        hora_tarde: form.hora_tarde || null,
-        aplica_ambas_jornadas: form.aplica_ambas_jornadas,
-      })
+      if (inicial) {
+        await onSubmit({
+          id_tarea: inicial.tarea.id_tarea,
+          jornada: form.jornada,
+          hora_sugerida: form.hora_sugerida || null,
+          hora_manana: form.hora_manana || null,
+          hora_tarde: form.hora_tarde || null,
+          aplica_ambas_jornadas: form.aplica_ambas_jornadas,
+        })
+      } else {
+        await onSubmit({
+          ids_tareas: seleccionadas,
+          jornada: form.jornada,
+          hora_sugerida: form.hora_sugerida || null,
+          hora_manana: form.hora_manana || null,
+          hora_tarde: form.hora_tarde || null,
+          aplica_ambas_jornadas: form.aplica_ambas_jornadas,
+        })
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -399,19 +415,57 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
   const horasSingle = form.jornada === 'tarde' ? HORAS_TARDE : HORAS_MANANA
 
   return (
-    <ModalWrapper title={inicial ? 'Editar tarea' : 'Agregar tarea'} onClose={onClose}>
+    <ModalWrapper title={inicial ? 'Editar tarea' : 'Agregar tareas'} onClose={onClose}>
       <form className="modal-form" onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Tarea</label>
-          <select value={form.id_tarea} onChange={set('id_tarea')} required disabled={!!inicial}>
-            <option value="">Seleccionar tarea</option>
-            {catalogoTareas.map((t) => (
-              <option key={t.id_tarea} value={t.id_tarea}>
-                {t.nombre}{t.recurrencia_label ? ` — ${t.recurrencia_label}` : ''}
-              </option>
-            ))}
-          </select>
-        </div>
+        {inicial ? (
+          <div className="form-group">
+            <label>Tarea</label>
+            <div className="tarea-nombre-static">{inicial.tarea?.nombre}</div>
+          </div>
+        ) : (
+          <div className="form-group">
+            <label>Tareas</label>
+            <input
+              type="text"
+              className="tareas-search-input"
+              placeholder="Buscar tarea..."
+              value={buscar}
+              onChange={(e) => setBuscar(e.target.value)}
+            />
+            <div className="tareas-check-list">
+              {catalogoTareas.length === 0 ? (
+                <span className="td-empty">Cargando...</span>
+              ) : tareasFiltradas.length === 0 ? (
+                <span className="td-empty">Sin resultados.</span>
+              ) : tareasFiltradas.map((t) => {
+                const duplicada = calcDuplicada(t.id_tarea, form.aplica_ambas_jornadas, form.jornada)
+                const checked = seleccionadas.includes(t.id_tarea)
+                return (
+                  <label key={t.id_tarea} className={`check-label${duplicada ? ' check-label-disabled' : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={duplicada}
+                      onChange={() => toggleTarea(t.id_tarea)}
+                    />
+                    <span className="tarea-check-nombre">
+                      {t.nombre}
+                      {t.recurrencia_label && (
+                        <span className="tarea-check-meta"> — {t.recurrencia_label}</span>
+                      )}
+                    </span>
+                    {duplicada && <span className="tarea-check-dup">ya agregada</span>}
+                  </label>
+                )
+              })}
+            </div>
+            {seleccionadas.length > 0 && (
+              <p className="tareas-seleccionadas-hint">
+                {seleccionadas.length} seleccionada{seleccionadas.length !== 1 ? 's' : ''}
+              </p>
+            )}
+          </div>
+        )}
 
         <label className="check-label" style={{ marginTop: '0.25rem' }}>
           <input type="checkbox" checked={form.aplica_ambas_jornadas} onChange={setCheck('aplica_ambas_jornadas')} disabled={!!inicial} />
@@ -455,7 +509,13 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
         <div className="modal-footer">
           <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
           <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Guardando...' : inicial ? 'Guardar cambios' : 'Agregar tarea'}
+            {loading
+              ? 'Guardando...'
+              : inicial
+                ? 'Guardar cambios'
+                : seleccionadas.length > 0
+                  ? `Agregar ${seleccionadas.length} tarea${seleccionadas.length !== 1 ? 's' : ''}`
+                  : 'Agregar tareas'}
           </button>
         </div>
       </form>

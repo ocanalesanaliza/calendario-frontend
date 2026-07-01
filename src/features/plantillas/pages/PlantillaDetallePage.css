@@ -176,14 +176,14 @@
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.35);
   display: flex; align-items: center; justify-content: center;
-  z-index: 200; padding: 1rem;
+  z-index: 200; padding: 0.5rem;
 }
 .modal {
   background: #fff; border-radius: 14px;
-  width: 100%; max-width: 480px;
+  width: 100%; max-width: 1200px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.12);
   animation: modalIn 0.18s ease;
-  max-height: 90vh;
+  max-height: 95vh;
   overflow-y: auto;
 }
 @keyframes modalIn {
@@ -253,6 +253,67 @@
   border: 1.5px solid #e2e8f0;
   border-radius: 8px;
   padding: 0.6rem 0.8rem;
+}
+
+.tareas-search-input {
+  padding: 0.5rem 0.8rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.2s;
+  color: #1e293b;
+}
+.tareas-search-input:focus { border-color: #6366f1; }
+
+.tareas-check-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+}
+
+.check-label-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.check-label-disabled input { cursor: not-allowed; }
+
+.tarea-check-nombre {
+  flex: 1;
+  font-size: 0.875rem;
+  color: #1e293b;
+  line-height: 1.3;
+}
+.tarea-check-meta {
+  color: #64748b;
+  font-size: 0.82rem;
+}
+.tarea-check-dup {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.tareas-seleccionadas-hint {
+  font-size: 0.8rem;
+  color: #6366f1;
+  font-weight: 500;
+  margin: 0;
+}
+
+.tarea-nombre-static {
+  padding: 0.6rem 0.8rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #64748b;
+  background: #f8fafc;
 }
 
 .modal-error {
