@@ -15,6 +15,7 @@ import CoberturasPage from "./features/coberturas/pages/CoberturasPage";
 import DashboardPage from "./features/dashboard/pages/DashboardPage";
 import RendimientoPage from "./features/rendimiento/pages/RendimientoPage";
 import SituacionesPage from "./features/situaciones/pages/SituacionesPage";
+import ReportesPage from "./features/reportes/pages/ReportesPage";
 import Layout from "./components/Layout/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -52,6 +53,7 @@ function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/rendimiento" element={<RendimientoPage />} />
           <Route path="/situaciones" element={<SituacionesPage />} />
+          <Route path="/reportes" element={<ReportesPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
