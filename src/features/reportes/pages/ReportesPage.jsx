@@ -22,13 +22,6 @@ const TIPO_LABEL = {
   no_aprobada_ga:   'N/A',
 }
 
-function getSucursalUsuario(usuario) {
-  const dias = usuario.dias ?? []
-  for (const d of dias) {
-    if (d.sucursales?.length) return d.sucursales[0].nombre
-  }
-  return '—'
-}
 
 function contarSituaciones(reportes) {
   let total = 0
@@ -335,7 +328,7 @@ function TablaSemanal({ reporte }) {
           {usuariosOrdenados.map((u, i) => {
             const diaMap = {}
             for (const d of u.dias) diaMap[d.fecha] = d
-            const sucursal = getSucursalUsuario(u)
+            const sucursal = u.sucursal_principal || '—'
             const pct = parseFloat(u.porcentaje_periodo)
             return (
               <tr key={i}>
@@ -414,7 +407,7 @@ function TablaRanking({ reporte }) {
             {usuariosOrdenados.map((u, i) => {
               const pct  = parseFloat(u.porcentaje_periodo)
               const sit  = u.dias.filter((d) => d.tipo_dia && d.tipo_dia !== 'normal').length
-              const suc  = getSucursalUsuario(u)
+              const suc  = u.sucursal_principal || '—'
               return (
                 <tr key={i}>
                   <td className="td-pos">{i + 1}</td>
