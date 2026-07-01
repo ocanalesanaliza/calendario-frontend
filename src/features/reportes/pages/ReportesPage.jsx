@@ -7,28 +7,72 @@ import './ReportesPage.css'
 const hoy = new Date()
 const ANIO_ACTUAL = hoy.getFullYear()
 const MES_ACTUAL = hoy.getMonth() + 1
-// semanal: default a hace 7 días para que el rango completo sea pasado
 const hace7 = new Date(hoy)
 hace7.setDate(hace7.getDate() - 7)
 const HACE7_STR = hace7.toISOString().slice(0, 10)
 
-const MESES = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-]
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+const DIAS_SEMANA = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
 
-function scoreColor(pct) {
-  const n = parseFloat(pct)
-  if (n >= 80) return 'high'
-  if (n >= 50) return 'mid'
-  return 'low'
+const TIPO_LABEL = {
+  vacaciones:       'VAC',
+  incapacidad:      'INC',
+  permiso_aprobado: 'PER',
+  otro_aprobado:    'COM',
+  no_aprobada_ga:   'N/A',
 }
 
-function scoreBarClass(pct) {
+function getSucursalUsuario(usuario) {
+  const dias = usuario.dias ?? []
+  for (const d of dias) {
+    if (d.sucursales?.length) return d.sucursales[0].nombre
+  }
+  return '—'
+}
+
+function contarSituaciones(reportes) {
+  let total = 0
+  for (const rep of reportes) {
+    for (const u of rep.usuarios) {
+      const tieneSit = u.dias.some((d) => d.tipo_dia && d.tipo_dia !== 'normal')
+      if (tieneSit) total++
+    }
+  }
+  return total
+}
+
+function totalUsuarios(reportes) {
+  return reportes.reduce((acc, r) => acc + r.usuarios_count, 0)
+}
+
+function pctColor(pct) {
+  if (pct === null || pct === undefined) return ''
   const n = parseFloat(pct)
-  if (n >= 80) return 'score-fill-high'
-  if (n >= 50) return 'score-fill-mid'
-  return 'score-fill-low'
+  if (n >= 100) return 'pct-excelente'
+  if (n >= 90)  return 'pct-bueno'
+  if (n >= 80)  return 'pct-regular'
+  return 'pct-malo'
+}
+
+function generarRango(inicio, fin) {
+  const dias = []
+  const cur = new Date(inicio + 'T00:00:00')
+  const end = new Date(fin + 'T00:00:00')
+  while (cur <= end) {
+    dias.push(cur.toISOString().slice(0, 10))
+    cur.setDate(cur.getDate() + 1)
+  }
+  return dias
+}
+
+function formatFecha(iso) {
+  const [, m, d] = iso.split('-')
+  return `${parseInt(d)}/${parseInt(m)}`
+}
+
+function diaNombre(iso) {
+  const d = new Date(iso + 'T00:00:00')
+  return DIAS_SEMANA[d.getDay()]
 }
 
 export default function ReportesPage() {
@@ -44,14 +88,11 @@ export default function ReportesPage() {
   const [gerentes, setGerentes]           = useState([])
   const [loading, setLoading]             = useState(false)
   const [resultado, setResultado]         = useState(null)
-  const [correos, setCorreos]             = useState([])
   const [error, setError]                 = useState('')
   const [successMsg, setSuccessMsg]       = useState('')
 
   useEffect(() => {
-    if (esAdmin) {
-      getGerentes().then(setGerentes).catch(() => {})
-    }
+    if (esAdmin) getGerentes().then(setGerentes).catch(() => {})
   }, [esAdmin])
 
   function buildBody() {
@@ -62,70 +103,47 @@ export default function ReportesPage() {
       body.anio = parseInt(anio, 10)
       body.mes  = parseInt(mes, 10)
     }
-    if (esAdmin && idGerenteArea) {
-      body.id_gerente_area = parseInt(idGerenteArea, 10)
-    }
+    if (esAdmin && idGerenteArea) body.id_gerente_area = parseInt(idGerenteArea, 10)
     return body
   }
 
   async function handleJson() {
-    setError('')
-    setSuccessMsg('')
-    setResultado(null)
-    setCorreos([])
-    setLoading(true)
+    setError(''); setSuccessMsg(''); setResultado(null); setLoading(true)
     try {
       const data = await generarReporteJson(buildBody())
       setResultado(data.resultado)
-      setCorreos(data.correos_enviados ?? [])
       if (data.correos_enviados?.length) {
         setSuccessMsg(`Correo(s) enviado(s) a: ${data.correos_enviados.map((c) => c.email).join(', ')}`)
       }
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
+    } catch (err) { setError(err.message) }
+    finally { setLoading(false) }
   }
 
   async function handlePdf() {
-    setError('')
-    setSuccessMsg('')
-    setLoading(true)
+    setError(''); setSuccessMsg(''); setLoading(true)
     try {
       const { blob, filename, correos: cnt } = await generarReportePdf(buildBody())
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      a.click()
+      a.href = url; a.download = filename; a.click()
       URL.revokeObjectURL(url)
-      if (cnt > 0) {
-        setSuccessMsg(`PDF descargado. ${cnt} correo(s) enviado(s).`)
-      } else {
-        setSuccessMsg('PDF descargado correctamente.')
-      }
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
+      setSuccessMsg(`PDF descargado.${cnt > 0 ? ` ${cnt} correo(s) enviado(s).` : ''}`)
+    } catch (err) { setError(err.message) }
+    finally { setLoading(false) }
   }
 
   return (
     <div className="reportes-page">
-      <div className="page-header">
-        <div>
-          <h1>Reportes de rendimiento</h1>
-          <p>Genera reportes por periodo para tu área o para todas las áreas.</p>
-        </div>
+      <div className="rp-header">
+        <h1>Reportes de rendimiento</h1>
+        <p>Genera reportes por periodo para tu área o para todas las áreas.</p>
       </div>
 
       {/* Filtros */}
-      <div className="filtros-card">
-        <div className="filtros-row">
-          <div className="filtro-group">
-            <label>Tipo de reporte</label>
+      <div className="rp-filtros-card">
+        <div className="rp-filtros-row">
+          <div className="rp-filtro-group">
+            <label>Tipo</label>
             <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
               <option value="semanal">Semanal</option>
               {esAdmin && <option value="quincenal">Quincenal</option>}
@@ -134,179 +152,316 @@ export default function ReportesPage() {
           </div>
 
           {tipo === 'semanal' ? (
-            <div className="filtro-group">
+            <div className="rp-filtro-group">
               <label>Fecha de inicio</label>
-              <input
-                type="date"
-                value={fechaInicio}
-                onChange={(e) => setFechaInicio(e.target.value)}
-              />
+              <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
             </div>
           ) : (
             <>
-              <div className="filtro-group">
+              <div className="rp-filtro-group" style={{ width: 90 }}>
                 <label>Año</label>
-                <input
-                  type="number"
-                  value={anio}
-                  min="2020"
-                  max={ANIO_ACTUAL}
-                  onChange={(e) => setAnio(e.target.value)}
-                  style={{ width: 90 }}
-                />
+                <input type="number" value={anio} min="2020" max={ANIO_ACTUAL} onChange={(e) => setAnio(e.target.value)} />
               </div>
-              <div className="filtro-group">
+              <div className="rp-filtro-group">
                 <label>Mes</label>
                 <select value={mes} onChange={(e) => setMes(e.target.value)}>
-                  {MESES.map((m, i) => (
-                    <option key={i + 1} value={i + 1}>{m}</option>
-                  ))}
+                  {MESES.map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
                 </select>
               </div>
             </>
           )}
 
           {esAdmin && (
-            <div className="filtro-group">
+            <div className="rp-filtro-group">
               <label>Gerente de área</label>
               <select value={idGerenteArea} onChange={(e) => setIdGerenteArea(e.target.value)}>
                 <option value="">Todos</option>
                 {gerentes.map((g) => (
-                  <option key={g.id_gerente_area} value={g.id_gerente_area}>
-                    {g.nombre}
-                  </option>
+                  <option key={g.id_gerente_area} value={g.id_gerente_area}>{g.nombre}</option>
                 ))}
               </select>
             </div>
           )}
 
-          <label className="filtro-check">
-            <input
-              type="checkbox"
-              checked={enviarCorreo}
-              onChange={(e) => setEnviarCorreo(e.target.checked)}
-            />
+          <label className="rp-filtro-check">
+            <input type="checkbox" checked={enviarCorreo} onChange={(e) => setEnviarCorreo(e.target.checked)} />
             Enviar por correo
           </label>
         </div>
 
-        <div className="filtros-actions">
-          <button className="btn-generar" onClick={handleJson} disabled={loading}>
+        <div className="rp-filtros-actions">
+          <button className="rp-btn-ver" onClick={handleJson} disabled={loading}>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="20" x2="18" y2="10"/>
-              <line x1="12" y1="20" x2="12" y2="4"/>
-              <line x1="6"  y1="20" x2="6"  y2="14"/>
+              <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
             </svg>
             {loading ? 'Generando...' : 'Ver reporte'}
           </button>
-
-          <button className="btn-pdf" onClick={handlePdf} disabled={loading}>
+          <button className="rp-btn-pdf" onClick={handlePdf} disabled={loading}>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="12" y1="18" x2="12" y2="12"/>
-              <line x1="9"  y1="15" x2="15" y2="15"/>
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+              <line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
             </svg>
             {loading ? 'Generando...' : 'Descargar PDF'}
           </button>
-
-          {error     && <p className="error-msg">{error}</p>}
-          {successMsg && <p className="success-msg">{successMsg}</p>}
+          {error      && <span className="rp-error">{error}</span>}
+          {successMsg && <span className="rp-success">{successMsg}</span>}
         </div>
       </div>
 
-      {/* Resultados JSON */}
-      {resultado && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div className="reporte-periodo-info">
-            <span><strong>Tipo:</strong> {resultado.tipo}</span>
-            <span><strong>Periodo:</strong> {resultado.fecha_inicio} — {resultado.fecha_fin}</span>
-            <span><strong>Áreas incluidas:</strong> {resultado.count}</span>
-          </div>
-
-          {resultado.reportes.map((rep, i) => (
-            <ReporteCard key={i} reporte={rep} />
-          ))}
-        </div>
-      )}
+      {/* Resultados */}
+      {resultado && <ResultadoReporte resultado={resultado} />}
     </div>
   )
 }
 
-function ReporteCard({ reporte }) {
-  const [expandido, setExpandido] = useState(true)
-  const pct = parseFloat(reporte.promedio_general)
+function ResultadoReporte({ resultado }) {
+  const { tipo, fecha_inicio, fecha_fin, reportes } = resultado
+  const totalU   = totalUsuarios(reportes)
+  const totalSit = contarSituaciones(reportes)
+  const promedioGlobal = reportes.length === 1
+    ? parseFloat(reportes[0].promedio_general)
+    : reportes.reduce((acc, r) => acc + parseFloat(r.promedio_general), 0) / reportes.length
 
   return (
-    <div className="reporte-card">
-      <div className="reporte-card-header">
-        <div className="reporte-gerente-info">
-          <h3>{reporte.gerente_area.nombre}</h3>
-          <p>{reporte.gerente_area.email}</p>
-        </div>
-        <div className="reporte-stats">
-          <div className="stat-item">
-            <div className={`stat-value ${scoreColor(reporte.promedio_general)}`}>
-              {pct.toFixed(1)}%
-            </div>
-            <div className="stat-label">Promedio área</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-value">{reporte.usuarios_count}</div>
-            <div className="stat-label">Gerentes</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-value">{reporte.dias_periodo}</div>
-            <div className="stat-label">Días periodo</div>
-          </div>
-          <button
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontSize: '0.82rem' }}
-            onClick={() => setExpandido((v) => !v)}
-          >
-            {expandido ? 'Ocultar' : 'Ver detalle'}
-          </button>
-        </div>
+    <div className="rp-resultado">
+      {/* Periodo banner */}
+      <div className="rp-periodo-banner">
+        <span className="rp-tipo-badge">{tipo.charAt(0).toUpperCase() + tipo.slice(1)}</span>
+        <span>Período: <strong>{formatFecha(fecha_inicio)}/{fecha_inicio.slice(0,4)} — {formatFecha(fecha_fin)}/{fecha_fin.slice(0,4)}</strong></span>
+        {reportes.length > 1 && <span>{reportes.length} áreas incluidas</span>}
       </div>
 
-      {expandido && (
-        <div className="usuarios-table-wrap">
-          <table className="usuarios-table">
-            <thead>
-              <tr>
-                <th>Gerente de sucursal</th>
-                <th>Sucursal</th>
-                <th>Días laborales</th>
-                <th>Días no laborales</th>
-                <th>Rendimiento periodo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {reporte.usuarios.map((u, i) => {
-                const pctU = parseFloat(u.porcentaje_periodo)
-                return (
-                  <tr key={i}>
-                    <td>{u.usuario?.nombre ?? '—'}</td>
-                    <td>{u.usuario?.sucursal ?? '—'}</td>
-                    <td>{u.dias_laborales}</td>
-                    <td>{u.dias_no_laborales}</td>
-                    <td>
-                      <div className="score-bar-wrap">
-                        <div className="score-bar-bg">
-                          <div
-                            className={`score-bar-fill ${scoreBarClass(u.porcentaje_periodo)}`}
-                            style={{ width: `${Math.min(pctU, 100)}%` }}
-                          />
-                        </div>
-                        <span className="score-pct">{pctU.toFixed(1)}%</span>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+      {/* KPI cards (globales si hay un solo reporte) */}
+      {reportes.length === 1 && (
+        <KpiCards
+          promedio={promedioGlobal}
+          usuarios={totalU}
+          dias={reportes[0].dias_periodo}
+          situaciones={totalSit}
+        />
+      )}
+
+      {reportes.map((rep, i) => (
+        <ReporteArea key={i} reporte={rep} tipo={tipo} mostrarHeader={reportes.length > 1} />
+      ))}
+    </div>
+  )
+}
+
+function KpiCards({ promedio, usuarios, dias, situaciones }) {
+  return (
+    <div className="rp-kpis">
+      <div className="rp-kpi">
+        <div className={`rp-kpi-valor ${pctColor(promedio)}`}>{parseFloat(promedio).toFixed(2)}%</div>
+        <div className="rp-kpi-label">Promedio general</div>
+      </div>
+      <div className="rp-kpi">
+        <div className="rp-kpi-valor">{usuarios}</div>
+        <div className="rp-kpi-label">Gerentes evaluados</div>
+      </div>
+      <div className="rp-kpi">
+        <div className="rp-kpi-valor">{dias}</div>
+        <div className="rp-kpi-label">Días del período</div>
+      </div>
+      <div className="rp-kpi">
+        <div className="rp-kpi-valor rp-kpi-sit">{situaciones}</div>
+        <div className="rp-kpi-label">Con sit. especiales</div>
+      </div>
+    </div>
+  )
+}
+
+function ReporteArea({ reporte, tipo, mostrarHeader }) {
+  const totalSit = contarSituaciones([reporte])
+  const promedio = parseFloat(reporte.promedio_general)
+
+  return (
+    <div className="rp-area-card">
+      {mostrarHeader && (
+        <div className="rp-area-header">
+          <div>
+            <h3>{reporte.gerente_area.nombre}</h3>
+            <span>{reporte.gerente_area.email}</span>
+          </div>
+          <div className="rp-area-kpis-mini">
+            <div className="rp-kpi-mini">
+              <span className={`rp-kpi-mini-val ${pctColor(promedio)}`}>{promedio.toFixed(2)}%</span>
+              <span>Promedio</span>
+            </div>
+            <div className="rp-kpi-mini">
+              <span className="rp-kpi-mini-val">{reporte.usuarios_count}</span>
+              <span>Gerentes</span>
+            </div>
+            <div className="rp-kpi-mini">
+              <span className="rp-kpi-mini-val">{totalSit}</span>
+              <span>Sit. esp.</span>
+            </div>
+          </div>
         </div>
       )}
+
+      {tipo === 'semanal'
+        ? <TablaSemanal reporte={reporte} />
+        : <TablaRanking reporte={reporte} />
+      }
+    </div>
+  )
+}
+
+function TablaSemanal({ reporte }) {
+  const rango = generarRango(reporte.fecha_inicio, reporte.fecha_fin)
+
+  const usuariosOrdenados = [...reporte.usuarios].sort(
+    (a, b) => parseFloat(b.porcentaje_periodo) - parseFloat(a.porcentaje_periodo)
+  )
+
+  return (
+    <div className="rp-table-wrap">
+      <table className="rp-table rp-table-semanal">
+        <thead>
+          <tr>
+            <th className="th-usuario">Usuario</th>
+            <th className="th-sucursal">Sucursal</th>
+            {rango.map((fecha) => (
+              <th key={fecha} className="th-dia">
+                <span className="dia-nombre">{diaNombre(fecha)}</span>
+                <span className="dia-fecha">{formatFecha(fecha)}</span>
+              </th>
+            ))}
+            <th className="th-promedio">Promedio</th>
+          </tr>
+        </thead>
+        <tbody>
+          {usuariosOrdenados.map((u, i) => {
+            const diaMap = {}
+            for (const d of u.dias) diaMap[d.fecha] = d
+            const sucursal = getSucursalUsuario(u)
+            const pct = parseFloat(u.porcentaje_periodo)
+            return (
+              <tr key={i}>
+                <td className="td-usuario">{u.usuario?.nombre ?? '—'}</td>
+                <td className="td-sucursal">{sucursal}</td>
+                {rango.map((fecha) => {
+                  const dia = diaMap[fecha]
+                  return <td key={fecha}><CeldaDia dia={dia} /></td>
+                })}
+                <td className={`td-promedio ${pctColor(pct)}`}>
+                  {pct === 0 ? '—' : `${pct.toFixed(pct % 1 === 0 ? 0 : 2)}%`}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function CeldaDia({ dia }) {
+  if (!dia) return <span className="celda celda-vacia">—</span>
+  if (!dia.laboral) return <span className="celda celda-vacia">—</span>
+
+  const tipo = dia.tipo_dia
+  if (tipo && tipo !== 'normal') {
+    const label = TIPO_LABEL[tipo] ?? tipo.slice(0, 3).toUpperCase()
+    return <span className="celda celda-especial" title={dia.motivo_dia_especial || tipo}>{label}</span>
+  }
+
+  if (!dia.rendimiento_id) return <span className="celda celda-sin-datos">—</span>
+
+  const pct = parseFloat(dia.porcentaje_dia)
+  const cls = pctColor(pct)
+  return (
+    <span className={`celda ${cls}`}>
+      {pct === 100 ? '100%' : `${pct.toFixed(pct % 1 === 0 ? 0 : 1)}%`}
+    </span>
+  )
+}
+
+function TablaRanking({ reporte }) {
+  const usuariosOrdenados = [...reporte.usuarios].sort(
+    (a, b) => parseFloat(b.porcentaje_periodo) - parseFloat(a.porcentaje_periodo)
+  )
+
+  const top5    = usuariosOrdenados.slice(0, 5)
+  const bottom5 = usuariosOrdenados.length >= 5
+    ? [...usuariosOrdenados].reverse().slice(0, 5).reverse()
+    : []
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      {usuariosOrdenados.length >= 6 && (
+        <div className="rp-rankings">
+          <MiniRanking titulo="Top 5" icono="🏆" usuarios={top5} tipo="top" />
+          <MiniRanking titulo="Bottom 5" icono="📉" usuarios={bottom5} tipo="bottom" />
+        </div>
+      )}
+
+      <div className="rp-table-wrap">
+        <table className="rp-table">
+          <thead>
+            <tr>
+              <th style={{ width: 40 }}>#</th>
+              <th>Gerente</th>
+              <th>Sucursal</th>
+              <th>Rendimiento</th>
+              <th>Días lab.</th>
+              <th>Días no lab.</th>
+              <th>Sit. esp.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {usuariosOrdenados.map((u, i) => {
+              const pct  = parseFloat(u.porcentaje_periodo)
+              const sit  = u.dias.filter((d) => d.tipo_dia && d.tipo_dia !== 'normal').length
+              const suc  = getSucursalUsuario(u)
+              return (
+                <tr key={i}>
+                  <td className="td-pos">{i + 1}</td>
+                  <td className="td-usuario">{u.usuario?.nombre ?? '—'}</td>
+                  <td className="td-sucursal">{suc}</td>
+                  <td>
+                    <div className="rp-score-wrap">
+                      <div className="rp-score-bg">
+                        <div className={`rp-score-fill ${pctColor(pct)}-fill`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                      </div>
+                      <span className={`rp-score-pct ${pctColor(pct)}`}>{pct.toFixed(2)}%</span>
+                    </div>
+                  </td>
+                  <td>{u.dias_laborales}</td>
+                  <td>{u.dias_no_laborales}</td>
+                  <td>{sit > 0 ? sit : '—'}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function MiniRanking({ titulo, icono, usuarios, tipo }) {
+  return (
+    <div className={`rp-mini-ranking ${tipo}`}>
+      <div className="rp-mini-ranking-title">{icono} {titulo}</div>
+      <table className="rp-mini-table">
+        <thead>
+          <tr><th>#</th><th>Gerente</th><th>Rendimiento</th></tr>
+        </thead>
+        <tbody>
+          {usuarios.map((u, i) => {
+            const pct = parseFloat(u.porcentaje_periodo)
+            return (
+              <tr key={i}>
+                <td>{i + 1}</td>
+                <td>{u.usuario?.nombre ?? '—'}</td>
+                <td className={pctColor(pct)}>{pct.toFixed(2)}%</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }
