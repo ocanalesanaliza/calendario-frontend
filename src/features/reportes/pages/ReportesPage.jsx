@@ -27,7 +27,7 @@ function contarSituaciones(reportes) {
   let total = 0
   for (const rep of reportes) {
     for (const u of rep.usuarios) {
-      const tieneSit = u.dias.some((d) => d.tipo_dia && d.tipo_dia !== 'normal')
+      const tieneSit = u.dias.some((d) => d.laboral && d.tipo_dia && d.tipo_dia !== 'normal')
       if (tieneSit) total++
     }
   }
@@ -411,7 +411,7 @@ function TablaRanking({ reporte }) {
           <tbody>
             {usuariosOrdenados.map((u, i) => {
               const pct  = parseFloat(u.porcentaje_periodo)
-              const sit  = u.dias.filter((d) => d.tipo_dia && d.tipo_dia !== 'normal').length
+              const sit  = u.dias.filter((d) => d.laboral && d.tipo_dia && d.tipo_dia !== 'normal').length
               const suc  = u.sucursal_principal || '—'
               return (
                 <tr key={i}>
