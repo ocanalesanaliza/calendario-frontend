@@ -1,5 +1,5 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./features/auth/context/AuthContext";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./features/auth/context/AuthContext";
 import LoginPage from "./features/auth/pages/LoginPage";
 import ChangePasswordPage from "./features/auth/pages/ChangePasswordPage";
 import CalendarPage from "./features/calendar/pages/CalendarPage";
@@ -18,6 +18,12 @@ import SituacionesPage from "./features/situaciones/pages/SituacionesPage";
 import ReportesPage from "./features/reportes/pages/ReportesPage";
 import Layout from "./components/Layout/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
+
+function SucursalRoute({ children }) {
+  const { perfil } = useAuth()
+  if (perfil && perfil.type !== 'gerente_sucursal') return <Navigate to="/" replace />
+  return children
+}
 
 function App() {
   return (
@@ -51,7 +57,7 @@ function App() {
           <Route path="/almuerzos" element={<AlmuerzosPage />} />
           <Route path="/coberturas" element={<CoberturasPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/rendimiento" element={<RendimientoPage />} />
+          <Route path="/rendimiento" element={<SucursalRoute><RendimientoPage /></SucursalRoute>} />
           <Route path="/situaciones" element={<SituacionesPage />} />
           <Route path="/reportes" element={<ReportesPage />} />
         </Route>
