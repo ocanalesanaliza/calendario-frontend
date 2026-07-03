@@ -352,20 +352,25 @@ function TablaSemanal({ reporte }) {
 
 function CeldaDia({ dia }) {
   if (!dia) return <span className="celda celda-vacia">—</span>
-  if (!dia.laboral) return <span className="celda celda-vacia">—</span>
+  if (!dia.laboral) return <span className="celda celda-vacia" title={dia.motivo_no_laboral || undefined}>—</span>
 
   const tipo = dia.tipo_dia
+  const sucursalTitle = dia.sucursales?.length
+    ? dia.sucursales.map((s) => s.tipo === 'temporal' ? `${s.nombre} (temporal)` : s.nombre).join(', ')
+    : undefined
+
   if (tipo && tipo !== 'normal') {
     const label = TIPO_LABEL[tipo] ?? tipo.slice(0, 3).toUpperCase()
     return <span className="celda celda-especial" title={dia.motivo_dia_especial || tipo}>{label}</span>
   }
 
-  if (!dia.rendimiento_id) return <span className="celda celda-sin-datos">—</span>
+  if (!dia.rendimiento_id) return <span className="celda celda-sin-datos" title={sucursalTitle}>—</span>
 
   const pct = parseFloat(dia.porcentaje_dia)
   const cls = pctColor(pct)
+  const esTemporal = dia.sucursales?.some((s) => s.tipo === 'temporal')
   return (
-    <span className={`celda ${cls}`}>
+    <span className={`celda ${cls}${esTemporal ? ' celda-temporal' : ''}`} title={sucursalTitle}>
       {pct === 100 ? '100%' : `${pct.toFixed(pct % 1 === 0 ? 0 : 1)}%`}
     </span>
   )

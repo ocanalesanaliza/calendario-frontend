@@ -235,6 +235,12 @@
   text-align: right;
 }
 
+.score-tareas {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
 /* ── Trabajo de campo ── */
 .campo-banner {
   display: flex;

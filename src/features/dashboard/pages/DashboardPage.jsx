@@ -143,10 +143,13 @@ export default function DashboardPage() {
 }
 
 function UserCard({ user, fechaDashboard, onCrearCampo, onCancelarCampo }) {
-  const presencia  = PRESENCIA_BADGE[user.estado]
-  const score      = parseFloat(user.rendimiento_hoy ?? 0)
-  const colorClass = LABEL_COLOR[user.estado_operativo_label] ?? 'estado-sin'
-  const campo      = user.trabajo_campo_pendiente
+  const presencia    = PRESENCIA_BADGE[user.estado]
+  const score        = parseFloat(user.rendimiento_hoy ?? 0)
+  const colorClass   = LABEL_COLOR[user.estado_operativo_label] ?? 'estado-sin'
+  const campo        = user.trabajo_campo_pendiente
+  const resultadoDia = user.resultado_dia
+  const tareasCumplidas   = resultadoDia?.tareas_cumplidas ?? null
+  const tareasProgramadas = resultadoDia?.tareas_programadas ?? null
 
   return (
     <div className={`user-card ${colorClass}`}>
@@ -198,6 +201,9 @@ function UserCard({ user, fechaDashboard, onCrearCampo, onCancelarCampo }) {
             />
           </div>
           <span className="score-pct">{score.toFixed(0)}%</span>
+          {tareasProgramadas !== null && tareasProgramadas > 0 && (
+            <span className="score-tareas">{tareasCumplidas}/{tareasProgramadas}</span>
+          )}
         </div>
         {!campo && user.sucursal && (
           <button

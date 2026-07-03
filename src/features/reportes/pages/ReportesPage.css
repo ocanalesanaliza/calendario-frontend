@@ -247,6 +247,7 @@
 .celda-vacia    { color: #cbd5e1; font-weight: 400; }
 .celda-sin-datos { color: #cbd5e1; font-weight: 400; }
 .celda-especial { background: #dbeafe; color: #1d4ed8; font-size: 0.72rem; }
+.celda-temporal { outline: 1.5px dashed #8b5cf6; outline-offset: -1px; }
 
 /* Colores de porcentaje */
 .pct-excelente { color: #15803d !important; }
