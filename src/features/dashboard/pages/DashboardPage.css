@@ -87,6 +87,37 @@
   transition: border-color 0.2s;
 }
 .filtro-select:focus { border-color: #6366f1; }
+.filtro-select:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.filtro-check {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: #334155;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ── Resumen por área ── */
+.resumen-areas-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.resumen-area-card {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.82rem;
+}
+.resumen-area-nombre { font-weight: 600; color: #1e293b; }
+.resumen-area-pct { font-weight: 700; color: #6366f1; }
+.resumen-area-usuarios { color: #94a3b8; font-size: 0.76rem; }
 
 /* ── States ── */
 .loading-state, .empty-state {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../auth/context/AuthContext'
 import { getGerentes } from '../../gerentes/services/gerentesService'
+import { getUsuarios } from '../../usuarios/services/usuariosService'
 import { generarReporteJson, generarReportePdf } from '../services/reportesService'
 import './ReportesPage.css'
 
@@ -77,8 +78,10 @@ export default function ReportesPage() {
   const [anio, setAnio]                   = useState(ANIO_ACTUAL)
   const [mes, setMes]                     = useState(MES_ACTUAL)
   const [idGerenteArea, setIdGerenteArea] = useState('')
+  const [idUsuario, setIdUsuario]         = useState('')
   const [enviarCorreo, setEnviarCorreo]   = useState(false)
   const [gerentes, setGerentes]           = useState([])
+  const [usuarios, setUsuarios]           = useState([])
   const [loading, setLoading]             = useState(false)
   const [resultado, setResultado]         = useState(null)
   const [error, setError]                 = useState('')
@@ -87,6 +90,13 @@ export default function ReportesPage() {
   useEffect(() => {
     if (esAdmin) getGerentes().then(setGerentes).catch(() => {})
   }, [esAdmin])
+
+  useEffect(() => {
+    setIdUsuario('')
+    const params = esAdmin && idGerenteArea ? { id_gerente_area: idGerenteArea } : {}
+    if (esAdmin && !idGerenteArea) { setUsuarios([]); return }
+    getUsuarios(params).then(setUsuarios).catch(() => setUsuarios([]))
+  }, [esAdmin, idGerenteArea])
 
   function buildBody() {
     const body = { tipo, enviar_correo: enviarCorreo }
@@ -97,6 +107,7 @@ export default function ReportesPage() {
       body.mes  = parseInt(mes, 10)
     }
     if (esAdmin && idGerenteArea) body.id_gerente_area = parseInt(idGerenteArea, 10)
+    if (idUsuario) body.id_usuario = parseInt(idUsuario, 10)
     return body
   }
 
@@ -171,6 +182,18 @@ export default function ReportesPage() {
                 <option value="">Todos</option>
                 {gerentes.map((g) => (
                   <option key={g.id_gerente_area} value={g.id_gerente_area}>{g.nombre}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {usuarios.length > 0 && (
+            <div className="rp-filtro-group">
+              <label>Usuario</label>
+              <select value={idUsuario} onChange={(e) => setIdUsuario(e.target.value)}>
+                <option value="">Todos</option>
+                {usuarios.map((u) => (
+                  <option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>
                 ))}
               </select>
             </div>

@@ -1,5 +1,7 @@
 ﻿import { useState, useEffect, useCallback } from 'react'
+import { useAuth } from '../../auth/context/AuthContext'
 import { getDashboardOperativo } from '../services/dashboardService'
+import { getGerentes } from '../../gerentes/services/gerentesService'
 import { createTrabajoCampo, cancelarTrabajoCampo } from '../../trabajosCampo/services/trabajosCampoService'
 import './DashboardPage.css'
 
@@ -22,15 +24,28 @@ const LABEL_COLOR = {
   'Sin sucursal':        'estado-sin',
 }
 
+const META_VACIA = { requiere_filtro: false, mensaje: '', resumen_areas: [] }
+
 export default function DashboardPage() {
+  const { perfil } = useAuth()
+  const esAdmin = perfil?.es_admin_maestro === true
+
   const [results, setResults]       = useState([])
   const [count, setCount]           = useState(0)
+  const [meta, setMeta]             = useState(META_VACIA)
   const [loading, setLoading]       = useState(true)
   const [fecha, setFecha]           = useState('')
   const [buscar, setBuscar]         = useState('')
   const [filtroOp, setFiltroOp]     = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
+  const [idGerenteArea, setIdGerenteArea] = useState('')
+  const [verTodos, setVerTodos]     = useState(false)
+  const [gerentes, setGerentes]     = useState([])
   const [modalCampo, setModalCampo] = useState(null)
+
+  useEffect(() => {
+    if (esAdmin) getGerentes().then(setGerentes).catch(() => {})
+  }, [esAdmin])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -40,13 +55,18 @@ export default function DashboardPage() {
       if (buscar)       params.buscar           = buscar
       if (filtroOp)     params.estado_operativo = filtroOp
       if (filtroEstado) params.estado           = filtroEstado
+      if (esAdmin) {
+        if (verTodos) params.todos = 'true'
+        else if (idGerenteArea) params.id_gerente_area = idGerenteArea
+      }
       const data = await getDashboardOperativo(params)
       setResults(data.results ?? [])
       setCount(data.count ?? 0)
+      setMeta(data.meta ?? META_VACIA)
     } finally {
       setLoading(false)
     }
-  }, [fecha, buscar, filtroOp, filtroEstado])
+  }, [fecha, buscar, filtroOp, filtroEstado, esAdmin, idGerenteArea, verTodos])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -83,7 +103,7 @@ export default function DashboardPage() {
           </svg>
           <input
             type="text"
-            placeholder="Buscar por nombre o sucursal..."
+            placeholder="Buscar por nombre, email, sucursal o área..."
             value={buscar}
             onChange={(e) => setBuscar(e.target.value)}
           />
@@ -109,10 +129,43 @@ export default function DashboardPage() {
           <option value="activo">Activo</option>
           <option value="en_almuerzo">En almuerzo</option>
         </select>
+        {esAdmin && (
+          <>
+            <select
+              className="filtro-select"
+              value={idGerenteArea}
+              disabled={verTodos}
+              onChange={(e) => setIdGerenteArea(e.target.value)}
+            >
+              <option value="">Selecciona un área...</option>
+              {gerentes.map((g) => (
+                <option key={g.id_gerente_area} value={g.id_gerente_area}>{g.nombre}</option>
+              ))}
+            </select>
+            <label className="filtro-check">
+              <input type="checkbox" checked={verTodos} onChange={(e) => setVerTodos(e.target.checked)} />
+              Ver todos
+            </label>
+          </>
+        )}
       </div>
+
+      {meta.resumen_areas.length > 0 && (
+        <div className="resumen-areas-row">
+          {meta.resumen_areas.map((r) => (
+            <div key={r.gerente_area.id_gerente_area} className="resumen-area-card">
+              <span className="resumen-area-nombre">{r.gerente_area.nombre}</span>
+              <span className="resumen-area-pct">{parseFloat(r.rendimiento_mes).toFixed(0)}%</span>
+              <span className="resumen-area-usuarios">{r.usuarios_count} usuario{r.usuarios_count !== 1 ? 's' : ''}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <div className="loading-state">Cargando dashboard...</div>
+      ) : meta.requiere_filtro ? (
+        <div className="empty-state">{meta.mensaje || 'Selecciona un filtro para ver el dashboard.'}</div>
       ) : results.length === 0 ? (
         <div className="empty-state">Sin resultados para los filtros aplicados.</div>
       ) : (
@@ -121,6 +174,7 @@ export default function DashboardPage() {
             <UserCard
               key={i}
               user={u}
+              esAdmin={esAdmin}
               fechaDashboard={fecha}
               onCrearCampo={(idUsuario) => setModalCampo({ idUsuario, nombreUsuario: u.nombre_usuario })}
               onCancelarCampo={handleCancelarCampo}
@@ -142,7 +196,7 @@ export default function DashboardPage() {
   )
 }
 
-function UserCard({ user, fechaDashboard, onCrearCampo, onCancelarCampo }) {
+function UserCard({ user, esAdmin, fechaDashboard, onCrearCampo, onCancelarCampo }) {
   const presencia    = PRESENCIA_BADGE[user.estado]
   const score        = parseFloat(user.rendimiento_hoy ?? 0)
   const colorClass   = LABEL_COLOR[user.estado_operativo_label] ?? 'estado-sin'
@@ -159,7 +213,10 @@ function UserCard({ user, fechaDashboard, onCrearCampo, onCancelarCampo }) {
         </div>
         <div className="user-card-info">
           <p className="user-card-nombre">{user.nombre_usuario}</p>
-          <p className="user-card-sucursal">{user.sucursal ?? '—'}</p>
+          <p className="user-card-sucursal">
+            {user.sucursal ?? '—'}
+            {esAdmin && user.gerente_area && ` · ${user.gerente_area.nombre}`}
+          </p>
         </div>
         {presencia && (
           <span className={`badge ${presencia.cls}`}>{presencia.label}</span>
