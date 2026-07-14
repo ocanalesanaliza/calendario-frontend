@@ -369,13 +369,28 @@ function TablaSemanal({ reporte }) {
           })}
         </tbody>
       </table>
+      <LeyendaSimbolos />
     </div>
+  )
+}
+
+function LeyendaSimbolos() {
+  return (
+    <p className="rp-leyenda">
+      <span>— sin dato</span>
+      <span><b>N/L</b> aun no laboraba (sin sucursal asignada o sucursal cerrada ese dia)</span>
+      <span><b>VAC</b> vacaciones</span>
+      <span><b>INC</b> incapacidad</span>
+      <span><b>PER</b> permiso aprobado</span>
+      <span><b>COM</b> otro aprobado</span>
+      <span><b>N/A</b> no aprobada por GA</span>
+    </p>
   )
 }
 
 function CeldaDia({ dia }) {
   if (!dia) return <span className="celda celda-vacia">—</span>
-  if (!dia.laboral) return <span className="celda celda-vacia" title={dia.motivo_no_laboral || undefined}>—</span>
+  if (!dia.laboral) return <span className="celda celda-no-laboral" title={dia.motivo_no_laboral || undefined}>N/L</span>
 
   const tipo = dia.tipo_dia
   const sucursalTitle = dia.sucursales?.length

@@ -246,8 +246,18 @@
 }
 .celda-vacia    { color: #cbd5e1; font-weight: 400; }
 .celda-sin-datos { color: #cbd5e1; font-weight: 400; }
+.celda-no-laboral { background: #f1f5f9; color: #94a3b8; font-size: 0.72rem; }
 .celda-especial { background: #dbeafe; color: #1d4ed8; font-size: 0.72rem; }
 .celda-temporal { outline: 1.5px dashed #8b5cf6; outline-offset: -1px; }
+
+.rp-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.9rem;
+  margin: 0.6rem 0 0;
+  font-size: 0.72rem;
+  color: #64748b;
+}
 
 /* Colores de porcentaje */
 .pct-excelente { color: #15803d !important; }
