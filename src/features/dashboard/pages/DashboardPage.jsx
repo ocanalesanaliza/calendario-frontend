@@ -200,7 +200,7 @@ function UserCard({ user, esAdmin, fechaDashboard, onCrearCampo, onCancelarCampo
   const presencia    = PRESENCIA_BADGE[user.estado]
   const score        = parseFloat(user.rendimiento_hoy ?? 0)
   const colorClass   = LABEL_COLOR[user.estado_operativo_label] ?? 'estado-sin'
-  const campo        = user.trabajo_campo_pendiente
+  const campo        = user.trabajo_campo
   const resultadoDia = user.resultado_dia
   const tareasCumplidas   = resultadoDia?.tareas_cumplidas ?? null
   const tareasProgramadas = resultadoDia?.tareas_programadas ?? null
@@ -224,13 +224,13 @@ function UserCard({ user, esAdmin, fechaDashboard, onCrearCampo, onCancelarCampo
       </div>
 
       {campo && (
-        <div className="campo-banner">
+        <div className={`campo-banner${campo.estado === 'aceptado' ? ' campo-banner-aceptado' : ''}`}>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
             <polyline points="9 22 9 12 15 12 15 22"/>
           </svg>
           <span>
-            Trabajo de campo — {campo.jornada === 'manana' ? 'Mañana' : 'Tarde'}
+            Trabajo de campo {campo.estado === 'aceptado' ? '(autorizado)' : '(pendiente)'} — {campo.jornada === 'manana' ? 'Mañana' : 'Tarde'}
             {campo.motivo ? ` · ${campo.motivo}` : ''}
           </span>
           {campo.estado === 'pendiente' && (

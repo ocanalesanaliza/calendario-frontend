@@ -285,6 +285,13 @@
   color: #92400e;
 }
 .campo-banner svg { flex-shrink: 0; stroke: #b45309; }
+
+.campo-banner-aceptado {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #166534;
+}
+.campo-banner-aceptado svg { stroke: #16a34a; }
 .campo-banner span { flex: 1; }
 
 .campo-cancel-btn {
