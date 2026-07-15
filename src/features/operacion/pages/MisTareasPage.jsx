@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getMisTareas, registrarTarea } from '../services/operacionService'
+import { getMisTareas, registrarTarea, registrarTareasLote } from '../services/operacionService'
 import { getTrabajosCampo, aceptarTrabajoCampo, rechazarTrabajoCampo } from '../../trabajosCampo/services/trabajosCampoService'
 import './MisTareasPage.css'
 
@@ -114,26 +114,28 @@ export default function MisTareasPage() {
   }
 
   async function handleRegistrarSeleccionadas() {
+    const tareas = tareasFiltradas.filter((t) => seleccionadas.includes(t.id_sucursal_tarea))
     setRegistrandoLote(true)
     setLoteError('')
-    const tareas = tareasFiltradas.filter((t) => seleccionadas.includes(t.id_sucursal_tarea))
-    const fallidas = []
-    for (const tarea of tareas) {
-      try {
-        await registrarTarea({
-          id_tarea: tarea.tarea?.id_tarea,
-          fecha:    data.meta?.fecha_consultada,
-        })
-      } catch (err) {
-        fallidas.push(tarea.tarea?.nombre || `Tarea #${tarea.id_sucursal_tarea}`)
+    try {
+      const res = await registrarTareasLote({
+        fecha:     data.meta?.fecha_consultada,
+        id_tareas: tareas.map((t) => t.tarea?.id_tarea),
+      })
+      if (res.errores?.length > 0) {
+        const nombrePorId = new Map(
+          tareas.map((t) => [t.tarea?.id_tarea, t.tarea?.nombre || `Tarea #${t.id_sucursal_tarea}`])
+        )
+        const nombres = res.errores.map((e) => nombrePorId.get(e.id_tarea) || `Tarea ${e.id_tarea}`)
+        setLoteError(`No se pudieron registrar: ${nombres.join(', ')}`)
       }
+    } catch (err) {
+      setLoteError(err.message)
+    } finally {
+      setSeleccionadas([])
+      await loadTareas()
+      setRegistrandoLote(false)
     }
-    setSeleccionadas([])
-    await loadTareas()
-    if (fallidas.length > 0) {
-      setLoteError(`No se pudieron registrar: ${fallidas.join(', ')}`)
-    }
-    setRegistrandoLote(false)
   }
 
   const tareasFiltradas = data?.results?.filter((t) => t.jornada === jornada) ?? []

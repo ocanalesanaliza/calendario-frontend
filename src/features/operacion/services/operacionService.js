@@ -26,6 +26,16 @@ export async function registrarTarea(body) {
   return data
 }
 
+export async function registrarTareasLote(body) {
+  const res = await apiRequest('/api/registros-tareas/lote/', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.detail || 'Error al registrar tareas')
+  return data
+}
+
 export async function registrarTareaManual(body) {
   const res = await apiRequest('/api/registros-tareas/manual/', {
     method: 'POST',
