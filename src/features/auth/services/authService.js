@@ -19,6 +19,18 @@ export async function login(email, password) {
   return data
 }
 
+export async function forgotPassword(email) {
+  const res = await fetch(`${BASE_URL}/api/auth/forgot-password/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.detail || 'Error al solicitar recuperacion de contraseña')
+  return data
+}
+
 export async function changePassword(current_password, new_password) {
   const res = await apiRequest('/api/auth/change-password/', {
     method: 'POST',

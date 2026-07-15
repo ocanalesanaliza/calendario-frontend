@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { login, decodeToken } from '../services/authService'
 import { useAuth } from '../context/AuthContext'
 import './LoginPage.css'
@@ -109,7 +109,7 @@ function LoginPage() {
               <input type="checkbox" />
               <span>Recordarme</span>
             </label>
-            <a href="#" className="forgot-link">¿Olvidaste tu contraseña?</a>
+            <Link to="/olvide-password" className="forgot-link">¿Olvidaste tu contraseña?</Link>
           </div>
 
           {error && <p className="login-error">{error}</p>}

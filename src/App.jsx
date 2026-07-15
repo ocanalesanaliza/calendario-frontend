@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./features/auth/context/AuthContext";
 import LoginPage from "./features/auth/pages/LoginPage";
+import ForgotPasswordPage from "./features/auth/pages/ForgotPasswordPage";
 import ChangePasswordPage from "./features/auth/pages/ChangePasswordPage";
 import CalendarPage from "./features/calendar/pages/CalendarPage";
 import TareasPage from "./features/tareas/pages/TareasPage";
@@ -31,6 +32,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/Login" element={<LoginPage />} />
+        <Route path="/olvide-password" element={<ForgotPasswordPage />} />
         <Route
           path="/cambiar-password"
           element={

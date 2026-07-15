@@ -23,6 +23,11 @@ export default function MisTareasPage() {
   const [fecha, setFecha]       = useState('')
   const [trabajosCampo, setTrabajosCampo] = useState([])
   const [campoAction, setCampoAction]     = useState(null)
+  const [seleccionadas, setSeleccionadas] = useState([])
+  const [registrandoLote, setRegistrandoLote] = useState(false)
+  const [loteError, setLoteError] = useState('')
+
+  const busy = savingId !== null || registrandoLote
 
   useEffect(() => { loadTareas(); loadTrabajosCampo() }, [fecha])
 
@@ -98,6 +103,37 @@ export default function MisTareasPage() {
     setRegistrando(null)
     setNotas('')
     setRegError('')
+    setSeleccionadas([])
+    setLoteError('')
+  }
+
+  function toggleSeleccion(id) {
+    setSeleccionadas((prev) =>
+      prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
+    )
+  }
+
+  async function handleRegistrarSeleccionadas() {
+    setRegistrandoLote(true)
+    setLoteError('')
+    const tareas = tareasFiltradas.filter((t) => seleccionadas.includes(t.id_sucursal_tarea))
+    const fallidas = []
+    for (const tarea of tareas) {
+      try {
+        await registrarTarea({
+          id_tarea: tarea.tarea?.id_tarea,
+          fecha:    data.meta?.fecha_consultada,
+        })
+      } catch (err) {
+        fallidas.push(tarea.tarea?.nombre || `Tarea #${tarea.id_sucursal_tarea}`)
+      }
+    }
+    setSeleccionadas([])
+    await loadTareas()
+    if (fallidas.length > 0) {
+      setLoteError(`No se pudieron registrar: ${fallidas.join(', ')}`)
+    }
+    setRegistrandoLote(false)
   }
 
   const tareasFiltradas = data?.results?.filter((t) => t.jornada === jornada) ?? []
@@ -119,8 +155,9 @@ export default function MisTareasPage() {
           type="date"
           className="fecha-picker"
           value={fecha || data?.meta?.fecha_consultada || ''}
-          onChange={(e) => { setFecha(e.target.value); setRegistrando(null) }}
+          onChange={(e) => { setFecha(e.target.value); cancelarRegistro() }}
           max={data?.meta?.fecha_servidor || undefined}
+          disabled={busy}
         />
       </div>
 
@@ -181,6 +218,7 @@ export default function MisTareasPage() {
         <button
           className={`jornada-tab${jornada === 'manana' ? ' active' : ''}`}
           onClick={() => { setJornada('manana'); cancelarRegistro() }}
+          disabled={busy}
         >
           Mañana
           {resumen?.manana && <span className="tab-count">{resumen.manana.total}</span>}
@@ -188,11 +226,27 @@ export default function MisTareasPage() {
         <button
           className={`jornada-tab${jornada === 'tarde' ? ' active' : ''}`}
           onClick={() => { setJornada('tarde'); cancelarRegistro() }}
+          disabled={busy}
         >
           Tarde
           {resumen?.tarde && <span className="tab-count">{resumen.tarde.total}</span>}
         </button>
       </div>
+
+      {seleccionadas.length > 0 && (
+        <div className="seleccion-bar">
+          <span>{seleccionadas.length} tarea{seleccionadas.length > 1 ? 's' : ''} seleccionada{seleccionadas.length > 1 ? 's' : ''}</span>
+          {loteError && <p className="reg-error">{loteError}</p>}
+          <div className="seleccion-actions">
+            <button className="btn-secondary-sm" onClick={() => setSeleccionadas([])} disabled={busy}>
+              Cancelar selección
+            </button>
+            <button className="btn-primary-sm" onClick={handleRegistrarSeleccionadas} disabled={busy}>
+              {registrandoLote ? 'Registrando...' : `Registrar ${seleccionadas.length} seleccionada${seleccionadas.length > 1 ? 's' : ''}`}
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="loading-state">Cargando tareas...</div>
@@ -203,6 +257,15 @@ export default function MisTareasPage() {
           {tareasFiltradas.map((t) => (
             <div key={t.id_sucursal_tarea} className={`tarea-card estado-${t.estado_ui}`}>
               <div className="tarea-card-top">
+                {t.disponible_para_registro && (
+                  <input
+                    type="checkbox"
+                    className="tarea-checkbox"
+                    checked={seleccionadas.includes(t.id_sucursal_tarea)}
+                    onChange={() => toggleSeleccion(t.id_sucursal_tarea)}
+                    disabled={busy}
+                  />
+                )}
                 <div className="tarea-card-info">
                   <p className="tarea-card-nombre">
                     {t.tarea?.nombre || `Tarea #${t.id_sucursal_tarea}`}
@@ -229,20 +292,24 @@ export default function MisTareasPage() {
                   />
                   {regError && <p className="reg-error">{regError}</p>}
                   <div className="registrar-actions">
-                    <button className="btn-secondary-sm" onClick={cancelarRegistro}>
+                    <button className="btn-secondary-sm" onClick={cancelarRegistro} disabled={busy}>
                       Cancelar
                     </button>
                     <button
                       className="btn-primary-sm"
                       onClick={() => handleRegistrar(t)}
-                      disabled={savingId === t.id_sucursal_tarea}
+                      disabled={busy}
                     >
                       {savingId === t.id_sucursal_tarea ? 'Registrando...' : 'Confirmar'}
                     </button>
                   </div>
                 </div>
               ) : t.disponible_para_registro ? (
-                <button className="btn-registrar" onClick={() => { setRegistrando(t.id_sucursal_tarea); setRegError('') }}>
+                <button
+                  className="btn-registrar"
+                  onClick={() => { setRegistrando(t.id_sucursal_tarea); setRegError('') }}
+                  disabled={busy}
+                >
                   Registrar
                 </button>
               ) : t.motivo_no_disponible ? (
