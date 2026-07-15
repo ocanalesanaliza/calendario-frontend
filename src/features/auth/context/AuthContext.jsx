@@ -1,12 +1,13 @@
 import { createContext, useContext, useMemo, useState } from 'react'
 import { decodeToken } from '../services/authService'
+import { clearTokens, getAccessToken, setTokens } from '../../../services/tokenStorage'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [accessToken, setAccessToken] = useState(() => {
     localStorage.removeItem('perfil')
-    return localStorage.getItem('access')
+    return getAccessToken()
   })
 
   const perfil = useMemo(() => {
@@ -18,15 +19,13 @@ export function AuthProvider({ children }) {
     }
   }, [accessToken])
 
-  function setAuthData(access, refresh) {
-    localStorage.setItem('access', access)
-    localStorage.setItem('refresh', refresh)
+  function setAuthData(access, refresh, remember) {
+    setTokens(access, refresh, remember)
     setAccessToken(access)
   }
 
   function logout() {
-    localStorage.removeItem('access')
-    localStorage.removeItem('refresh')
+    clearTokens()
     setAccessToken(null)
   }
 

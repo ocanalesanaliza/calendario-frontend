@@ -1,4 +1,5 @@
 import { apiRequest } from '../../../services/apiClient'
+import { getAccessToken } from '../../../services/tokenStorage'
 
 function _parsearError(detail) {
   if (!detail) return 'Error desconocido'
@@ -27,7 +28,7 @@ export async function generarReporteJson(body) {
 }
 
 export async function generarReportePdf(body) {
-  const access = localStorage.getItem('access')
+  const access = getAccessToken()
   const res = await fetch(`${BASE_URL}/api/reportes/rendimiento/generar/`, {
     method: 'POST',
     headers: {

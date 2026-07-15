@@ -1,10 +1,11 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../features/auth/context/AuthContext'
+import { getAccessToken } from '../services/tokenStorage'
 
 function ProtectedRoute({ children }) {
   const { perfil } = useAuth()
   const location = useLocation()
-  const access = localStorage.getItem('access')
+  const access = getAccessToken()
 
   if (!access) return <Navigate to="/Login" replace />
 

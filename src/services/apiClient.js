@@ -1,3 +1,5 @@
+import { clearTokens, getAccessToken, getRefreshToken, setAccessToken } from './tokenStorage'
+
 const BASE_URL = import.meta.env.VITE_API_URL
 
 let isRefreshing = false
@@ -12,13 +14,12 @@ function processQueue(error, token = null) {
 }
 
 function logout() {
-  localStorage.removeItem('access')
-  localStorage.removeItem('refresh')
+  clearTokens()
   window.location.href = '/Login'
 }
 
 async function doRefresh() {
-  const refresh = localStorage.getItem('refresh')
+  const refresh = getRefreshToken()
   if (!refresh) throw new Error('No refresh token')
 
   const res = await fetch(`${BASE_URL}/api/auth/refresh/`, {
@@ -30,12 +31,12 @@ async function doRefresh() {
   if (!res.ok) throw new Error('Refresh failed')
 
   const data = await res.json()
-  localStorage.setItem('access', data.access)
+  setAccessToken(data.access)
   return data.access
 }
 
 export async function apiRequest(path, options = {}) {
-  const access = localStorage.getItem('access')
+  const access = getAccessToken()
 
   const headers = {
     'Content-Type': 'application/json',

@@ -8,6 +8,7 @@ function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [remember, setRemember] = useState(true)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
@@ -19,7 +20,7 @@ function LoginPage() {
     setLoading(true)
     try {
       const data = await login(email, password)
-      setAuthData(data.access, data.refresh)
+      setAuthData(data.access, data.refresh, remember)
       const claims = decodeToken(data.access)
       if (claims.perfil?.debe_cambiar_password) {
         navigate('/cambiar-password')
@@ -106,7 +107,11 @@ function LoginPage() {
 
           <div className="form-options">
             <label className="remember-me">
-              <input type="checkbox" />
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+              />
               <span>Recordarme</span>
             </label>
             <Link to="/olvide-password" className="forgot-link">¿Olvidaste tu contraseña?</Link>
