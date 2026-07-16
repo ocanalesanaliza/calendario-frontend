@@ -1,17 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../features/auth/context/AuthContext'
-import {
-  getTrabajosCampo,
-  aceptarTrabajoCampo,
-  rechazarTrabajoCampo,
-} from '../../features/trabajosCampo/services/trabajosCampoService'
+import { getTrabajosCampo } from '../../features/trabajosCampo/services/trabajosCampoService'
 import './Layout.css'
 
 function Layout() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
   const navigate = useNavigate()
+  const location = useLocation()
   const { perfil, logout } = useAuth()
 
   const esGerenteArea  = perfil?.type === 'gerente_area'
@@ -20,7 +17,6 @@ function Layout() {
 
   const [notifOpen, setNotifOpen]     = useState(false)
   const [notificaciones, setNotificaciones] = useState([])
-  const [notifAction, setNotifAction] = useState(null)
   const notifRef = useRef(null)
 
   useEffect(() => {
@@ -41,30 +37,11 @@ function Layout() {
     getTrabajosCampo({ estado: 'pendiente' })
       .then((res) => setNotificaciones(res.results ?? []))
       .catch(() => {})
-  }, [esSucursal])
+  }, [esSucursal, location.pathname])
 
-  async function handleAceptarNotif(id) {
-    setNotifAction(id)
-    try {
-      await aceptarTrabajoCampo(id)
-      setNotificaciones((prev) => prev.filter((tc) => tc.id_trabajo_campo !== id))
-    } catch (err) {
-      alert(err.message)
-    } finally {
-      setNotifAction(null)
-    }
-  }
-
-  async function handleRechazarNotif(id) {
-    setNotifAction(id)
-    try {
-      await rechazarTrabajoCampo(id)
-      setNotificaciones((prev) => prev.filter((tc) => tc.id_trabajo_campo !== id))
-    } catch (err) {
-      alert(err.message)
-    } finally {
-      setNotifAction(null)
-    }
+  function handleNotifClick(tc) {
+    setNotifOpen(false)
+    navigate('/solicitudes-pendientes', { state: { highlightId: tc.id_trabajo_campo } })
   }
 
   function handleLogout() {
@@ -112,29 +89,17 @@ function Layout() {
                   <p className="notif-empty">No tienes notificaciones.</p>
                 ) : (
                   notificaciones.map((tc) => (
-                    <div key={tc.id_trabajo_campo} className="notif-item">
+                    <button
+                      key={tc.id_trabajo_campo}
+                      className="notif-item"
+                      onClick={() => handleNotifClick(tc)}
+                    >
                       <p className="notif-item-titulo">Solicitud de trabajo de campo</p>
                       <p className="notif-item-meta">
                         {tc.fecha} · {tc.jornada === 'manana' ? 'Mañana' : 'Tarde'}
                         {tc.motivo ? ` · ${tc.motivo}` : ''}
                       </p>
-                      <div className="notif-item-actions">
-                        <button
-                          className="btn-rechazar"
-                          disabled={notifAction === tc.id_trabajo_campo}
-                          onClick={() => handleRechazarNotif(tc.id_trabajo_campo)}
-                        >
-                          Rechazar
-                        </button>
-                        <button
-                          className="btn-aceptar"
-                          disabled={notifAction === tc.id_trabajo_campo}
-                          onClick={() => handleAceptarNotif(tc.id_trabajo_campo)}
-                        >
-                          Aceptar
-                        </button>
-                      </div>
-                    </div>
+                    </button>
                   ))
                 )}
               </div>
@@ -254,6 +219,19 @@ function Layout() {
                   <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
                 </svg>
                 Mis tareas
+              </NavLink>
+            )}
+
+            {esSucursal && (
+              <NavLink to="/solicitudes-pendientes" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                  <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+                Solicitudes pendientes
+                {notificaciones.length > 0 && (
+                  <span className="tab-count">{notificaciones.length}</span>
+                )}
               </NavLink>
             )}
 

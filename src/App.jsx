@@ -11,6 +11,7 @@ import PlantillasPage from "./features/plantillas/pages/PlantillasPage";
 import PlantillaDetallePage from "./features/plantillas/pages/PlantillaDetallePage";
 import GerentesPage from "./features/gerentes/pages/GerentesPage";
 import MisTareasPage from "./features/operacion/pages/MisTareasPage";
+import SolicitudesPendientesPage from "./features/trabajosCampo/pages/SolicitudesPendientesPage";
 import AlmuerzosPage from "./features/almuerzos/pages/AlmuerzosPage";
 import CoberturasPage from "./features/coberturas/pages/CoberturasPage";
 import DashboardPage from "./features/dashboard/pages/DashboardPage";
@@ -56,6 +57,7 @@ function App() {
           <Route path="/plantillas/:id" element={<PlantillaDetallePage />} />
           <Route path="/gerentes" element={<GerentesPage />} />
           <Route path="/mis-tareas" element={<MisTareasPage />} />
+          <Route path="/solicitudes-pendientes" element={<SucursalRoute><SolicitudesPendientesPage /></SucursalRoute>} />
           <Route path="/almuerzos" element={<AlmuerzosPage />} />
           <Route path="/coberturas" element={<CoberturasPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
