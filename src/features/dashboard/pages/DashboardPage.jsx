@@ -2,8 +2,20 @@
 import { useAuth } from '../../auth/context/AuthContext'
 import { getDashboardOperativo } from '../services/dashboardService'
 import { getGerentes } from '../../gerentes/services/gerentesService'
-import { createTrabajoCampo, cancelarTrabajoCampo } from '../../trabajosCampo/services/trabajosCampoService'
+import { getUsuarios } from '../../usuarios/services/usuariosService'
+import {
+  createTrabajoCampo,
+  cancelarTrabajoCampo,
+  getTrabajosCampo,
+} from '../../trabajosCampo/services/trabajosCampoService'
 import './DashboardPage.css'
+
+const ESTADO_CAMPO_BADGE = {
+  pendiente: 'badge-yellow',
+  aceptado:  'badge-green',
+  rechazado: 'badge-red',
+  cancelado: 'badge-tipo',
+}
 
 const PRESENCIA_BADGE = {
   activo:      { cls: 'badge-green',  label: 'Activo' },
@@ -42,6 +54,7 @@ export default function DashboardPage() {
   const [verTodos, setVerTodos]     = useState(false)
   const [gerentes, setGerentes]     = useState([])
   const [modalCampo, setModalCampo] = useState(null)
+  const [tab, setTab]               = useState('operativo')
 
   useEffect(() => {
     if (esAdmin) getGerentes().then(setGerentes).catch(() => {})
@@ -96,6 +109,25 @@ export default function DashboardPage() {
         </button>
       </div>
 
+      <div className="tab-bar">
+        <button
+          className={`tab-btn${tab === 'operativo' ? ' active' : ''}`}
+          onClick={() => setTab('operativo')}
+        >
+          Vista operativa
+        </button>
+        <button
+          className={`tab-btn${tab === 'campo' ? ' active' : ''}`}
+          onClick={() => setTab('campo')}
+        >
+          Tareas de campo
+        </button>
+      </div>
+
+      {tab === 'campo' ? (
+        <TareasCampoTab perfil={perfil} />
+      ) : (
+        <>
       <div className="toolbar">
         <div className="search-wrapper">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -163,7 +195,12 @@ export default function DashboardPage() {
       )}
 
       {loading ? (
-        <div className="loading-state">Cargando dashboard...</div>
+        <div className="loading-state">
+          <div className="loading-bar">
+            <div className="loading-bar-fill" />
+          </div>
+          <span>Cargando dashboard...</span>
+        </div>
       ) : meta.requiere_filtro ? (
         <div className="empty-state">{meta.mensaje || 'Selecciona un filtro para ver el dashboard.'}</div>
       ) : results.length === 0 ? (
@@ -191,6 +228,8 @@ export default function DashboardPage() {
           onClose={() => setModalCampo(null)}
           onSuccess={() => { setModalCampo(null); loadData() }}
         />
+      )}
+        </>
       )}
     </div>
   )
@@ -275,12 +314,13 @@ function UserCard({ user, esAdmin, fechaDashboard, onCrearCampo, onCancelarCampo
   )
 }
 
-function TrabajoCampoModal({ idUsuario, nombreUsuario, fechaDashboard, onClose, onSuccess }) {
+function TrabajoCampoModal({ idUsuario, nombreUsuario, fechaDashboard, usuarios, onClose, onSuccess }) {
   const hoy = new Date().toISOString().slice(0, 10)
   const [form, setForm] = useState({
-    fecha:   fechaDashboard || hoy,
-    jornada: 'manana',
-    motivo:  '',
+    idUsuario: idUsuario || '',
+    fecha:     fechaDashboard || hoy,
+    jornada:   'manana',
+    motivo:    '',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
@@ -293,7 +333,7 @@ function TrabajoCampoModal({ idUsuario, nombreUsuario, fechaDashboard, onClose, 
     setLoading(true)
     try {
       await createTrabajoCampo({
-        id_usuario: idUsuario,
+        id_usuario: idUsuario || form.idUsuario,
         fecha:      form.fecha,
         jornada:    form.jornada,
         motivo:     form.motivo || undefined,
@@ -310,7 +350,7 @@ function TrabajoCampoModal({ idUsuario, nombreUsuario, fechaDashboard, onClose, 
     <div className="modal-overlay">
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Trabajo de campo — {nombreUsuario}</h2>
+          <h2>{nombreUsuario ? `Trabajo de campo — ${nombreUsuario}` : 'Nueva solicitud de trabajo de campo'}</h2>
           <button className="modal-close" onClick={onClose}>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -318,6 +358,17 @@ function TrabajoCampoModal({ idUsuario, nombreUsuario, fechaDashboard, onClose, 
           </button>
         </div>
         <form className="modal-form" onSubmit={handleSubmit}>
+          {!idUsuario && (
+            <div className="form-group">
+              <label>Empleado</label>
+              <select value={form.idUsuario} onChange={set('idUsuario')} required>
+                <option value="">Selecciona un empleado...</option>
+                {(usuarios ?? []).map((u) => (
+                  <option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="form-group">
             <label>Fecha</label>
             <input type="date" value={form.fecha} onChange={set('fecha')} required />
@@ -342,6 +393,95 @@ function TrabajoCampoModal({ idUsuario, nombreUsuario, fechaDashboard, onClose, 
           </div>
         </form>
       </div>
+    </div>
+  )
+}
+
+function TareasCampoTab({ perfil }) {
+  const [enviadas, setEnviadas]   = useState([])
+  const [usuarios, setUsuarios]   = useState([])
+  const [loading, setLoading]     = useState(true)
+  const [modalOpen, setModalOpen] = useState(false)
+
+  useEffect(() => {
+    getUsuarios().then(setUsuarios).catch(() => {})
+  }, [])
+
+  const loadEnviadas = useCallback(async () => {
+    setLoading(true)
+    try {
+      const data = await getTrabajosCampo({})
+      const propias = (data.results ?? []).filter(
+        (t) => t.solicitado_por?.id_usuario === perfil?.id
+      )
+      setEnviadas(propias)
+    } finally {
+      setLoading(false)
+    }
+  }, [perfil])
+
+  useEffect(() => { loadEnviadas() }, [loadEnviadas])
+
+  async function handleCancelar(id) {
+    try {
+      await cancelarTrabajoCampo(id)
+      await loadEnviadas()
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
+  return (
+    <div className="tareas-campo-tab">
+      <div className="tareas-campo-header">
+        <p>{enviadas.length} solicitud{enviadas.length !== 1 ? 'es' : ''} enviada{enviadas.length !== 1 ? 's' : ''}</p>
+        <button className="btn-primary" onClick={() => setModalOpen(true)}>Nueva solicitud</button>
+      </div>
+
+      {loading ? (
+        <div className="loading-state">
+          <div className="loading-bar">
+            <div className="loading-bar-fill" />
+          </div>
+          <span>Cargando...</span>
+        </div>
+      ) : enviadas.length === 0 ? (
+        <div className="empty-state">No has enviado solicitudes de trabajo de campo.</div>
+      ) : (
+        <div className="campo-enviadas-list">
+          {enviadas.map((t) => (
+            <div key={t.id_trabajo_campo} className="campo-enviada-row">
+              <div className="campo-enviada-info">
+                <p className="campo-enviada-nombre">{t.usuario?.nombre}</p>
+                <p className="campo-enviada-meta">
+                  {t.fecha} · {t.jornada === 'manana' ? 'Mañana' : 'Tarde'}
+                  {t.motivo ? ` · ${t.motivo}` : ''}
+                </p>
+              </div>
+              <span className={`badge ${ESTADO_CAMPO_BADGE[t.estado] ?? 'badge-tipo'}`}>
+                {t.estado_label}
+              </span>
+              {t.estado === 'pendiente' && (
+                <button
+                  className="campo-cancel-btn"
+                  title="Cancelar solicitud"
+                  onClick={() => handleCancelar(t.id_trabajo_campo)}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {modalOpen && (
+        <TrabajoCampoModal
+          usuarios={usuarios}
+          onClose={() => setModalOpen(false)}
+          onSuccess={() => { setModalOpen(false); loadEnviadas() }}
+        />
+      )}
     </div>
   )
 }
