@@ -1,6 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../features/auth/context/AuthContext'
+import {
+  getTrabajosCampo,
+  aceptarTrabajoCampo,
+  rechazarTrabajoCampo,
+} from '../../features/trabajosCampo/services/trabajosCampoService'
 import './Layout.css'
 
 function Layout() {
@@ -13,15 +18,54 @@ function Layout() {
   const esSucursal     = perfil?.type === 'gerente_sucursal'
   const esAdmin        = perfil?.es_admin_maestro === true
 
+  const [notifOpen, setNotifOpen]     = useState(false)
+  const [notificaciones, setNotificaciones] = useState([])
+  const [notifAction, setNotifAction] = useState(null)
+  const notifRef = useRef(null)
+
   useEffect(() => {
     function handleClickOutside(e) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setDropdownOpen(false)
       }
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setNotifOpen(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  useEffect(() => {
+    if (!esSucursal) return
+    getTrabajosCampo({ estado: 'pendiente' })
+      .then((res) => setNotificaciones(res.results ?? []))
+      .catch(() => {})
+  }, [esSucursal])
+
+  async function handleAceptarNotif(id) {
+    setNotifAction(id)
+    try {
+      await aceptarTrabajoCampo(id)
+      setNotificaciones((prev) => prev.filter((tc) => tc.id_trabajo_campo !== id))
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setNotifAction(null)
+    }
+  }
+
+  async function handleRechazarNotif(id) {
+    setNotifAction(id)
+    try {
+      await rechazarTrabajoCampo(id)
+      setNotificaciones((prev) => prev.filter((tc) => tc.id_trabajo_campo !== id))
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setNotifAction(null)
+    }
+  }
 
   function handleLogout() {
     logout()
@@ -47,12 +91,55 @@ function Layout() {
 
         <div className="topbar-actions">
           {/* Notificaciones */}
-          <button className="icon-btn" aria-label="Notificaciones">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-          </button>
+          <div className="notif-menu" ref={notifRef}>
+            <button
+              className="icon-btn"
+              aria-label="Notificaciones"
+              onClick={() => setNotifOpen(!notifOpen)}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+              {notificaciones.length > 0 && (
+                <span className="notif-badge">{notificaciones.length}</span>
+              )}
+            </button>
+
+            {notifOpen && (
+              <div className="dropdown-menu notif-dropdown">
+                {notificaciones.length === 0 ? (
+                  <p className="notif-empty">No tienes notificaciones.</p>
+                ) : (
+                  notificaciones.map((tc) => (
+                    <div key={tc.id_trabajo_campo} className="notif-item">
+                      <p className="notif-item-titulo">Solicitud de trabajo de campo</p>
+                      <p className="notif-item-meta">
+                        {tc.fecha} · {tc.jornada === 'manana' ? 'Mañana' : 'Tarde'}
+                        {tc.motivo ? ` · ${tc.motivo}` : ''}
+                      </p>
+                      <div className="notif-item-actions">
+                        <button
+                          className="btn-rechazar"
+                          disabled={notifAction === tc.id_trabajo_campo}
+                          onClick={() => handleRechazarNotif(tc.id_trabajo_campo)}
+                        >
+                          Rechazar
+                        </button>
+                        <button
+                          className="btn-aceptar"
+                          disabled={notifAction === tc.id_trabajo_campo}
+                          onClick={() => handleAceptarNotif(tc.id_trabajo_campo)}
+                        >
+                          Aceptar
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Usuario dropdown */}
           <div className="user-menu" ref={dropdownRef}>
