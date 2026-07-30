@@ -175,9 +175,7 @@ function VistaDiaria({ esGerente, idUsuario }) {
                       <th>Tarea</th>
                       <th>Jornada</th>
                       <th>Hora</th>
-                      <th>Peso</th>
                       <th>Estado</th>
-                      <th>Aporte</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -186,13 +184,11 @@ function VistaDiaria({ esGerente, idUsuario }) {
                         <td className="td-nombre">{d.nombre_tarea_snapshot}</td>
                         <td>{d.jornada === 'manana' ? 'Mañana' : 'Tarde'}</td>
                         <td>{d.hora_programada}</td>
-                        <td className="td-mono">{d.peso_programado}</td>
                         <td>
                           <span className={`badge ${ESTADO_BADGE[d.estado_final] ?? 'badge-tipo'}`}>
                             {d.estado_final}
                           </span>
                         </td>
-                        <td className="td-mono">{d.porcentaje_aportado}%</td>
                       </tr>
                     ))}
                   </tbody>

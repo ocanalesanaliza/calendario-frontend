@@ -27,6 +27,14 @@ function SucursalRoute({ children }) {
   return children
 }
 
+function PendientesRoute({ children }) {
+  const { perfil } = useAuth()
+  if (perfil && perfil.type !== 'gerente_sucursal' && perfil.type !== 'gerente_area') {
+    return <Navigate to="/" replace />
+  }
+  return children
+}
+
 function App() {
   return (
     <AuthProvider>
@@ -57,7 +65,7 @@ function App() {
           <Route path="/plantillas/:id" element={<PlantillaDetallePage />} />
           <Route path="/gerentes" element={<GerentesPage />} />
           <Route path="/mis-tareas" element={<MisTareasPage />} />
-          <Route path="/solicitudes-pendientes" element={<SucursalRoute><SolicitudesPendientesPage /></SucursalRoute>} />
+          <Route path="/solicitudes-pendientes" element={<PendientesRoute><SolicitudesPendientesPage /></PendientesRoute>} />
           <Route path="/almuerzos" element={<AlmuerzosPage />} />
           <Route path="/coberturas" element={<CoberturasPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />

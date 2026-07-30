@@ -63,3 +63,20 @@ export async function completarCobertura(id) {
   if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al completar cobertura')
   return data
 }
+
+export async function aceptarCobertura(id) {
+  const res = await apiRequest(`/api/coberturas-temporales/${id}/aceptar/`, { method: 'POST' })
+  const data = await res.json()
+  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al aceptar cobertura')
+  return data
+}
+
+export async function rechazarCobertura(id, motivo = '') {
+  const res = await apiRequest(`/api/coberturas-temporales/${id}/rechazar/`, {
+    method: 'POST',
+    body: JSON.stringify(motivo ? { motivo } : {}),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al rechazar cobertura')
+  return data
+}

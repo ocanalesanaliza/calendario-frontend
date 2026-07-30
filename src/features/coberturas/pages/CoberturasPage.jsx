@@ -6,10 +6,12 @@ import Toast from '../../../components/Toast/Toast'
 import './CoberturasPage.css'
 
 const ESTADO_BADGE = {
-  programada:  'badge-yellow',
+  pendiente:   'badge-yellow',
+  programada:  'badge-blue',
   activa:      'badge-green',
   completada:  'badge-blue',
   cancelada:   'badge-red',
+  rechazada:   'badge-red',
 }
 
 const JORNADA_LABEL = {
@@ -79,10 +81,12 @@ export default function CoberturasPage() {
       <div className="toolbar">
         <select className="filtro-select" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
           <option value="">Todos los estados</option>
+          <option value="pendiente">Pendientes</option>
           <option value="programada">Programadas</option>
           <option value="activa">Activas</option>
           <option value="completada">Completadas</option>
           <option value="cancelada">Canceladas</option>
+          <option value="rechazada">Rechazadas</option>
         </select>
       </div>
 
@@ -135,7 +139,7 @@ export default function CoberturasPage() {
                           </svg>
                         </button>
                       )}
-                      {(c.estado === 'programada' || c.estado === 'activa') && (
+                      {(c.estado === 'pendiente' || c.estado === 'programada' || c.estado === 'activa') && (
                         <button className="action-btn action-btn-danger" title="Cancelar" onClick={() => handleAccion(c.id_cobertura, 'cancelar')}>
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>

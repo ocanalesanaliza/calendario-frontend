@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../features/auth/context/AuthContext'
 import { getTrabajosCampo } from '../../features/trabajosCampo/services/trabajosCampoService'
+import { getCoberturas } from '../../features/coberturas/services/coberturasService'
 import './Layout.css'
 
 function Layout() {
@@ -33,15 +34,38 @@ function Layout() {
   }, [])
 
   useEffect(() => {
-    if (!esSucursal) return
-    getTrabajosCampo({ estado: 'pendiente' })
-      .then((res) => setNotificaciones(res.results ?? []))
-      .catch(() => {})
-  }, [esSucursal, location.pathname])
+    if (esGerenteArea) {
+      getTrabajosCampo({ estado: 'pendiente' })
+        .then((res) => setNotificaciones(
+          (res.results ?? []).map((tc) => ({
+            id: tc.id_trabajo_campo,
+            tipo: 'campo',
+            titulo: `Trabajo de campo — ${tc.usuario?.nombre ?? ''}`,
+            fecha: tc.fecha,
+            meta: `${tc.jornada === 'manana' ? 'Mañana' : 'Tarde'}${tc.motivo ? ` · ${tc.motivo}` : ''}`,
+          }))
+        ))
+        .catch(() => {})
+    } else if (esSucursal) {
+      getCoberturas({ estado: 'pendiente' })
+        .then((res) => setNotificaciones(
+          (res.results ?? []).map((c) => ({
+            id: c.id_cobertura,
+            tipo: 'cobertura',
+            titulo: `Cobertura en ${c.sucursal_destino?.nombre ?? ''}`,
+            fecha: c.fecha,
+            meta: `${c.jornada_label ?? ''}${c.motivo ? ` · ${c.motivo}` : ''}`,
+          }))
+        ))
+        .catch(() => {})
+    } else {
+      setNotificaciones([])
+    }
+  }, [esGerenteArea, esSucursal, location.pathname])
 
-  function handleNotifClick(tc) {
+  function handleNotifClick(item) {
     setNotifOpen(false)
-    navigate('/solicitudes-pendientes', { state: { highlightId: tc.id_trabajo_campo } })
+    navigate('/solicitudes-pendientes', { state: { highlightId: item.tipo === 'campo' ? item.id : null } })
   }
 
   function handleLogout() {
@@ -88,17 +112,14 @@ function Layout() {
                 {notificaciones.length === 0 ? (
                   <p className="notif-empty">No tienes notificaciones.</p>
                 ) : (
-                  notificaciones.map((tc) => (
+                  notificaciones.map((item) => (
                     <button
-                      key={tc.id_trabajo_campo}
+                      key={`${item.tipo}-${item.id}`}
                       className="notif-item"
-                      onClick={() => handleNotifClick(tc)}
+                      onClick={() => handleNotifClick(item)}
                     >
-                      <p className="notif-item-titulo">Solicitud de trabajo de campo</p>
-                      <p className="notif-item-meta">
-                        {tc.fecha} · {tc.jornada === 'manana' ? 'Mañana' : 'Tarde'}
-                        {tc.motivo ? ` · ${tc.motivo}` : ''}
-                      </p>
+                      <p className="notif-item-titulo">{item.titulo}</p>
+                      <p className="notif-item-meta">{item.fecha} · {item.meta}</p>
                     </button>
                   ))
                 )}
@@ -222,7 +243,7 @@ function Layout() {
               </NavLink>
             )}
 
-            {esSucursal && (
+            {(esSucursal || esGerenteArea) && (
               <NavLink to="/solicitudes-pendientes" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>

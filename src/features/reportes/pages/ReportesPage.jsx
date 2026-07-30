@@ -420,9 +420,7 @@ function TablaRanking({ reporte }) {
   )
 
   const top5    = usuariosOrdenados.slice(0, 5)
-  const bottom5 = usuariosOrdenados.length >= 5
-    ? [...usuariosOrdenados].reverse().slice(0, 5).reverse()
-    : []
+  const bottom5 = usuariosOrdenados.slice(5).slice(-5)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

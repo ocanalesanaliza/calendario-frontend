@@ -25,6 +25,23 @@ function formatFecha(iso) {
   return `${d}/${m}/${y}`
 }
 
+function formatFechaHora(iso) {
+  if (!iso) return '—'
+  const fecha = formatFecha(iso.slice(0, 10))
+  const hora = new Date(iso).toLocaleTimeString('es-HN', { hour: '2-digit', minute: '2-digit' })
+  return `${fecha} ${hora}`
+}
+
+function hoyISO() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function haceNDiasISO(dias) {
+  const d = new Date()
+  d.setDate(d.getDate() - dias)
+  return d.toISOString().slice(0, 10)
+}
+
 export default function SituacionesPage() {
   const [situaciones, setSituaciones] = useState([])
   const [loading, setLoading]         = useState(true)
@@ -93,6 +110,7 @@ export default function SituacionesPage() {
                 <th>Tipo</th>
                 <th>Notas</th>
                 <th>Creada por</th>
+                <th>Fecha creación</th>
                 <th>Estado</th>
                 <th>Acciones</th>
               </tr>
@@ -109,6 +127,7 @@ export default function SituacionesPage() {
                   </td>
                   <td className="td-notas">{s.notas || <span className="td-empty">—</span>}</td>
                   <td>{s.creada_por?.nombre ?? '—'}</td>
+                  <td>{formatFechaHora(s.created_at)}</td>
                   <td>
                     <span className={`badge ${s.activa ? 'badge-green' : 'badge-red'}`}>
                       {s.activa ? 'Activa' : 'Inactiva'}
@@ -212,6 +231,15 @@ function CrearModal({ onSubmit, onClose }) {
     e.preventDefault()
     setError('')
 
+    if (form.fecha_inicio < haceNDiasISO(15)) {
+      setError('No se puede registrar una situación con más de 15 días de antigüedad.')
+      return
+    }
+    if (form.fecha_inicio > hoyISO()) {
+      setError('No se puede aplicar rendimiento futuro.')
+      return
+    }
+
     const fechaFin = form.fecha_fin || form.fecha_inicio
     if (form.fecha_fin && form.fecha_fin < form.fecha_inicio) {
       setError('La fecha de fin no puede ser anterior a la fecha de inicio.')
@@ -257,7 +285,14 @@ function CrearModal({ onSubmit, onClose }) {
         <div className="form-row">
           <div className="form-group">
             <label>Fecha inicio</label>
-            <input type="date" value={form.fecha_inicio} onChange={set('fecha_inicio')} required />
+            <input
+              type="date"
+              value={form.fecha_inicio}
+              min={haceNDiasISO(15)}
+              max={hoyISO()}
+              onChange={set('fecha_inicio')}
+              required
+            />
           </div>
           <div className="form-group">
             <label>Fecha fin <span className="label-optional">(opcional)</span></label>
