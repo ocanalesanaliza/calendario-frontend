@@ -27,6 +27,38 @@ export default function SolicitudesPendientesPage() {
 
 /* ── Vista gerente de área: acepta/rechaza trabajo de campo ── */
 function VistaGerenteArea() {
+  const [tab, setTab] = useState('pendientes')
+
+  return (
+    <div className="solicitudes-pendientes-page">
+      <div className="page-header">
+        <div>
+          <h1>Solicitudes pendientes</h1>
+          <p>Trabajo de campo que te han solicitado</p>
+        </div>
+      </div>
+
+      <div className="tab-bar">
+        <button
+          className={`tab-btn${tab === 'pendientes' ? ' active' : ''}`}
+          onClick={() => setTab('pendientes')}
+        >
+          Pendientes
+        </button>
+        <button
+          className={`tab-btn${tab === 'historial' ? ' active' : ''}`}
+          onClick={() => setTab('historial')}
+        >
+          Historial de solicitudes
+        </button>
+      </div>
+
+      {tab === 'pendientes' ? <PendientesTrabajoCampo /> : <HistorialSolicitudes />}
+    </div>
+  )
+}
+
+function PendientesTrabajoCampo() {
   const location = useLocation()
   const highlightId = location.state?.highlightId ?? null
 
@@ -78,14 +110,7 @@ function VistaGerenteArea() {
   }
 
   return (
-    <div className="solicitudes-pendientes-page">
-      <div className="page-header">
-        <div>
-          <h1>Solicitudes pendientes</h1>
-          <p>Trabajo de campo que te han solicitado</p>
-        </div>
-      </div>
-
+    <>
       {loading ? (
         <div className="loading-state">
           <div className="loading-bar">
@@ -139,7 +164,102 @@ function VistaGerenteArea() {
           ))}
         </div>
       )}
-    </div>
+    </>
+  )
+}
+
+const PAGE_SIZE_HISTORIAL = 10
+
+function HistorialSolicitudes() {
+  const [busqueda, setBusqueda] = useState('')
+  const [page, setPage]         = useState(1)
+  const [data, setData]         = useState({ results: [], count: 0, total_pages: 0 })
+  const [loading, setLoading]   = useState(true)
+
+  useEffect(() => { setPage(1) }, [busqueda])
+
+  const loadHistorial = useCallback(async () => {
+    setLoading(true)
+    try {
+      const params = { page, page_size: PAGE_SIZE_HISTORIAL }
+      if (busqueda.trim()) params.buscar = busqueda.trim()
+      const res = await getTrabajosCampo(params)
+      setData({
+        results: res.results ?? [],
+        count: res.count ?? 0,
+        total_pages: res.total_pages ?? 0,
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [busqueda, page])
+
+  useEffect(() => { loadHistorial() }, [loadHistorial])
+
+  return (
+    <>
+      <div className="toolbar">
+        <div className="search-wrapper">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input
+            type="text"
+            placeholder="Buscar por nombre, email o motivo..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="loading-state">
+          <div className="loading-bar">
+            <div className="loading-bar-fill" />
+          </div>
+          <span>Cargando...</span>
+        </div>
+      ) : data.results.length === 0 ? (
+        <div className="empty-state">No hay solicitudes en el historial.</div>
+      ) : (
+        <div className="campo-enviadas-list">
+          {data.results.map((tc) => (
+            <div key={tc.id_trabajo_campo} className="campo-enviada-row">
+              <div className="campo-enviada-info">
+                <p className="campo-enviada-nombre">{tc.usuario?.nombre}</p>
+                <p className="campo-enviada-meta">
+                  {tc.fecha} · {tc.jornada === 'manana' ? 'Mañana' : 'Tarde'}
+                  {tc.motivo ? ` · ${tc.motivo}` : ''}
+                </p>
+              </div>
+              <span className={`badge ${ESTADO_CAMPO_BADGE[tc.estado] ?? 'badge-tipo'}`}>
+                {tc.estado_label}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {data.total_pages > 1 && (
+        <div className="paginacion">
+          <button
+            className="btn-secondary"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            Anterior
+          </button>
+          <span className="paginacion-info">Página {page} de {data.total_pages}</span>
+          <button
+            className="btn-secondary"
+            disabled={page >= data.total_pages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Siguiente
+          </button>
+        </div>
+      )}
+    </>
   )
 }
 
