@@ -4,20 +4,29 @@ import { getUsuarios } from '../../usuarios/services/usuariosService'
 import './SituacionesPage.css'
 
 const TIPO_LABEL = {
-  incapacidad:      'Incapacidad',
-  vacaciones:       'Vacaciones',
-  permiso_aprobado: 'Permiso aprobado',
-  otro_aprobado:    'Otro aprobado',
-  no_aprobada_ga:   'No aprobada por GA',
+  incapacidad:            'Incapacidad',
+  vacaciones:             'Vacaciones no programadas',
+  vacaciones_programadas: 'Vacaciones programadas',
+  permiso_aprobado:       'Permiso aprobado',
+  otro_aprobado:          'Otro aprobado',
+  no_aprobada_ga:         'No aprobada por GA',
 }
 
+// vacaciones_programadas solo se genera al aceptar una solicitud, no manualmente
+const TIPO_LABEL_CREABLE = Object.fromEntries(
+  Object.entries(TIPO_LABEL).filter(([val]) => val !== 'vacaciones_programadas')
+)
+
 const TIPO_BADGE = {
-  incapacidad:      'badge-blue',
-  vacaciones:       'badge-green',
-  permiso_aprobado: 'badge-yellow',
-  otro_aprobado:    'badge-orange',
-  no_aprobada_ga:   'badge-red',
+  incapacidad:            'badge-blue',
+  vacaciones:             'badge-green',
+  vacaciones_programadas: 'badge-green',
+  permiso_aprobado:       'badge-yellow',
+  otro_aprobado:          'badge-orange',
+  no_aprobada_ga:         'badge-red',
 }
+
+const PAGE_SIZE = 15
 
 function formatFecha(iso) {
   if (!iso) return '—'
@@ -44,18 +53,26 @@ function haceNDiasISO(dias) {
 
 export default function SituacionesPage() {
   const [situaciones, setSituaciones] = useState([])
+  const [totalPages, setTotalPages]   = useState(0)
   const [loading, setLoading]         = useState(true)
   const [modal, setModal]             = useState(null)
   const [filtroActiva, setFiltroActiva] = useState('activas')
+  const [apartado, setApartado]       = useState('todas')
+  const [page, setPage]               = useState(1)
 
-  useEffect(() => { loadData() }, [filtroActiva])
+  useEffect(() => { setPage(1) }, [filtroActiva, apartado])
+  useEffect(() => { loadData() }, [filtroActiva, apartado, page])
 
   async function loadData() {
     setLoading(true)
     try {
       const params = filtroActiva === 'todas' ? { activa: '' } : { activa: filtroActiva === 'activas' ? 'true' : 'false' }
+      params.page = page
+      params.page_size = PAGE_SIZE
+      if (apartado === 'programadas') params.tipo = 'vacaciones_programadas'
       const data = await getSituaciones(params)
-      setSituaciones(data)
+      setSituaciones(data.results ?? [])
+      setTotalPages(data.total_pages ?? 0)
     } finally {
       setLoading(false)
     }
@@ -85,6 +102,21 @@ export default function SituacionesPage() {
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
           </svg>
           Nueva situación
+        </button>
+      </div>
+
+      <div className="tab-bar">
+        <button
+          className={`tab-btn${apartado === 'todas' ? ' active' : ''}`}
+          onClick={() => setApartado('todas')}
+        >
+          Todas
+        </button>
+        <button
+          className={`tab-btn${apartado === 'programadas' ? ' active' : ''}`}
+          onClick={() => setApartado('programadas')}
+        >
+          Vacaciones programadas
         </button>
       </div>
 
@@ -155,6 +187,18 @@ export default function SituacionesPage() {
           <div className="table-footer">
             {situaciones.length} situación{situaciones.length !== 1 ? 'es' : ''}
           </div>
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="paginacion">
+          <button className="btn-secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            Anterior
+          </button>
+          <span className="paginacion-info">Página {page} de {totalPages}</span>
+          <button className="btn-secondary" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+            Siguiente
+          </button>
         </div>
       )}
 
@@ -312,7 +356,7 @@ function CrearModal({ onSubmit, onClose }) {
         <div className="form-group">
           <label>Tipo</label>
           <select value={form.tipo} onChange={set('tipo')} required>
-            {Object.entries(TIPO_LABEL).map(([val, label]) => (
+            {Object.entries(TIPO_LABEL_CREABLE).map(([val, label]) => (
               <option key={val} value={val}>{label}</option>
             ))}
           </select>

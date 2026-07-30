@@ -5,7 +5,7 @@ export async function getSituaciones(params = {}) {
   const res = await apiRequest(`/api/rendimiento/situaciones-especiales/${query ? `?${query}` : ''}`)
   const data = await res.json()
   if (!res.ok) throw new Error(data.detail || 'Error al cargar situaciones especiales')
-  return data.results
+  return data
 }
 
 export async function crearSituacion(body) {

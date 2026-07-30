@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../features/auth/context/AuthContext'
 import { getTrabajosCampo } from '../../features/trabajosCampo/services/trabajosCampoService'
 import { getCoberturas } from '../../features/coberturas/services/coberturasService'
+import { getSolicitudesVacacion } from '../../features/vacacionesProgramadas/services/vacacionesProgramadasService'
 import './Layout.css'
 
 function Layout() {
@@ -35,17 +36,26 @@ function Layout() {
 
   useEffect(() => {
     if (esGerenteArea) {
-      getTrabajosCampo({ estado: 'pendiente' })
-        .then((res) => setNotificaciones(
-          (res.results ?? []).map((tc) => ({
-            id: tc.id_trabajo_campo,
-            tipo: 'campo',
-            titulo: `Trabajo de campo — ${tc.usuario?.nombre ?? ''}`,
-            fecha: tc.fecha,
-            meta: `${tc.jornada === 'manana' ? 'Mañana' : 'Tarde'}${tc.motivo ? ` · ${tc.motivo}` : ''}`,
-          }))
-        ))
-        .catch(() => {})
+      Promise.all([
+        getTrabajosCampo({ estado: 'pendiente' }).catch(() => ({ results: [] })),
+        getSolicitudesVacacion({ estado: 'pendiente' }).catch(() => ({ results: [] })),
+      ]).then(([trabajos, vacaciones]) => {
+        const deCampo = (trabajos.results ?? []).map((tc) => ({
+          id: tc.id_trabajo_campo,
+          tipo: 'campo',
+          titulo: `Trabajo de campo — ${tc.usuario?.nombre ?? ''}`,
+          fecha: tc.fecha,
+          meta: `${tc.jornada === 'manana' ? 'Mañana' : 'Tarde'}${tc.motivo ? ` · ${tc.motivo}` : ''}`,
+        }))
+        const deVacaciones = (vacaciones.results ?? []).map((v) => ({
+          id: v.id_solicitud_vacacion,
+          tipo: 'vacacion',
+          titulo: `Vacaciones programadas — ${v.usuario?.nombre ?? ''}`,
+          fecha: v.fecha_inicio,
+          meta: `${v.fecha_inicio} al ${v.fecha_fin}${v.motivo ? ` · ${v.motivo}` : ''}`,
+        }))
+        setNotificaciones([...deCampo, ...deVacaciones])
+      })
     } else if (esSucursal) {
       getCoberturas({ estado: 'pendiente' })
         .then((res) => setNotificaciones(

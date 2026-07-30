@@ -16,11 +16,12 @@ const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto'
 const DIAS_SEMANA = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
 
 const TIPO_LABEL = {
-  vacaciones:       'VAC',
-  incapacidad:      'INC',
-  permiso_aprobado: 'PER',
-  otro_aprobado:    'COM',
-  no_aprobada_ga:   'N/A',
+  vacaciones:             'VAC',
+  vacaciones_programadas: 'VAC-P',
+  incapacidad:            'INC',
+  permiso_aprobado:       'PER',
+  otro_aprobado:          'COM',
+  no_aprobada_ga:         'N/A',
 }
 
 
@@ -379,7 +380,8 @@ function LeyendaSimbolos() {
     <p className="rp-leyenda">
       <span>— sin dato</span>
       <span><b>N/L</b> aun no laboraba (sin sucursal asignada o sucursal cerrada ese dia)</span>
-      <span><b>VAC</b> vacaciones</span>
+      <span><b>VAC</b> vacaciones no programadas</span>
+      <span><b>VAC-P</b> vacaciones programadas</span>
       <span><b>INC</b> incapacidad</span>
       <span><b>PER</b> permiso aprobado</span>
       <span><b>COM</b> otro aprobado</span>

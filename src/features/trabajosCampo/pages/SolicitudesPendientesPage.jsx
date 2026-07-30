@@ -8,7 +8,14 @@ import {
   cancelarTrabajoCampo,
 } from '../services/trabajosCampoService'
 import { getCoberturas, aceptarCobertura, rechazarCobertura } from '../../coberturas/services/coberturasService'
+import {
+  getSolicitudesVacacion,
+  aceptarSolicitudVacacion,
+  rechazarSolicitudVacacion,
+  cancelarSolicitudVacacion,
+} from '../../vacacionesProgramadas/services/vacacionesProgramadasService'
 import TrabajoCampoModal from '../components/TrabajoCampoModal'
+import VacacionModal from '../../vacacionesProgramadas/components/VacacionModal'
 import './SolicitudesPendientesPage.css'
 
 const ESTADO_CAMPO_BADGE = {
@@ -34,7 +41,7 @@ function VistaGerenteArea() {
       <div className="page-header">
         <div>
           <h1>Solicitudes pendientes</h1>
-          <p>Trabajo de campo que te han solicitado</p>
+          <p>Trabajo de campo y vacaciones programadas que te han solicitado</p>
         </div>
       </div>
 
@@ -53,7 +60,24 @@ function VistaGerenteArea() {
         </button>
       </div>
 
-      {tab === 'pendientes' ? <PendientesTrabajoCampo /> : <HistorialSolicitudes />}
+      {tab === 'pendientes' ? (
+        <>
+          <div className="solicitudes-section">
+            <div className="solicitudes-section-header">
+              <h2>Trabajo de campo pendiente</h2>
+            </div>
+            <PendientesTrabajoCampo />
+          </div>
+          <div className="solicitudes-section">
+            <div className="solicitudes-section-header">
+              <h2>Vacaciones programadas pendientes</h2>
+            </div>
+            <PendientesVacaciones />
+          </div>
+        </>
+      ) : (
+        <HistorialSolicitudes />
+      )}
     </div>
   )
 }
@@ -168,6 +192,102 @@ function PendientesTrabajoCampo() {
   )
 }
 
+function PendientesVacaciones() {
+  const [solicitudes, setSolicitudes] = useState([])
+  const [loading, setLoading]         = useState(true)
+  const [action, setAction]           = useState(null)
+
+  const loadSolicitudes = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await getSolicitudesVacacion({ estado: 'pendiente' })
+      setSolicitudes(res.results ?? [])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadSolicitudes() }, [loadSolicitudes])
+
+  async function handleAceptar(id) {
+    setAction(id)
+    try {
+      await aceptarSolicitudVacacion(id)
+      await loadSolicitudes()
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setAction(null)
+    }
+  }
+
+  async function handleRechazar(id) {
+    setAction(id)
+    try {
+      await rechazarSolicitudVacacion(id)
+      await loadSolicitudes()
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setAction(null)
+    }
+  }
+
+  return (
+    <>
+      {loading ? (
+        <div className="loading-state">
+          <div className="loading-bar">
+            <div className="loading-bar-fill" />
+          </div>
+          <span>Cargando...</span>
+        </div>
+      ) : solicitudes.length === 0 ? (
+        <div className="empty-state">No tienes solicitudes de vacaciones pendientes.</div>
+      ) : (
+        <div className="campo-solicitudes">
+          {solicitudes.map((sv) => (
+            <div key={sv.id_solicitud_vacacion} className="campo-solicitud-card">
+              <div className="campo-solicitud-info">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+                <div>
+                  <p className="campo-solicitud-titulo">
+                    Vacaciones programadas — {sv.usuario?.nombre}
+                    <span className="badge badge-yellow">Pendiente</span>
+                  </p>
+                  <p className="campo-solicitud-meta">
+                    {sv.fecha_inicio}{sv.fecha_fin !== sv.fecha_inicio ? ` al ${sv.fecha_fin}` : ''}
+                    {sv.motivo ? ` · ${sv.motivo}` : ''}
+                  </p>
+                </div>
+              </div>
+              <div className="campo-solicitud-actions">
+                <button
+                  className="btn-rechazar"
+                  disabled={action === sv.id_solicitud_vacacion}
+                  onClick={() => handleRechazar(sv.id_solicitud_vacacion)}
+                >
+                  Rechazar
+                </button>
+                <button
+                  className="btn-aceptar"
+                  disabled={action === sv.id_solicitud_vacacion}
+                  onClick={() => handleAceptar(sv.id_solicitud_vacacion)}
+                >
+                  Aceptar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
 const PAGE_SIZE_HISTORIAL = 10
 
 function HistorialSolicitudes() {
@@ -266,23 +386,30 @@ function HistorialSolicitudes() {
 /* ── Vista gerente de sucursal: solicita trabajo de campo + acepta/rechaza coberturas ── */
 function VistaGerenteSucursal() {
   const { perfil } = useAuth()
-  const [enviadas, setEnviadas]     = useState([])
-  const [coberturas, setCoberturas] = useState([])
-  const [loading, setLoading]       = useState(true)
-  const [action, setAction]         = useState(null)
-  const [modalOpen, setModalOpen]   = useState(false)
+  const [enviadas, setEnviadas]       = useState([])
+  const [vacacionesEnviadas, setVacacionesEnviadas] = useState([])
+  const [coberturas, setCoberturas]   = useState([])
+  const [loading, setLoading]         = useState(true)
+  const [action, setAction]           = useState(null)
+  const [modalOpen, setModalOpen]     = useState(false)
+  const [vacacionModalOpen, setVacacionModalOpen] = useState(false)
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [trabajos, coberturasRes] = await Promise.all([
+      const [trabajos, coberturasRes, vacaciones] = await Promise.all([
         getTrabajosCampo({}),
         getCoberturas({ estado: 'pendiente' }),
+        getSolicitudesVacacion({}),
       ])
       const propias = (trabajos.results ?? []).filter(
         (t) => t.solicitado_por?.id_usuario === perfil?.id
       )
+      const vacacionesPropias = (vacaciones.results ?? []).filter(
+        (v) => v.solicitado_por?.id_usuario === perfil?.id
+      )
       setEnviadas(propias)
+      setVacacionesEnviadas(vacacionesPropias)
       setCoberturas(coberturasRes.results ?? [])
     } finally {
       setLoading(false)
@@ -294,6 +421,15 @@ function VistaGerenteSucursal() {
   async function handleCancelar(id) {
     try {
       await cancelarTrabajoCampo(id)
+      await loadData()
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
+  async function handleCancelarVacacion(id) {
+    try {
+      await cancelarSolicitudVacacion(id)
       await loadData()
     } catch (err) {
       alert(err.message)
@@ -422,7 +558,49 @@ function VistaGerenteSucursal() {
               </div>
             )}
           </div>
+
+          <div className="solicitudes-section">
+            <div className="solicitudes-section-header">
+              <h2>Vacaciones programadas</h2>
+              <button className="btn-primary" onClick={() => setVacacionModalOpen(true)}>Nueva solicitud</button>
+            </div>
+            {vacacionesEnviadas.length === 0 ? (
+              <div className="empty-state">No has enviado solicitudes de vacaciones programadas.</div>
+            ) : (
+              <div className="campo-enviadas-list">
+                {vacacionesEnviadas.map((v) => (
+                  <div key={v.id_solicitud_vacacion} className="campo-enviada-row">
+                    <div className="campo-enviada-info">
+                      <p className="campo-enviada-nombre">
+                        {v.fecha_inicio}{v.fecha_fin !== v.fecha_inicio ? ` al ${v.fecha_fin}` : ''}
+                      </p>
+                      <p className="campo-enviada-meta">{v.motivo || 'Sin motivo indicado'}</p>
+                    </div>
+                    <span className={`badge ${ESTADO_CAMPO_BADGE[v.estado] ?? 'badge-tipo'}`}>
+                      {v.estado_label}
+                    </span>
+                    {v.estado === 'pendiente' && (
+                      <button
+                        className="campo-cancel-btn"
+                        title="Cancelar solicitud"
+                        onClick={() => handleCancelarVacacion(v.id_solicitud_vacacion)}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </>
+      )}
+
+      {vacacionModalOpen && (
+        <VacacionModal
+          onClose={() => setVacacionModalOpen(false)}
+          onSuccess={() => { setVacacionModalOpen(false); loadData() }}
+        />
       )}
 
       {modalOpen && (
