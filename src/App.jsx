@@ -18,6 +18,7 @@ import DashboardPage from "./features/dashboard/pages/DashboardPage";
 import RendimientoPage from "./features/rendimiento/pages/RendimientoPage";
 import SituacionesPage from "./features/situaciones/pages/SituacionesPage";
 import ReportesPage from "./features/reportes/pages/ReportesPage";
+import ConfiguracionPage from "./features/configuracion/pages/ConfiguracionPage";
 import Layout from "./components/Layout/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -32,6 +33,12 @@ function PendientesRoute({ children }) {
   if (perfil && perfil.type !== 'gerente_sucursal' && perfil.type !== 'gerente_area') {
     return <Navigate to="/" replace />
   }
+  return children
+}
+
+function AdminMaestroRoute({ children }) {
+  const { perfil } = useAuth()
+  if (perfil && perfil.es_admin_maestro !== true) return <Navigate to="/" replace />
   return children
 }
 
@@ -72,6 +79,7 @@ function App() {
           <Route path="/rendimiento" element={<SucursalRoute><RendimientoPage /></SucursalRoute>} />
           <Route path="/situaciones" element={<SituacionesPage />} />
           <Route path="/reportes" element={<ReportesPage />} />
+          <Route path="/configuracion" element={<AdminMaestroRoute><ConfiguracionPage /></AdminMaestroRoute>} />
         </Route>
       </Routes>
     </BrowserRouter>

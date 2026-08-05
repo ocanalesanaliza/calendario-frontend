@@ -23,6 +23,7 @@ const ESTADO_CAMPO_BADGE = {
   aceptado:  'badge-green',
   rechazado: 'badge-red',
   cancelado: 'badge-tipo',
+  vencida:   'badge-orange',
 }
 
 export default function SolicitudesPendientesPage() {

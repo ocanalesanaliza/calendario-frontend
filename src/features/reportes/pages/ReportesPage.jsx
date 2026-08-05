@@ -380,7 +380,7 @@ function LeyendaSimbolos() {
     <p className="rp-leyenda">
       <span>— sin dato</span>
       <span><b>N/L</b> aun no laboraba (sin sucursal asignada o sucursal cerrada ese dia)</span>
-      <span><b>VAC</b> vacaciones no programadas</span>
+      <span><b>VAC</b> permiso extraordinario</span>
       <span><b>VAC-P</b> vacaciones programadas</span>
       <span><b>INC</b> incapacidad</span>
       <span><b>PER</b> permiso aprobado</span>

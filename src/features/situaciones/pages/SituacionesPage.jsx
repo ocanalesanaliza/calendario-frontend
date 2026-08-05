@@ -5,7 +5,7 @@ import './SituacionesPage.css'
 
 const TIPO_LABEL = {
   incapacidad:            'Incapacidad',
-  vacaciones:             'Vacaciones no programadas',
+  vacaciones:             'Permiso extraordinario',
   vacaciones_programadas: 'Vacaciones programadas',
   permiso_aprobado:       'Permiso aprobado',
   otro_aprobado:          'Otro aprobado',
