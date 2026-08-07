@@ -56,8 +56,7 @@ function CalendarPage() {
   const navigate = useNavigate()
   const { perfil } = useAuth()
   const esGerenteArea = perfil?.type === 'gerente_area'
-  const esSucursal = perfil?.type === 'gerente_sucursal'
-  const tieneAgenda = esGerenteArea || esSucursal
+  const tieneAgenda = esGerenteArea
 
   const [agenda, setAgenda] = useState([])
   const [cargando, setCargando] = useState(tieneAgenda)

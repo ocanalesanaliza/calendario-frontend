@@ -42,6 +42,12 @@ function AdminMaestroRoute({ children }) {
   return children
 }
 
+function HomeRoute() {
+  const { perfil } = useAuth()
+  if (perfil?.type === 'gerente_sucursal') return <Navigate to="/mis-tareas" replace />
+  return <CalendarPage />
+}
+
 function App() {
   return (
     <AuthProvider>
@@ -64,7 +70,7 @@ function App() {
             </ProtectedRoute>
           }
         >
-          <Route path="/" element={<CalendarPage />} />
+          <Route path="/" element={<HomeRoute />} />
           <Route path="/tareas" element={<TareasPage />} />
           <Route path="/sucursales" element={<SucursalesPage />} />
           <Route path="/usuarios" element={<UsuariosPage />} />

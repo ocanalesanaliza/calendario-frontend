@@ -41,6 +41,14 @@ export async function getSucursal(id) {
   return data.sucursal
 }
 
+export async function getTitularSucursal(idSucursal, fecha) {
+  const query = fecha ? `?fecha=${fecha}` : ''
+  const res = await apiRequest(`/api/sucursales/${idSucursal}/titular/${query}`)
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.detail || 'Error al cargar el titular de la sucursal')
+  return data.usuario_titular
+}
+
 // Horarios
 
 export async function getHorarios(idSucursal) {

@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react'
 import { getCoberturas, createCobertura, activarCobertura, cancelarCobertura, completarCobertura } from '../services/coberturasService'
 import { getUsuarios } from '../../usuarios/services/usuariosService'
-import { getSucursales } from '../../sucursales/services/sucursalesService'
+import { getSucursales, getTitularSucursal } from '../../sucursales/services/sucursalesService'
 import Toast from '../../../components/Toast/Toast'
 import './CoberturasPage.css'
 
@@ -197,9 +197,10 @@ function ModalWrapper({ title, onClose, children }) {
 function CoberturaModal({ onSubmit, onClose, showToast }) {
   const [usuarios, setUsuarios]     = useState([])
   const [sucursales, setSucursales] = useState([])
+  const [titular, setTitular]       = useState(null)
+  const [buscandoTitular, setBuscandoTitular] = useState(false)
   const [form, setForm] = useState({
     id_usuario_reemplazo: '',
-    id_usuario_titular:   '',
     id_sucursal_destino:  '',
     fecha:    '',
     jornada:  'dia_completo',
@@ -212,6 +213,20 @@ function CoberturaModal({ onSubmit, onClose, showToast }) {
       .then(([u, s]) => { setUsuarios(u); setSucursales(s) })
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (!form.id_sucursal_destino) {
+      setTitular(null)
+      return
+    }
+    let cancelado = false
+    setBuscandoTitular(true)
+    getTitularSucursal(form.id_sucursal_destino, form.fecha || undefined)
+      .then((u) => { if (!cancelado) setTitular(u) })
+      .catch(() => { if (!cancelado) setTitular(null) })
+      .finally(() => { if (!cancelado) setBuscandoTitular(false) })
+    return () => { cancelado = true }
+  }, [form.id_sucursal_destino, form.fecha])
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
@@ -226,7 +241,7 @@ function CoberturaModal({ onSubmit, onClose, showToast }) {
         jornada: form.jornada,
         motivo:  form.motivo,
       }
-      if (form.id_usuario_titular) body.id_usuario_titular = Number(form.id_usuario_titular)
+      if (titular) body.id_usuario_titular = titular.id_usuario
       await onSubmit(body)
     } catch (err) {
       showToast(err.message)
@@ -244,15 +259,6 @@ function CoberturaModal({ onSubmit, onClose, showToast }) {
           <label>Usuario reemplazo <span className="label-required">*</span></label>
           <select value={form.id_usuario_reemplazo} onChange={set('id_usuario_reemplazo')} required>
             <option value="">Seleccionar usuario</option>
-            {usuariosActivos.map((u) => (
-              <option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>
-            ))}
-          </select>
-        </div>
-        <div className="form-group">
-          <label>Usuario titular <span className="label-optional">(opcional)</span></label>
-          <select value={form.id_usuario_titular} onChange={set('id_usuario_titular')}>
-            <option value="">Sin titular</option>
             {usuariosActivos.map((u) => (
               <option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>
             ))}
@@ -280,6 +286,15 @@ function CoberturaModal({ onSubmit, onClose, showToast }) {
               <option value="tarde">Tarde</option>
             </select>
           </div>
+        </div>
+        <div className="form-group">
+          <label>Usuario titular</label>
+          <input
+            type="text"
+            value={buscandoTitular ? 'Buscando...' : (titular?.nombre ?? (form.id_sucursal_destino ? 'Sin titular asignado' : ''))}
+            disabled
+            placeholder="Selecciona una sucursal destino"
+          />
         </div>
         <div className="form-group">
           <label>Motivo <span className="label-optional">(opcional)</span></label>
