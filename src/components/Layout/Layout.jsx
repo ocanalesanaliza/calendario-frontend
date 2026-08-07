@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { Outlet, Link, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../features/auth/context/AuthContext'
 import { getTrabajosCampo } from '../../features/trabajosCampo/services/trabajosCampoService'
 import { getCoberturas } from '../../features/coberturas/services/coberturasService'
@@ -314,7 +314,7 @@ function Layout() {
     <div className="layout">
       {/* Topbar */}
       <header className="topbar">
-        <div className="topbar-brand">
+        <Link to="/" className="topbar-brand">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
             <line x1="16" y1="2" x2="16" y2="6" />
@@ -325,7 +325,7 @@ function Layout() {
             <circle cx="16" cy="15" r="1" fill="currentColor" stroke="none" />
           </svg>
           <span>Taskly</span>
-        </div>
+        </Link>
 
         <div className="topbar-actions">
           {/* Notificaciones */}

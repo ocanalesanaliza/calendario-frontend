@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/context/AuthContext'
 import { getTrabajosCampo } from '../../trabajosCampo/services/trabajosCampoService'
 import { getCoberturas } from '../../coberturas/services/coberturasService'
@@ -52,6 +53,7 @@ function fechaDeHoy() {
 }
 
 function CalendarPage() {
+  const navigate = useNavigate()
   const { perfil } = useAuth()
   const esGerenteArea = perfil?.type === 'gerente_area'
   const esSucursal = perfil?.type === 'gerente_sucursal'
@@ -76,6 +78,7 @@ function CalendarPage() {
         .map((tc) => ({
           id: `campo-${tc.id_trabajo_campo}`,
           tipo: 'campo',
+          idOriginal: tc.id_trabajo_campo,
           jornada: tc.jornada,
           titulo: `Trabajo de campo — ${tc.usuario?.nombre ?? ''}`,
           meta: [tc.jornada_label, tc.sucursal?.nombre, tc.motivo].filter(Boolean).join(' · '),
@@ -112,6 +115,12 @@ function CalendarPage() {
     }).finally(() => setCargando(false))
   }, [tieneAgenda])
 
+  function handleAgendaClick(item) {
+    navigate('/solicitudes-pendientes', {
+      state: { highlightId: item.tipo === 'campo' ? item.idOriginal : null },
+    })
+  }
+
   return (
     <div className="home-page">
       <div className="home-header">
@@ -130,7 +139,12 @@ function CalendarPage() {
           ) : (
             <div className="agenda-list">
               {agenda.map((item) => (
-                <div className="agenda-item" key={item.id}>
+                <button
+                  type="button"
+                  className="agenda-item"
+                  key={item.id}
+                  onClick={() => handleAgendaClick(item)}
+                >
                   <div className={`agenda-item-icon agenda-item-icon-${item.tipo}`}>
                     {AGENDA_ICONS[item.tipo]}
                   </div>
@@ -139,7 +153,7 @@ function CalendarPage() {
                     {item.meta && <span className="agenda-item-meta">{item.meta}</span>}
                   </div>
                   {item.pendiente && <span className="agenda-item-badge">Pendiente</span>}
-                </div>
+                </button>
               ))}
             </div>
           )}

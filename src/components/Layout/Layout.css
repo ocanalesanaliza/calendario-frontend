@@ -27,6 +27,12 @@
   font-weight: 700;
   font-size: 1.1rem;
   color: #f1f5f9;
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+
+.topbar-brand:hover {
+  opacity: 0.85;
 }
 
 .topbar-brand svg {

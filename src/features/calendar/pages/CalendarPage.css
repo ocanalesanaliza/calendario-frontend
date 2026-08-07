@@ -47,10 +47,21 @@
   display: flex;
   align-items: center;
   gap: 0.85rem;
+  width: 100%;
   padding: 0.85rem 1rem;
   background: #ffffff;
   border: 1.5px solid #e2e8f0;
   border-radius: 12px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.agenda-item:hover {
+  border-color: #a5b4fc;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.12);
+  transform: translateY(-1px);
 }
 
 .agenda-item-icon {
