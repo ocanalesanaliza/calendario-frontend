@@ -45,7 +45,7 @@ export default function TrabajoCampoModal({ onClose, onSuccess }) {
         <form className="modal-form" onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Fecha</label>
-            <input type="date" value={form.fecha} onChange={set('fecha')} required />
+            <input type="date" value={form.fecha} min={hoy} onChange={set('fecha')} required />
           </div>
           <div className="form-group">
             <label>Jornada</label>
