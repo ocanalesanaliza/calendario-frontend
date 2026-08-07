@@ -74,7 +74,7 @@ function CalendarPage() {
       getSolicitudesVacacion({}).catch(() => ({ results: [] })),
     ]).then(([trabajos, coberturas, vacaciones]) => {
       const deCampo = (trabajos.results ?? [])
-        .filter((tc) => tc.estado !== 'rechazado' && tc.estado !== 'cancelado')
+        .filter((tc) => tc.estado === 'pendiente')
         .map((tc) => ({
           id: `campo-${tc.id_trabajo_campo}`,
           tipo: 'campo',
