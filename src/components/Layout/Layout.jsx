@@ -23,9 +23,10 @@ function Layout() {
   const [notificaciones, setNotificaciones] = useState([])
   const notifRef = useRef(null)
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(
-    () => localStorage.getItem('sidebarCollapsed') === '1'
-  )
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const stored = localStorage.getItem('sidebarCollapsed')
+    return stored === null ? true : stored === '1'
+  })
   const [openCategories, setOpenCategories] = useState(
     () => new Set(NAV_CATEGORY_KEYS)
   )

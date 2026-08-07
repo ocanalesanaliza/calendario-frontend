@@ -3,7 +3,7 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: #f8fafc;
+  background: #eef1f6;
 }
 
 /* ── Topbar ── */
@@ -13,8 +13,8 @@
   justify-content: space-between;
   padding: 0 1.5rem;
   height: 60px;
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
+  background: #0f172a;
+  border-bottom: 1px solid #1e293b;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -26,13 +26,13 @@
   gap: 0.5rem;
   font-weight: 700;
   font-size: 1.1rem;
-  color: #1e293b;
+  color: #f1f5f9;
 }
 
 .topbar-brand svg {
   width: 22px;
   height: 22px;
-  stroke: #6366f1;
+  stroke: #818cf8;
 }
 
 .topbar-actions {
@@ -53,13 +53,13 @@
   background: transparent;
   border-radius: 8px;
   cursor: pointer;
-  color: #64748b;
+  color: #94a3b8;
   transition: background 0.15s, color 0.15s;
 }
 
 .icon-btn:hover {
-  background: #f1f5f9;
-  color: #1e293b;
+  background: #1e293b;
+  color: #f1f5f9;
 }
 
 .icon-btn svg {
@@ -146,12 +146,12 @@
   background: transparent;
   border-radius: 8px;
   cursor: pointer;
-  color: #1e293b;
+  color: #e2e8f0;
   transition: background 0.15s;
 }
 
 .user-btn:hover {
-  background: #f1f5f9;
+  background: #1e293b;
 }
 
 .user-avatar {
@@ -175,7 +175,7 @@
 .chevron {
   width: 16px;
   height: 16px;
-  stroke: #64748b;
+  stroke: #94a3b8;
   transition: transform 0.2s;
 }
 
@@ -246,8 +246,8 @@
 .sidebar {
   position: relative;
   width: 240px;
-  background: #ffffff;
-  border-right: 1px solid #e2e8f0;
+  background: #0f172a;
+  border-right: 1px solid #1e293b;
   padding: 1rem 0.75rem;
   flex-shrink: 0;
   display: flex;
@@ -270,18 +270,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #e2e8f0;
-  background: #ffffff;
+  border: 1px solid #334155;
+  background: #1e293b;
   border-radius: 50%;
-  color: #64748b;
+  color: #94a3b8;
   cursor: pointer;
   z-index: 10;
   transition: background 0.15s, color 0.15s;
 }
 
 .sidebar-toggle:hover {
-  background: #f1f5f9;
-  color: #1e293b;
+  background: #334155;
+  color: #f1f5f9;
 }
 
 .sidebar-toggle svg {
@@ -320,13 +320,13 @@
   cursor: pointer;
   font-size: 0.7rem;
   font-weight: 700;
-  color: #94a3b8;
+  color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .nav-group-header:hover {
-  color: #475569;
+  color: #cbd5e1;
 }
 
 .nav-group-chevron {
@@ -347,7 +347,7 @@
 
 .nav-group-divider {
   height: 1px;
-  background: #e2e8f0;
+  background: #1e293b;
   margin: 0.5rem 0.35rem;
 }
 
@@ -357,7 +357,7 @@
   gap: 0.6rem;
   padding: 0.75rem;
   margin-top: 0.5rem;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid #1e293b;
 }
 
 .sidebar-collapsed .sidebar-footer {
@@ -388,7 +388,7 @@
 .sidebar-user-name {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #1e293b;
+  color: #e2e8f0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -396,7 +396,7 @@
 
 .sidebar-user-role {
   font-size: 0.72rem;
-  color: #64748b;
+  color: #94a3b8;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -411,19 +411,19 @@
   border-radius: 8px;
   font-size: 0.9rem;
   font-weight: 500;
-  color: #64748b;
+  color: #94a3b8;
   text-decoration: none;
   transition: background 0.15s, color 0.15s;
 }
 
 .nav-item:hover {
-  background: #f1f5f9;
-  color: #1e293b;
+  background: #1e293b;
+  color: #f1f5f9;
 }
 
 .nav-item.active {
-  background: #eef2ff;
-  color: #6366f1;
+  background: rgba(99, 102, 241, 0.18);
+  color: #a5b4fc;
 }
 
 .nav-item svg {
