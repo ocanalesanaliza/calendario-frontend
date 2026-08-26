@@ -179,6 +179,7 @@
 .tarea-card--selected {
   border-color: #6366f1;
   background: #eef2ff;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.14);
 }
 
 .tarea-card-info { flex: 1; }
