@@ -68,6 +68,18 @@ export default function MisTareasPage() {
     }
   }
 
+  function handleCardClick(event, tarea){
+    if (!tarea.disponible_para_registro || busy) return
+
+    const clickedInteractiveElement = event.target.closest(
+      'button, a, input, select, textarea, label, [role="button"], [role="link"], [contenteditable="true"]'
+    )
+
+    if (clickedInteractiveElement) return
+
+    toggleSeleccion(tarea.id_sucursal_tarea)
+  }
+
   async function handleRechazarCampo(id) {
     setCampoAction(id)
     try {
@@ -99,10 +111,22 @@ export default function MisTareasPage() {
     }
   }
 
-  function cancelarRegistro() {
+  /* function cancelarRegistro() {
     setRegistrando(null)
     setNotas('')
     setRegError('')
+    setSeleccionadas([])
+    setLoteError('')
+  } */
+
+  function cancelarRegistroIndividual() {
+    setRegistrando(null)
+    setNotas('')
+    setRegError('')
+  }
+
+  function reiniciarVista() {
+    cancelarRegistroIndividual()
     setSeleccionadas([])
     setLoteError('')
   }
@@ -157,7 +181,7 @@ export default function MisTareasPage() {
           type="date"
           className="fecha-picker"
           value={fecha || data?.meta?.fecha_consultada || ''}
-          onChange={(e) => { setFecha(e.target.value); cancelarRegistro() }}
+          onChange={(e) => { setFecha(e.target.value); reiniciarVista() }}
           max={data?.meta?.fecha_servidor || undefined}
           disabled={busy}
         />
@@ -219,7 +243,7 @@ export default function MisTareasPage() {
       <div className="jornada-tabs">
         <button
           className={`jornada-tab${jornada === 'manana' ? ' active' : ''}`}
-          onClick={() => { setJornada('manana'); cancelarRegistro() }}
+          onClick={() => { setJornada('manana'); reiniciarVista() }}
           disabled={busy}
         >
           Mañana
@@ -227,7 +251,7 @@ export default function MisTareasPage() {
         </button>
         <button
           className={`jornada-tab${jornada === 'tarde' ? ' active' : ''}`}
-          onClick={() => { setJornada('tarde'); cancelarRegistro() }}
+          onClick={() => { setJornada('tarde'); reiniciarVista() }}
           disabled={busy}
         >
           Tarde
@@ -257,12 +281,17 @@ export default function MisTareasPage() {
       ) : (
         <div className="tareas-cards">
           {tareasFiltradas.map((t) => (
-            <div key={t.id_sucursal_tarea} className={`tarea-card estado-${t.estado_ui}`}>
+            <div key={t.id_sucursal_tarea} className={['tarea-card',
+                    `estado-${t.estado_ui}`,
+                    t.disponible_para_registro && !busy && 'tarea-card--selectable',
+                    seleccionadas.includes(t.id_sucursal_tarea) && 'tarea-card--selected',
+                    ].filter(Boolean).join(' ')} onClick={(event) => handleCardClick(event, t)}>
               <div className="tarea-card-top">
                 {t.disponible_para_registro && (
                   <input
                     type="checkbox"
                     className="tarea-checkbox"
+                    aria-label={`Seleccionar ${t.tarea?.nombre || `Tarea #${t.id_sucursal_tarea}`}`}
                     checked={seleccionadas.includes(t.id_sucursal_tarea)}
                     onChange={() => toggleSeleccion(t.id_sucursal_tarea)}
                     disabled={busy}
@@ -294,7 +323,7 @@ export default function MisTareasPage() {
                   />
                   {regError && <p className="reg-error">{regError}</p>}
                   <div className="registrar-actions">
-                    <button className="btn-secondary-sm" onClick={cancelarRegistro} disabled={busy}>
+                    <button className="btn-secondary-sm" onClick={cancelarRegistroIndividual} disabled={busy}>
                       Cancelar
                     </button>
                     <button

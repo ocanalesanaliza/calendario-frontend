@@ -163,6 +163,24 @@
   gap: 0.5rem;
 }
 
+.tarea-card--selectable {
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s,
+    box-shadow 0.2s, transform 0.2s;
+}
+
+.tarea-card--selectable:hover {
+  border-color: #6366f1;
+  background: #f8faff;
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.12);
+  transform: translateY(-2px);
+}
+
+.tarea-card--selected {
+  border-color: #6366f1;
+  background: #eef2ff;
+}
+
 .tarea-card-info { flex: 1; }
 
 .tarea-card-nombre {
