@@ -343,9 +343,9 @@
   flex-shrink: 0;
 }
 
-.btn-aceptar {
+.btn-mistareas-aceptar {
   padding: 0.4rem 0.9rem;
-  background: #22c55e;
+  background: #6366f1;
   color: #fff;
   border: none;
   border-radius: 7px;
@@ -354,8 +354,8 @@
   cursor: pointer;
   transition: background 0.15s;
 }
-.btn-aceptar:hover { background: #16a34a; }
-.btn-aceptar:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-mistareas-aceptar:hover { background: #4f46e5; }
+.btn-mistareas-aceptar:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .btn-rechazar {
   padding: 0.4rem 0.9rem;

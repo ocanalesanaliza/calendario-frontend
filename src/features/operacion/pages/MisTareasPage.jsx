@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getMisTareas, registrarTarea, registrarTareasLote } from '../services/operacionService'
 import { getTrabajosCampo, aceptarTrabajoCampo, rechazarTrabajoCampo } from '../../trabajosCampo/services/trabajosCampoService'
+import { useAuth } from '../../auth/context/AuthContext'
 import './MisTareasPage.css'
 
 const ESTADO_BADGE = {
@@ -27,7 +28,10 @@ export default function MisTareasPage() {
   const [registrandoLote, setRegistrandoLote] = useState(false)
   const [loteError, setLoteError] = useState('')
 
+  const { perfil } = useAuth()
+
   const busy = savingId !== null || registrandoLote
+  const esGerenteArea = perfil?.type === 'gerente_area';
 
   useEffect(() => { loadTareas(); loadTrabajosCampo() }, [fecha])
 
@@ -219,22 +223,25 @@ export default function MisTareasPage() {
                   </p>
                 </div>
               </div>
-              <div className="campo-solicitud-actions">
-                <button
-                  className="btn-rechazar"
-                  disabled={campoAction === tc.id_trabajo_campo}
-                  onClick={() => handleRechazarCampo(tc.id_trabajo_campo)}
-                >
-                  Rechazar
-                </button>
-                <button
-                  className="btn-aceptar"
-                  disabled={campoAction === tc.id_trabajo_campo}
-                  onClick={() => handleAceptarCampo(tc.id_trabajo_campo)}
-                >
-                  Aceptar
-                </button>
-              </div>
+              {esGerenteArea && (
+                <div className="campo-solicitud-actions">
+                  <button
+                    className="btn-rechazar"
+                    disabled={campoAction === tc.id_trabajo_campo}
+                    onClick={() => handleRechazarCampo(tc.id_trabajo_campo)}
+                  >
+                    Rechazar
+                  </button>
+
+                  <button
+                    className="btn-mistareas-aceptar"
+                    disabled={campoAction === tc.id_trabajo_campo}
+                    onClick={() => handleAceptarCampo(tc.id_trabajo_campo)}
+                  >
+                    Aceptar
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
