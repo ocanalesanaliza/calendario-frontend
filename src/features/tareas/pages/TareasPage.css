@@ -204,6 +204,10 @@
 }
 .form-group input:focus,
 .form-group select:focus { border-color: #6366f1; }
+.form-row .form-group > label {
+  display: block;
+  min-height: 2.5em;
+}
 .label-optional { font-weight: 400; color: #94a3b8; font-size: 0.8rem; }
 .form-checks { display: flex; flex-direction: column; gap: 0.5rem; }
 .check-label {
