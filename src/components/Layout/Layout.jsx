@@ -21,6 +21,8 @@ function Layout() {
 
   const [notifOpen, setNotifOpen]     = useState(false)
   const [notificaciones, setNotificaciones] = useState([])
+  const puedeVerNotificaciones = esGerenteArea || esSucursal
+  const notificacionesVisibles = puedeVerNotificaciones ? notificaciones : []
   const notifRef = useRef(null)
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -95,8 +97,6 @@ function Layout() {
           }))
         ))
         .catch(() => {})
-    } else {
-      setNotificaciones([])
     }
   }, [esGerenteArea, esSucursal, location.pathname])
 
@@ -156,7 +156,7 @@ function Layout() {
           to: '/solicitudes-pendientes',
           label: 'Solicitudes pendientes',
           visible: esSucursal || esGerenteArea,
-          badge: notificaciones.length,
+          badge: notificacionesVisibles.length,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
@@ -339,17 +339,17 @@ function Layout() {
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                 <path d="M13.73 21a2 2 0 0 1-3.46 0" />
               </svg>
-              {notificaciones.length > 0 && (
+              {notificacionesVisibles.length > 0 && (
                 <span className="notif-badge">{notificaciones.length}</span>
               )}
             </button>
 
             {notifOpen && (
               <div className="dropdown-menu notif-dropdown">
-                {notificaciones.length === 0 ? (
+                {notificacionesVisibles.length === 0 ? (
                   <p className="notif-empty">No tienes notificaciones.</p>
                 ) : (
-                  notificaciones.map((item) => (
+                  notificacionesVisibles.map((item) => (
                     <button
                       key={`${item.tipo}-${item.id}`}
                       className="notif-item"
