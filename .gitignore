@@ -25,3 +25,5 @@ dist-ssr
 .agents
 .env
 skills-lock.json
+.atl
+.codegraph
