@@ -5,6 +5,26 @@ const BASE_URL = import.meta.env.VITE_API_URL
 let isRefreshing = false
 let failedQueue = []
 
+async function parseJsonResponse(res, parse = res.json.bind(res)) {
+  try {
+    return await parse()
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new Error(
+        `The server returned a non-JSON response (HTTP ${res.status}). Please try again later.`,
+        { cause: error },
+      )
+    }
+    throw error
+  }
+}
+
+function withSafeJson(res) {
+  const parse = res.json.bind(res)
+  res.json = () => parseJsonResponse(res, parse)
+  return res
+}
+
 function processQueue(error, token = null) {
   failedQueue.forEach(({ resolve, reject }) => {
     if (error) reject(error)
@@ -30,7 +50,7 @@ async function doRefresh() {
 
   if (!res.ok) throw new Error('Refresh failed')
 
-  const data = await res.json()
+  const data = await parseJsonResponse(res)
   setAccessToken(data.access)
   return data.access
 }
@@ -46,7 +66,7 @@ export async function apiRequest(path, options = {}) {
 
   let res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
 
-  if (res.status !== 401) return res
+  if (res.status !== 401) return withSafeJson(res)
 
   if (isRefreshing) {
     return new Promise((resolve, reject) => {
@@ -55,7 +75,7 @@ export async function apiRequest(path, options = {}) {
       return fetch(`${BASE_URL}${path}`, {
         ...options,
         headers: { ...headers, Authorization: `Bearer ${newToken}` },
-      })
+      }).then(withSafeJson)
     })
   }
 
@@ -68,7 +88,7 @@ export async function apiRequest(path, options = {}) {
       ...options,
       headers: { ...headers, Authorization: `Bearer ${newToken}` },
     })
-    return res
+    return withSafeJson(res)
   } catch (err) {
     processQueue(err)
     logout()
