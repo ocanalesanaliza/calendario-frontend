@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getPlantilla, updatePlantilla, desactivarPlantilla, addTarea, updateTarea, desactivarTarea, asignarSucursales } from '../services/plantillasService'
 import { getTareas } from '../../tareas/services/tareasService'
@@ -63,8 +63,7 @@ export default function PlantillaDetallePage() {
   }
 
   async function handleAsignar(form) {
-    await asignarSucursales(id, form)
-    setModal(null)
+    return asignarSucursales(id, form)
   }
 
   if (loading) return <div className="loading-state">Cargando plantilla...</div>
@@ -534,6 +533,8 @@ function AsignarModal({ onSubmit, onClose }) {
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resultados, setResultados] = useState(null)
+  const asignacionEnCurso = useRef(false)
 
   useEffect(() => {
     getSucursales().then(setSucursales).catch(() => {})
@@ -550,65 +551,106 @@ function AsignarModal({ onSubmit, onClose }) {
   async function handleSubmit(e) {
     e.preventDefault()
     if (seleccionadas.length === 0) { setError('Selecciona al menos una sucursal.'); return }
+    if (asignacionEnCurso.current) return
+    asignacionEnCurso.current = true
     setError('')
     setLoading(true)
     try {
       const body = { ids_sucursales: seleccionadas, ...form }
       if (!form.fecha_inicio) delete body.fecha_inicio
-      await onSubmit(body)
+      const resumen = (respuesta.resultados ?? []).reduce(
+        (total, resultado) => ({
+          sucursales_procesadas: total.sucursales_procesadas + 1,
+          tareas_creadas: total.tareas_creadas + resultado.tareas_creadas,
+          tareas_actualizadas: total.tareas_actualizadas + resultado.tareas_actualizadas,
+          reglas_creadas: total.reglas_creadas + resultado.reglas_creadas,
+          tareas_desactivadas: total.tareas_desactivadas + resultado.tareas_desactivadas,
+        }),
+        {
+          sucursales_procesadas: 0,
+          tareas_creadas: 0,
+          tareas_actualizadas: 0,
+          reglas_creadas: 0,
+          tareas_desactivadas: 0,
+        },
+      )
+      setResultados(resumen)
     } catch (err) {
-      setError(err.message)
+      setError(err.message || 'No fue posible asignar la plantilla. Inténtalo de nuevo.')
     } finally {
+      asignacionEnCurso.current = false
       setLoading(false)
     }
   }
 
   return (
     <ModalWrapper title="Asignar a sucursales" onClose={onClose}>
-      <form className="modal-form" onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Sucursales</label>
-          <div className="sucursales-check-list">
-            {sucursales.length === 0 ? (
-              <span className="td-empty">Cargando...</span>
-            ) : sucursales.filter((s) => s.activa).map((s) => (
-              <label key={s.id_sucursal} className="check-label">
-                <input
-                  type="checkbox"
-                  checked={seleccionadas.includes(s.id_sucursal)}
-                  onChange={() => toggleSucursal(s.id_sucursal)}
-                />
-                {s.nombre}
-              </label>
-            ))}
+      {resultados ? (
+        <div className="modal-form asignacion-exitosa">
+          <div className="modal-success">
+            <strong>Plantilla asignada correctamente.</strong>
+            <span>La asignación se completó para las sucursales seleccionadas.</span>
+          </div>
+          <dl className="asignacion-resumen">
+            <div><dt>Sucursales procesadas</dt><dd>{resultados.sucursales_procesadas ?? 0}</dd></div>
+            <div><dt>Tareas creadas</dt><dd>{resultados.tareas_creadas ?? 0}</dd></div>
+            <div><dt>Tareas actualizadas</dt><dd>{resultados.tareas_actualizadas ?? 0}</dd></div>
+            <div><dt>Reglas creadas</dt><dd>{resultados.reglas_creadas ?? 0}</dd></div>
+            {resultados.tareas_desactivadas > 0 && (
+              <div><dt>Tareas desactivadas</dt><dd>{resultados.tareas_desactivadas}</dd></div>
+            )}
+          </dl>
+          <div className="modal-footer">
+            <button type="button" className="btn-primary" onClick={onClose}>Cerrar</button>
           </div>
         </div>
-        <div className="form-group">
-          <label>Fecha de inicio <span className="label-optional">(opcional)</span></label>
-          <input type="date" value={form.fecha_inicio} onChange={(e) => setForm((f) => ({ ...f, fecha_inicio: e.target.value }))} />
-        </div>
-        <div className="form-checks">
-          <label className="check-label">
-            <input type="checkbox" checked={form.aplicar} onChange={setCheck('aplicar')} />
-            Aplicar tareas en sucursales
-          </label>
-          <label className="check-label">
-            <input type="checkbox" checked={form.desactivar_no_incluidas} onChange={setCheck('desactivar_no_incluidas')} />
-            Desactivar tareas no incluidas
-          </label>
-          <label className="check-label">
-            <input type="checkbox" checked={form.sobrescribir_reglas} onChange={setCheck('sobrescribir_reglas')} />
-            Sobrescribir reglas existentes
-          </label>
-        </div>
-        {error && <p className="modal-error">{error}</p>}
-        <div className="modal-footer">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Asignando...' : 'Asignar'}
-          </button>
-        </div>
-      </form>
+      ) : (
+        <form className="modal-form" onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label>Sucursales</label>
+            <div className="sucursales-check-list">
+              {sucursales.length === 0 ? (
+                <span className="td-empty">Cargando...</span>
+              ) : sucursales.filter((s) => s.activa).map((s) => (
+                <label key={s.id_sucursal} className="check-label">
+                  <input
+                    type="checkbox"
+                    checked={seleccionadas.includes(s.id_sucursal)}
+                    onChange={() => toggleSucursal(s.id_sucursal)}
+                    disabled={loading}
+                  />
+                  {s.nombre}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="form-group">
+            <label>Fecha de inicio <span className="label-optional">(opcional)</span></label>
+            <input type="date" value={form.fecha_inicio} onChange={(e) => setForm((f) => ({ ...f, fecha_inicio: e.target.value }))} disabled={loading} />
+          </div>
+          <div className="form-checks">
+            <label className="check-label">
+              <input type="checkbox" checked={form.aplicar} onChange={setCheck('aplicar')} disabled={loading} />
+              Aplicar tareas en sucursales
+            </label>
+            <label className="check-label">
+              <input type="checkbox" checked={form.desactivar_no_incluidas} onChange={setCheck('desactivar_no_incluidas')} disabled={loading} />
+              Desactivar tareas no incluidas
+            </label>
+            <label className="check-label">
+              <input type="checkbox" checked={form.sobrescribir_reglas} onChange={setCheck('sobrescribir_reglas')} disabled={loading} />
+              Sobrescribir reglas existentes
+            </label>
+          </div>
+          {error && <p className="modal-error">{error}</p>}
+          <div className="modal-footer">
+            <button type="button" className="btn-secondary" onClick={onClose} disabled={loading}>Cancelar</button>
+            <button type="submit" className="btn-primary" disabled={loading}>
+              {loading ? 'Asignando...' : 'Asignar'}
+            </button>
+          </div>
+        </form>
+      )}
     </ModalWrapper>
   )
 }

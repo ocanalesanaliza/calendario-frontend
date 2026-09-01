@@ -321,6 +321,23 @@
   background: #fef2f2; border: 1px solid #fecaca;
   border-radius: 8px; padding: 0.6rem 0.8rem;
 }
+.modal-success {
+  display: flex; flex-direction: column; gap: 0.2rem;
+  font-size: 0.85rem; color: #166534;
+  background: #dcfce7; border: 1px solid #bbf7d0;
+  border-radius: 8px; padding: 0.6rem 0.8rem;
+}
+.asignacion-exitosa { gap: 1rem; }
+.asignacion-resumen {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem; margin: 0;
+}
+.asignacion-resumen > div {
+  padding: 0.65rem 0.75rem; border: 1px solid #e2e8f0;
+  border-radius: 8px; background: #f8fafc;
+}
+.asignacion-resumen dt { font-size: 0.78rem; color: #64748b; }
+.asignacion-resumen dd { margin: 0.15rem 0 0; font-size: 1rem; font-weight: 700; color: #1e293b; }
 .modal-confirm-text { font-size: 0.9rem; color: #475569; line-height: 1.5; }
 .modal-footer { display: flex; justify-content: flex-end; gap: 0.6rem; padding-top: 0.5rem; }
 
