@@ -558,6 +558,7 @@ function AsignarModal({ onSubmit, onClose }) {
     try {
       const body = { ids_sucursales: seleccionadas, ...form }
       if (!form.fecha_inicio) delete body.fecha_inicio
+      const respuesta = await onSubmit(body)
       const resumen = (respuesta.resultados ?? []).reduce(
         (total, resultado) => ({
           sucursales_procesadas: total.sucursales_procesadas + 1,

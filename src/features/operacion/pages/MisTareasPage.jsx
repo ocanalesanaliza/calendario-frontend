@@ -107,6 +107,7 @@ export default function MisTareasPage() {
       })
       setRegistrando(null)
       setNotas('')
+      setSeleccionadas([])
       await loadTareas()
     } catch (err) {
       setRegError(err.message)
@@ -269,15 +270,54 @@ export default function MisTareasPage() {
       {seleccionadas.length > 0 && (
         <div className="seleccion-bar">
           <span>{seleccionadas.length} tarea{seleccionadas.length > 1 ? 's' : ''} seleccionada{seleccionadas.length > 1 ? 's' : ''}</span>
-          {loteError && <p className="reg-error">{loteError}</p>}
-          <div className="seleccion-actions">
-            <button className="btn-secondary-sm" onClick={() => setSeleccionadas([])} disabled={busy}>
-              Cancelar selección
-            </button>
-            <button className="btn-primary-sm" onClick={handleRegistrarSeleccionadas} disabled={busy}>
-              {registrandoLote ? 'Registrando...' : `Registrar ${seleccionadas.length} seleccionada${seleccionadas.length > 1 ? 's' : ''}`}
-            </button>
-          </div>
+          {seleccionadas.length === 1 && registrando === seleccionadas[0] ? (
+            <div className="registrar-panel">
+              <input
+                type="text"
+                className="notas-input"
+                placeholder="Notas (opcional)"
+                value={notas}
+                onChange={(e) => setNotas(e.target.value)}
+                autoFocus
+              />
+              {regError && <p className="reg-error">{regError}</p>}
+              <div className="registrar-actions">
+                <button className="btn-secondary-sm" onClick={cancelarRegistroIndividual} disabled={busy}>
+                  Cancelar
+                </button>
+                <button
+                  className="btn-primary-sm"
+                  onClick={() => handleRegistrar(tareasFiltradas.find((t) => t.id_sucursal_tarea === seleccionadas[0]))}
+                  disabled={busy}
+                >
+                  {savingId === seleccionadas[0] ? 'Registrando...' : 'Confirmar'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {loteError && <p className="reg-error">{loteError}</p>}
+              <div className="seleccion-actions">
+                <button className="btn-secondary-sm" onClick={() => setSeleccionadas([])} disabled={busy}>
+                  Cancelar selección
+                </button>
+                <button
+                  className="btn-primary-sm"
+                  onClick={() => {
+                    if (seleccionadas.length === 1) {
+                      setRegistrando(seleccionadas[0])
+                      setRegError('')
+                    } else {
+                      handleRegistrarSeleccionadas()
+                    }
+                  }}
+                  disabled={busy}
+                >
+                  {registrandoLote ? 'Registrando...' : `Registrar ${seleccionadas.length} ${seleccionadas.length === 1 ? 'tarea' : 'tareas'}`}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -309,8 +349,8 @@ export default function MisTareasPage() {
                     {t.tarea?.nombre || `Tarea #${t.id_sucursal_tarea}`}
                   </p>
                   <p className="tarea-card-hora">
-                    Programada: {t.hora}
-                    {t.hora_fin_registro && ` · ventana hasta ${t.hora_fin_registro}`}
+                    {t.hora}
+                    {t.hora_fin_registro && ` - ${t.hora_fin_registro}`}
                   </p>
                 </div>
                 <span className={`badge ${ESTADO_BADGE[t.estado_ui] ?? 'badge-tipo'}`}>
@@ -318,39 +358,7 @@ export default function MisTareasPage() {
                 </span>
               </div>
 
-              {t.disponible_para_registro && registrando === t.id_sucursal_tarea ? (
-                <div className="registrar-panel">
-                  <input
-                    type="text"
-                    className="notas-input"
-                    placeholder="Notas (opcional)"
-                    value={notas}
-                    onChange={(e) => setNotas(e.target.value)}
-                    autoFocus
-                  />
-                  {regError && <p className="reg-error">{regError}</p>}
-                  <div className="registrar-actions">
-                    <button className="btn-secondary-sm" onClick={cancelarRegistroIndividual} disabled={busy}>
-                      Cancelar
-                    </button>
-                    <button
-                      className="btn-primary-sm"
-                      onClick={() => handleRegistrar(t)}
-                      disabled={busy}
-                    >
-                      {savingId === t.id_sucursal_tarea ? 'Registrando...' : 'Confirmar'}
-                    </button>
-                  </div>
-                </div>
-              ) : t.disponible_para_registro ? (
-                <button
-                  className="btn-registrar"
-                  onClick={() => { setRegistrando(t.id_sucursal_tarea); setRegError('') }}
-                  disabled={busy}
-                >
-                  Registrar
-                </button>
-              ) : t.motivo_no_disponible ? (
+              {t.motivo_no_disponible ? (
                 <p className="motivo-label">{t.motivo_no_disponible.replace(/_/g, ' ')}</p>
               ) : null}
             </div>

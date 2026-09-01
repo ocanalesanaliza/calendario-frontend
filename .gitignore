@@ -27,3 +27,4 @@ dist-ssr
 skills-lock.json
 .atl
 .codegraph
+/docs
