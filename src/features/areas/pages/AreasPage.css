@@ -1,0 +1,139 @@
+.areas-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.areas-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.areas-page h1 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1.4rem;
+}
+
+.areas-page p {
+  color: #64748b;
+}
+
+.areas-page button {
+  padding: .55rem .8rem;
+  border: 0;
+  border-radius: 8px;
+  background: #6366f1;
+  color: #fff;
+  cursor: pointer;
+}
+
+.areas-table-wrap {
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.areas-page table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.areas-page th,
+.areas-page td {
+  padding: .8rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+.areas-page td button {
+  margin-right: .4rem;
+  font-size: .8rem;
+}
+
+.areas-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(0 0 0 / 35%);
+}
+
+.areas-modal {
+  width: min(100%, 440px);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.areas-modal header,
+.areas-modal form,
+.areas-modal-content {
+  padding: 1.25rem;
+}
+
+.areas-modal header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0;
+}
+
+.areas-modal h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.areas-modal header button {
+  background: transparent;
+  color: #334155;
+  font-size: 1.4rem;
+}
+
+.areas-modal form {
+  display: grid;
+  gap: 1rem;
+}
+
+.areas-modal label {
+  display: grid;
+  gap: .35rem;
+  color: #374151;
+}
+
+.areas-modal input {
+  padding: .6rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+}
+
+.areas-modal span,
+.areas-modal [role=alert] {
+  color: #b91c1c;
+}
+
+.areas-modal footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: .6rem;
+}
+
+.areas-modal footer button:first-child {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.areas-modal .areas-danger {
+  background: #dc2626;
+}
+
+@media (max-width: 640px) {
+  .areas-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

@@ -1,6 +1,6 @@
 import { apiRequest } from '../../../services/apiClient'
 
-function formatError(detail) {
+export function formatError(detail) {
   if (!detail) return null
   if (typeof detail === 'string') return detail
   if (Array.isArray(detail)) return detail.map(formatError).filter(Boolean).join(' ')
@@ -8,9 +8,14 @@ function formatError(detail) {
   return String(detail)
 }
 
-async function parseResponse(res, fallbackMessage) {
+export async function parseResponse(res, fallbackMessage) {
   const data = await res.json()
-  if (!res.ok) throw new Error(formatError(data.detail) || fallbackMessage)
+  if (!res.ok) {
+    const error = new Error(formatError(data.detail) || formatError(data) || fallbackMessage)
+    error.status = res.status
+    error.fields = typeof data.detail === 'object' ? data.detail : data
+    throw error
+  }
   return data
 }
 
