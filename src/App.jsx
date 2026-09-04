@@ -10,6 +10,7 @@ import UsuariosPage from "./features/usuarios/pages/UsuariosPage";
 import PlantillasPage from "./features/plantillas/pages/PlantillasPage";
 import PlantillaDetallePage from "./features/plantillas/pages/PlantillaDetallePage";
 import GerentesPage from "./features/gerentes/pages/GerentesPage";
+import GerentesOperacionesPage from "./features/gerentes_operaciones/pages/GerentesOperacionesPage";
 import MisTareasPage from "./features/operacion/pages/MisTareasPage";
 import SolicitudesPendientesPage from "./features/trabajosCampo/pages/SolicitudesPendientesPage";
 import AlmuerzosPage from "./features/almuerzos/pages/AlmuerzosPage";
@@ -39,6 +40,13 @@ function PendientesRoute({ children }) {
 function AdminMaestroRoute({ children }) {
   const { perfil } = useAuth()
   if (perfil && perfil.es_admin_maestro !== true) return <Navigate to="/" replace />
+  return children
+}
+
+function GerentesOperacionesRoute({ children }) {
+  const { perfil } = useAuth()
+  const puedeGestionarGO = perfil?.es_cuenta_sistemas === true || perfil?.type === 'gerente_operaciones'
+  if (perfil && !puedeGestionarGO) return <Navigate to="/" replace />
   return children
 }
 
@@ -77,6 +85,7 @@ function App() {
           <Route path="/plantillas" element={<PlantillasPage />} />
           <Route path="/plantillas/:id" element={<PlantillaDetallePage />} />
           <Route path="/gerentes" element={<GerentesPage />} />
+          <Route path="/gerentes-operaciones" element={<GerentesOperacionesRoute><GerentesOperacionesPage /></GerentesOperacionesRoute>} />
           <Route path="/mis-tareas" element={<MisTareasPage />} />
           <Route path="/solicitudes-pendientes" element={<PendientesRoute><SolicitudesPendientesPage /></PendientesRoute>} />
           <Route path="/almuerzos" element={<AlmuerzosPage />} />
