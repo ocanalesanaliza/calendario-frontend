@@ -53,7 +53,7 @@ function App() {
     <AuthProvider>
     <BrowserRouter>
       <Routes>
-        <Route path="/Login" element={<LoginPage />} />
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/olvide-password" element={<ForgotPasswordPage />} />
         <Route
           path="/cambiar-password"
