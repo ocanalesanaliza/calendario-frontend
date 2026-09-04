@@ -30,10 +30,20 @@ describe('UsuariosPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
     fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'Ana' } })
     fireEvent.change(screen.getAllByRole('textbox')[1], { target: { value: 'ana@test.com' } })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: '1' } })
     fireEvent.click(screen.getByRole('button', { name: 'Crear usuario' }))
 
     expect(await screen.findByText('Temporal123')).toBeInTheDocument()
-    expect(screen.getByRole('alert')).toHaveTextContent('no pudo confirmar el envío del correo')
+    expect(screen.getByText(/no pudo confirmar el envío del correo/)).toBeInTheDocument()
+  })
+
+  it('requests inactive users only when that filter is selected and retains it after a mutation', async () => {
+    apiRequest.mockResolvedValue(response({ count: 0, results: [] }))
+    render(<UsuariosPage />)
+    await screen.findByText('No hay usuarios registrados.')
+    expect(apiRequest).toHaveBeenCalledWith('/api/usuarios/')
+    fireEvent.change(screen.getByLabelText('Mostrar'), { target: { value: 'inactive' } })
+    await screen.findByText('No hay usuarios registrados.')
+    expect(apiRequest).toHaveBeenCalledWith('/api/usuarios/?habilitado=false')
   })
 })

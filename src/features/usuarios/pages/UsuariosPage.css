@@ -348,3 +348,5 @@
 }
 
 .copy-btn:hover { background: #4f46e5; }
+.usuarios-filter { display: flex; align-items: center; gap: .5rem; color: #475569; font-size: .9rem; }
+.usuarios-filter select { padding: .45rem .6rem; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; color: #334155; }

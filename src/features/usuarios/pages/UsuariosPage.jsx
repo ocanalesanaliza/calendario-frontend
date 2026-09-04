@@ -7,16 +7,21 @@ export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState([])
   const [sucursales, setSucursales] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [filter, setFilter] = useState('active')
   const [modal, setModal] = useState(null)
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => { void loadData() }, [filter])
 
   async function loadData() {
     setLoading(true)
+    setError('')
     try {
-      const [u, s] = await Promise.all([getUsuarios(), getSucursales()])
+      const [u, s] = await Promise.all([getUsuarios(filter === 'inactive' ? { habilitado: 'false' } : {}), getSucursales()])
       setUsuarios(u)
       setSucursales(s)
+    } catch (requestError) {
+      setError(requestError.message || 'No se pudieron cargar los usuarios.')
     } finally {
       setLoading(false)
     }
@@ -79,8 +84,18 @@ export default function UsuariosPage() {
         </button>
       </div>
 
+      <div className="usuarios-filter">
+        <label htmlFor="usuarios-status-filter">Mostrar</label>
+        <select id="usuarios-status-filter" value={filter} onChange={(event) => setFilter(event.target.value)}>
+          <option value="active">Activos</option>
+          <option value="inactive">Inactivos</option>
+        </select>
+      </div>
+
       {loading ? (
         <div className="loading-state">Cargando usuarios...</div>
+      ) : error ? (
+        <div className="empty-state" role="alert"><p>{error}</p><button className="btn-secondary" onClick={loadData}>Reintentar</button></div>
       ) : usuarios.length === 0 ? (
         <div className="empty-state">No hay usuarios registrados.</div>
       ) : (
