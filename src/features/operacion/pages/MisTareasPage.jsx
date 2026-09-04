@@ -358,7 +358,7 @@ export default function MisTareasPage() {
                 </span>
               </div>
 
-              {t.motivo_no_disponible ? (
+              {t.motivo_no_disponible && t.estado_ui !== 'registrada' && t.estado_ui !== 'programada' ? (
                 <p className="motivo-label">{t.motivo_no_disponible.replace(/_/g, ' ')}</p>
               ) : null}
             </div>
