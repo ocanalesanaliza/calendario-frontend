@@ -1,11 +1,13 @@
 ﻿import { useState, useEffect } from 'react'
-import { getGerentes, createGerente, updateGerente, desactivarGerente, resetPasswordGerente } from '../services/gerentesService'
+import { getGerentes, createGerente, updateGerente, desactivarGerente, prepararDesactivacionGerente, resetPasswordGerente } from '../services/gerentesService'
+import Toast from '../../../components/Toast/Toast'
 import './GerentesPage.css'
 
 export default function GerentesPage() {
   const [gerentes, setGerentes] = useState([])
   const [loading, setLoading]   = useState(true)
   const [modal, setModal]       = useState(null)
+  const [toast, setToast]       = useState(null)
 
   useEffect(() => { loadData() }, [])
 
@@ -21,8 +23,13 @@ export default function GerentesPage() {
 
   async function handleCreate(form) {
     const data = await createGerente(form)
-    await loadData()
-    setModal({ type: 'password', password: data.password_temporal, nombre: data.gerente_area.nombre })
+    setModal({
+      type: 'password',
+      password: data.password_temporal,
+      nombre: data.gerente_area.nombre,
+      correoEnviado: data.correo_enviado !== false,
+    })
+    void loadData().catch(() => {})
   }
 
   async function handleEdit(id, form) {
@@ -31,16 +38,22 @@ export default function GerentesPage() {
     setModal(null)
   }
 
-  async function handleDesactivar(id) {
-    await desactivarGerente(id)
+  async function handleDesactivar(id, idNuevoGerenteArea) {
+    const data = await desactivarGerente(id, idNuevoGerenteArea)
     await loadData()
     setModal(null)
+    setToast({ message: data.detail, type: 'success' })
   }
 
   async function handleResetPassword(id) {
     const data = await resetPasswordGerente(id)
-    await loadData()
-    setModal({ type: 'password', password: data.password_temporal, nombre: data.gerente_area.nombre })
+    setModal({
+      type: 'password',
+      password: data.password_temporal,
+      nombre: data.gerente_area.nombre,
+      correoEnviado: data.correo_enviado !== false,
+    })
+    void loadData().catch(() => {})
   }
 
   return (
@@ -150,8 +163,9 @@ export default function GerentesPage() {
       )}
       {modal?.type === 'desactivar' && (
         <DesactivarModal
+          key={modal.gerente.id_gerente_area}
           gerente={modal.gerente}
-          onConfirm={() => handleDesactivar(modal.gerente.id_gerente_area)}
+          onConfirm={(idNuevoGerenteArea) => handleDesactivar(modal.gerente.id_gerente_area, idNuevoGerenteArea)}
           onClose={() => setModal(null)}
         />
       )}
@@ -166,9 +180,11 @@ export default function GerentesPage() {
         <PasswordModal
           nombre={modal.nombre}
           password={modal.password}
+          correoEnviado={modal.correoEnviado}
           onClose={() => setModal(null)}
         />
       )}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   )
 }
@@ -300,28 +316,81 @@ function EditarModal({ gerente, onSubmit, onClose }) {
 }
 
 function DesactivarModal({ gerente, onConfirm, onClose }) {
+  const [preparacion, setPreparacion] = useState(null)
+  const [cargandoPreparacion, setCargandoPreparacion] = useState(true)
+  const [idNuevoGerenteArea, setIdNuevoGerenteArea] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
 
+  useEffect(() => {
+    let activo = true
+
+    async function cargarPreparacion() {
+      try {
+        const data = await prepararDesactivacionGerente(gerente.id_gerente_area)
+        if (activo) setPreparacion(data)
+      } catch (err) {
+        if (activo) setError(`No se pudo preparar la desactivación del gerente: ${err.message}`)
+      } finally {
+        if (activo) setCargandoPreparacion(false)
+      }
+    }
+
+    cargarPreparacion()
+    return () => { activo = false }
+  }, [gerente.id_gerente_area])
+
   async function handleConfirm() {
+    if (preparacion.requiere_reasignacion && !idNuevoGerenteArea) {
+      setError('Debes seleccionar un gerente de destino para reasignar las sucursales.')
+      return
+    }
+
+    setError('')
     setLoading(true)
-    try { await onConfirm() }
+    try { await onConfirm(idNuevoGerenteArea ? Number(idNuevoGerenteArea) : undefined) }
     catch (err) { setError(err.message); setLoading(false) }
   }
 
   return (
     <ModalWrapper title="Desactivar gerente" onClose={onClose}>
       <div className="modal-form">
-        <p className="modal-confirm-text">
-          ¿Deseas desactivar a <strong>{gerente.nombre}</strong>?
-          {gerente.es_admin_maestro && (
-            <span className="modal-warn"> Este gerente es admin maestro — el sistema no permite desactivar al último admin activo.</span>
-          )}
-        </p>
+        {cargandoPreparacion ? (
+          <p className="modal-confirm-text">Preparando información de desactivación...</p>
+        ) : preparacion && (
+          <>
+            <p className="modal-confirm-text">
+              ¿Deseas desactivar a <strong>{preparacion.gerente_area?.nombre ?? gerente.nombre}</strong>?
+              {gerente.es_admin_maestro && (
+                <span className="modal-warn"> Este gerente es admin maestro — el sistema no permite desactivar al último admin activo.</span>
+              )}
+            </p>
+            <div className="desactivacion-resumen">
+              <p><strong>Sucursales afectadas:</strong> {preparacion.sucursales_count}</p>
+              <ul>
+                {preparacion.sucursales.map((sucursal) => (
+                  <li key={sucursal.id_sucursal}>{sucursal.nombre} ({sucursal.codigo})</li>
+                ))}
+              </ul>
+              <p><strong>Usuarios asignados:</strong> {preparacion.usuarios_asignados_count}</p>
+            </div>
+            {preparacion.requiere_reasignacion && (
+              <div className="form-group">
+                <label>Gerente de destino</label>
+                <select value={idNuevoGerenteArea} onChange={(e) => setIdNuevoGerenteArea(e.target.value)} disabled={loading}>
+                  <option value="">Seleccionar gerente de destino</option>
+                  {preparacion.gerentes_destino.map((destino) => (
+                    <option key={destino.id_gerente_area} value={destino.id_gerente_area}>{destino.nombre}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </>
+        )}
         {error && <p className="modal-error">{error}</p>}
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-danger" onClick={handleConfirm} disabled={loading}>
+          <button className="btn-danger" onClick={handleConfirm} disabled={cargandoPreparacion || !preparacion || loading}>
             {loading ? 'Desactivando...' : 'Desactivar'}
           </button>
         </div>
@@ -358,7 +427,7 @@ function ResetModal({ gerente, onConfirm, onClose }) {
   )
 }
 
-function PasswordModal({ nombre, password, onClose }) {
+function PasswordModal({ nombre, password, correoEnviado = true, onClose }) {
   const [copied, setCopied] = useState(false)
 
   function handleCopy() {
@@ -373,6 +442,11 @@ function PasswordModal({ nombre, password, onClose }) {
         <p className="modal-confirm-text">
           Contraseña temporal para <strong>{nombre}</strong> — no se volverá a mostrar.
         </p>
+        {!correoEnviado && (
+          <p className="modal-warning" role="alert">
+            El sistema no pudo confirmar el envío del correo. Copia y comparte esta contraseña por un canal seguro.
+          </p>
+        )}
         <div className="password-box">
           <span>{password}</span>
           <button className="copy-btn" onClick={handleCopy}>
