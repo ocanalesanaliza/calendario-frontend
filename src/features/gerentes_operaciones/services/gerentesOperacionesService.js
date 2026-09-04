@@ -31,3 +31,34 @@ export async function createGerenteOperaciones(body) {
   })
   return parseResponse(res, 'No se pudo crear el gerente de operaciones.')
 }
+
+export async function updateGerenteOperaciones(id, body) {
+  const res = await apiRequest(`/api/calendar/go/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+  return parseResponse(res, 'No se pudo actualizar el gerente de operaciones.')
+}
+
+export async function assignArea(id, areaId) {
+  const res = await apiRequest(`/api/calendar/go/${id}/areas/`, {
+    method: 'POST',
+    body: JSON.stringify({ area_id: areaId }),
+  })
+  return parseResponse(res, 'No se pudo asignar el área.')
+}
+
+export async function reassignArea(id, areaId) {
+  const res = await apiRequest(`/api/calendar/go/${id}/areas/${areaId}/`, { method: 'PUT' })
+  return parseResponse(res, 'No se pudo reasignar el área.')
+}
+
+export async function deactivateGerenteOperaciones(id) {
+  const res = await apiRequest(`/api/calendar/go/${id}/deactivation/`, { method: 'POST' })
+  return parseResponse(res, 'No se pudo desactivar el gerente de operaciones.')
+}
+
+export async function resetGerenteOperacionesPassword(id) {
+  const res = await apiRequest(`/api/calendar/go/${id}/password-reset/`, { method: 'POST' })
+  return parseResponse(res, 'No se pudo resetear la contraseña.')
+}
