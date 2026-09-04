@@ -302,6 +302,16 @@
   line-height: 1.5;
 }
 
+.modal-warning {
+  font-size: 0.85rem;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  line-height: 1.5;
+}
+
 .modal-footer {
   display: flex;
   justify-content: flex-end;

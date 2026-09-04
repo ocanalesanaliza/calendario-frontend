@@ -26,8 +26,13 @@ export default function UsuariosPage() {
 
   async function handleCreate(form) {
     const data = await createUsuario(form)
-    await loadData()
-    setModal({ type: 'password', password: data.password_temporal, nombre: data.usuario.nombre })
+    setModal({
+      type: 'password',
+      password: data.password_temporal,
+      nombre: data.usuario.nombre,
+      correoEnviado: data.correo_enviado !== false,
+    })
+    void loadData().catch(() => {})
   }
 
   async function handleEdit(id, form) {
@@ -50,8 +55,13 @@ export default function UsuariosPage() {
 
   async function handleResetPassword(id) {
     const data = await resetPasswordUsuario(id)
-    await loadData()
-    setModal({ type: 'password', password: data.password_temporal, nombre: data.usuario.nombre })
+    setModal({
+      type: 'password',
+      password: data.password_temporal,
+      nombre: data.usuario.nombre,
+      correoEnviado: data.correo_enviado !== false,
+    })
+    void loadData().catch(() => {})
   }
 
   return (
@@ -201,6 +211,7 @@ export default function UsuariosPage() {
         <PasswordModal
           nombre={modal.nombre}
           password={modal.password}
+          correoEnviado={modal.correoEnviado}
           onClose={closeModal}
         />
       )}
@@ -449,7 +460,7 @@ function ResetModal({ usuario, onConfirm, onClose }) {
   )
 }
 
-function PasswordModal({ nombre, password, onClose }) {
+function PasswordModal({ nombre, password, correoEnviado = true, onClose }) {
   const [copied, setCopied] = useState(false)
 
   function handleCopy() {
@@ -459,11 +470,16 @@ function PasswordModal({ nombre, password, onClose }) {
   }
 
   return (
-    <ModalWrapper title="Usuario creado" onClose={onClose}>
+    <ModalWrapper title="Contraseña temporal" onClose={onClose}>
       <div className="modal-form">
         <p className="modal-confirm-text">
-          El usuario <strong>{nombre}</strong> fue creado. Comparte esta contraseña temporal — no se volverá a mostrar.
+          Contraseña temporal para <strong>{nombre}</strong> — no se volverá a mostrar.
         </p>
+        {!correoEnviado && (
+          <p className="modal-warning" role="alert">
+            El sistema no pudo confirmar el envío del correo. Copia y comparte esta contraseña por un canal seguro.
+          </p>
+        )}
         <div className="password-box">
           <span>{password}</span>
           <button className="copy-btn" onClick={handleCopy}>
