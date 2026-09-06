@@ -59,7 +59,7 @@ function Modal({ title, onClose, children }) {
       <section ref={dialogRef} className="areas-modal" role="dialog" aria-modal="true" aria-label={title} tabIndex="-1" onKeyDown={handleKeyDown}>
         <header>
           <h2>{title}</h2>
-          <button onClick={onClose} aria-label="Cerrar">×</button>
+          <button className="areas-modal-close" onClick={onClose} aria-label="Cerrar">×</button>
         </header>
         {children}
       </section>
@@ -101,17 +101,19 @@ function FormModal({ area, onClose, onSubmit }) {
           const error = fieldError(field)
 
           return (
-            <label key={field}>
-              {field[0].toUpperCase() + field.slice(1)}
-              <input
-                value={form[field]}
-                onChange={(event) => setForm({ ...form, [field]: event.target.value })}
-                required
-                data-autofocus={field === fields[0] || undefined}
-                aria-describedby={error ? `${field}-error` : undefined}
-              />
-              {error && <span id={`${field}-error`} role="alert">{error}</span>}
-            </label>
+            <div className="area-form-group" key={field}>
+              <label>
+                {field[0].toUpperCase() + field.slice(1)}
+                <input
+                  value={form[field]}
+                  onChange={(event) => setForm({ ...form, [field]: event.target.value })}
+                  required
+                  data-autofocus={field === fields[0] || undefined}
+                  aria-describedby={error ? `${field}-error` : undefined}
+                />
+                {error && <span id={`${field}-error`} role="alert">{error}</span>}
+              </label>
+            </div>
           )
         })}
 
@@ -209,7 +211,12 @@ export default function AreasPage() {
           <h1>Áreas</h1>
           <p>{areas.length} área{areas.length !== 1 ? 's' : ''} registrada{areas.length !== 1 ? 's' : ''}</p>
         </div>
-        <button onClick={() => setModal({ type: 'create' })}>Nueva área</button>
+        <button onClick={() => setModal({ type: 'create' })}>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          Nueva área
+        </button>
       </header>
 
       {loading ? (
@@ -222,11 +229,10 @@ export default function AreasPage() {
       ) : !areas.length ? (
         <p className="areas-empty">No hay áreas registradas.</p>
       ) : (
-        <div className="areas-table-wrap">
-          <table>
+        <div className="areas-table-card areas-table-wrap">
+          <table className="areas-table">
             <thead>
               <tr>
-                <th>ID</th>
                 <th>Código</th>
                 <th>Nombre</th>
                 <th>Estado</th>
@@ -236,15 +242,30 @@ export default function AreasPage() {
             <tbody>
               {areas.map((area) => (
                 <tr key={area.id}>
-                  <td>{area.id}</td>
-                  <td>{area.codigo}</td>
-                  <td>{area.nombre}</td>
-                  <td>{area.activa === false ? 'Inactiva' : 'Activa'}</td>
+                  <td><span className="areas-code">{area.codigo}</span></td>
+                  <td className="areas-name">{area.nombre}</td>
                   <td>
-                    <button onClick={() => void openDetail(area)}>Editar</button>
-                    {area.activa !== false && (
-                      <button onClick={() => setModal({ type: 'deactivate', area })}>Desactivar</button>
-                    )}
+                    <span className={`areas-badge ${area.activa === false ? 'areas-badge-red' : 'areas-badge-green'}`}>
+                      {area.activa === false ? 'Inactiva' : 'Activa'}
+                    </span>
+                  </td>
+                  <td className="areas-actions-cell">
+                    <div className="row-actions">
+                      <button className="action-btn" title="Editar" aria-label="Editar" onClick={() => void openDetail(area)}>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                      </button>
+                      {area.activa !== false && (
+                        <button className="action-btn action-btn-danger" title="Desactivar" aria-label="Desactivar" onClick={() => setModal({ type: 'deactivate', area })}>
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

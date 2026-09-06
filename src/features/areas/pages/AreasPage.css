@@ -15,13 +15,32 @@
   margin: 0;
   color: #1e293b;
   font-size: 1.4rem;
+  font-weight: 700;
 }
 
 .areas-page p {
   color: #64748b;
 }
 
-.areas-page button {
+.areas-page-header p {
+  margin: .15rem 0 0;
+  font-size: .85rem;
+}
+
+.areas-page-header > button {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .9rem;
+  font-weight: 600;
+}
+
+.areas-page-header > button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.areas-page button:not(.action-btn) {
   padding: .55rem .8rem;
   border: 0;
   border-radius: 8px;
@@ -30,28 +49,129 @@
   cursor: pointer;
 }
 
-.areas-table-wrap {
-  overflow: auto;
+.areas-table-card {
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   background: #fff;
+  overflow: hidden;
 }
 
-.areas-page table {
+.areas-table-wrap {
+  overflow-x: auto;
+}
+
+.areas-table {
   width: 100%;
   border-collapse: collapse;
+  font-size: .9rem;
 }
 
-.areas-page th,
-.areas-page td {
-  padding: .8rem 1rem;
-  border-bottom: 1px solid #e2e8f0;
+.areas-table thead {
+  background: #f8fafc;
+}
+
+.areas-table th {
+  padding: .75rem 1rem;
   text-align: left;
+  color: #64748b;
+  font-size: .78rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border-bottom: 1px solid #e2e8f0;
 }
 
-.areas-page td button {
-  margin-right: .4rem;
-  font-size: .8rem;
+.areas-table td {
+  padding: .85rem 1rem;
+  color: #334155;
+  vertical-align: middle;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.areas-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.areas-table tbody tr:hover {
+  background: #fafbfc;
+}
+
+.areas-code {
+  padding: .2rem .5rem;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #475569;
+  font-family: monospace;
+  font-size: .85rem;
+}
+
+.areas-name {
+  color: #1e293b;
+  font-weight: 500;
+}
+
+.areas-badge {
+  display: inline-block;
+  padding: .2rem .6rem;
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 600;
+}
+
+.areas-badge-green {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.areas-badge-red {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.areas-actions-cell {
+  width: 1%;
+}
+
+.areas-page .row-actions {
+  display: flex;
+  gap: .25rem;
+  min-width: max-content;
+}
+
+.areas-page .action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+
+.areas-page .action-btn:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.areas-page .action-btn:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+.areas-page .action-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.areas-page .action-btn-danger:hover {
+  background: #fee2e2;
+  color: #ef4444;
 }
 
 .areas-modal-backdrop {
@@ -88,10 +208,25 @@
   font-size: 1.1rem;
 }
 
-.areas-modal header button {
+.areas-page .areas-modal .areas-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
   background: transparent;
-  color: #334155;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #94a3b8;
   font-size: 1.4rem;
+  transition: background 0.15s;
+}
+
+.areas-page .areas-modal .areas-modal-close:hover {
+  background: #f1f5f9;
+  color: #1e293b;
 }
 
 .areas-modal form {
@@ -105,10 +240,23 @@
   color: #374151;
 }
 
-.areas-modal input {
+.areas-modal .area-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+}
+
+.areas-modal .area-form-group input {
+  box-sizing: border-box;
+  width: 100%;
   padding: .6rem;
   border: 1px solid #cbd5e1;
   border-radius: 7px;
+}
+
+.areas-modal .area-form-group input:focus {
+  outline: none;
+  border-color: #6366f1;
 }
 
 .areas-modal span,
@@ -135,5 +283,10 @@
   .areas-page-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .areas-table th,
+  .areas-table td {
+    padding: .75rem;
   }
 }

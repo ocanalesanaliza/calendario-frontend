@@ -22,7 +22,7 @@ describe('AreasPage', () => {
 
     render(<AreasPage />)
     await screen.findByText('No hay áreas registradas.')
-    fireEvent.click(screen.getByRole('button', { name: 'Nueva área' }))
+    fireEvent.click(screen.getByRole('button', { name: /Nueva área/ }))
     fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Ventas' } })
     fireEvent.change(screen.getByLabelText('Codigo'), { target: { value: 'VEN' } })
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
@@ -38,7 +38,7 @@ describe('AreasPage', () => {
 
     render(<AreasPage />)
     await screen.findByText('No hay áreas registradas.')
-    fireEvent.click(screen.getByRole('button', { name: 'Nueva área' }))
+    fireEvent.click(screen.getByRole('button', { name: /Nueva área/ }))
     fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Ventas' } })
     fireEvent.change(screen.getByLabelText('Codigo'), { target: { value: 'VEN' } })
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
@@ -130,7 +130,7 @@ describe('AreasPage', () => {
     apiRequest.mockResolvedValue(response({ results: [] }))
 
     render(<AreasPage />)
-    const trigger = await screen.findByRole('button', { name: 'Nueva área' })
+    const trigger = await screen.findByRole('button', { name: /Nueva área/ })
     trigger.focus()
     fireEvent.click(trigger)
 
