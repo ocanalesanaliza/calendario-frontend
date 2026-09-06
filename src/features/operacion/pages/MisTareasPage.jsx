@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { getMisTareas, registrarTarea, registrarTareasLote } from '../services/operacionService'
 import { getTrabajosCampo, aceptarTrabajoCampo, rechazarTrabajoCampo } from '../../trabajosCampo/services/trabajosCampoService'
 import { useAuth } from '../../auth/context/AuthContext'
+import { DepositDemoModal, DepositReviewDemo } from '../components/DepositDemoModal'
 import './MisTareasPage.css'
 
 const ESTADO_BADGE = {
@@ -27,13 +28,20 @@ export default function MisTareasPage() {
   const [seleccionadas, setSeleccionadas] = useState([])
   const [registrandoLote, setRegistrandoLote] = useState(false)
   const [loteError, setLoteError] = useState('')
+  const [depositTask, setDepositTask] = useState(null)
 
   const { perfil } = useAuth()
 
   const busy = savingId !== null || registrandoLote
   const esGerenteArea = perfil?.type === 'gerente_area';
 
-  useEffect(() => { loadTareas(); loadTrabajosCampo() }, [fecha])
+  useEffect(() => {
+    if (esGerenteArea) {
+      return
+    }
+    loadTareas()
+    loadTrabajosCampo()
+  }, [fecha, esGerenteArea])
 
   async function loadTareas() {
     setLoading(true)
@@ -136,6 +144,15 @@ export default function MisTareasPage() {
     setLoteError('')
   }
 
+  function startRegistration(tarea) {
+    if (tarea.tarea?.id_tarea === 18) {
+      setDepositTask(tarea)
+      return
+    }
+    setRegistrando(tarea.id_sucursal_tarea)
+    setRegError('')
+  }
+
   function toggleSeleccion(id) {
     setSeleccionadas((prev) =>
       prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id]
@@ -169,6 +186,8 @@ export default function MisTareasPage() {
 
   const tareasFiltradas = data?.results?.filter((t) => t.jornada === jornada) ?? []
   const resumen = data?.resumen
+
+  if (esGerenteArea) return <DepositReviewDemo />
 
   return (
     <div className="mis-tareas-page">
@@ -305,8 +324,7 @@ export default function MisTareasPage() {
                   className="btn-primary-sm"
                   onClick={() => {
                     if (seleccionadas.length === 1) {
-                      setRegistrando(seleccionadas[0])
-                      setRegError('')
+                      startRegistration(tareasFiltradas.find((t) => t.id_sucursal_tarea === seleccionadas[0]))
                     } else {
                       handleRegistrarSeleccionadas()
                     }
@@ -365,6 +383,7 @@ export default function MisTareasPage() {
           ))}
         </div>
       )}
+      {depositTask && <DepositDemoModal tarea={depositTask} fecha={data?.meta?.fecha_consultada} sucursal={perfil?.sucursal?.nombre || 'Sucursal asignada'} onClose={() => setDepositTask(null)} />}
     </div>
   )
 }
