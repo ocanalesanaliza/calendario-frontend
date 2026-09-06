@@ -117,7 +117,7 @@ describe('GerentesOperacionesPage', () => {
 
     render(<GerentesOperacionesPage />)
     await screen.findByText('Ana')
-    fireEvent.click(screen.getByRole('button', { name: 'Nuevo gerente' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Nuevo gerente de operaciones' }))
     fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Beto' } })
     fireEvent.change(screen.getByLabelText('Apellido'), { target: { value: 'Ruiz' } })
     fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: 'beto@test.com' } })

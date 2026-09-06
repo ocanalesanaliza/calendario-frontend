@@ -395,7 +395,13 @@ export default function GerentesOperacionesPage() {
           <h1>Gerentes de operaciones</h1>
           <p>{gerentes.length} registrado{gerentes.length !== 1 ? 's' : ''}</p>
         </div>
-        <button className="go-btn-primary" onClick={() => setModal({ type: 'create' })}>Nuevo gerente</button>
+
+        <button className="go-btn-primary" onClick={() => setModal({ type: 'create' })}>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          Nuevo gerente de operaciones
+        </button>
       </div>
 
       {loading ? (
@@ -412,7 +418,7 @@ export default function GerentesOperacionesPage() {
           <table className="go-table">
             <thead>
               <tr>
-                <th>ID</th>
+
                 <th>Nombre</th>
                 <th>Apellido</th>
                 <th>Email</th>
@@ -425,7 +431,7 @@ export default function GerentesOperacionesPage() {
             <tbody>
               {gerentes.map((gerente) => (
                 <tr key={gerente.id}>
-                  <td>{gerente.id}</td>
+
                   <td>{gerente.nombre}</td>
                   <td>{gerente.apellido || '—'}</td>
                   <td>{gerente.email}</td>
