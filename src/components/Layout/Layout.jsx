@@ -122,7 +122,7 @@ function Layout() {
         {
           to: '/mis-tareas',
           label: 'Mis tareas',
-          visible: esSucursal,
+          visible: esSucursal || esGerenteArea,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 11l3 3L22 4" />
@@ -159,7 +159,7 @@ function Layout() {
         {
           to: '/solicitudes-pendientes',
           label: 'Solicitudes pendientes',
-          visible: esSucursal || esGerenteArea,
+          visible: esSucursal || esGerenteArea || esGerenteOperaciones,
           badge: notificacionesVisibles.length,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -177,7 +177,7 @@ function Layout() {
         {
           to: '/tareas',
           label: 'Tareas',
-          visible: esGerenteArea || esAdmin,
+          visible: esGerenteArea || esAdmin || esGerenteOperaciones,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 11l3 3L22 4" />
@@ -188,11 +188,21 @@ function Layout() {
         {
           to: '/sucursales',
           label: 'Sucursales',
-          visible: esGerenteArea || esAdmin,
+          visible: esGerenteArea || esAdmin || esGerenteOperaciones,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
               <polyline points="9 22 9 12 15 12 15 22" />
+            </svg>
+          ),
+        },
+        {
+          to: '/areas',
+          label: 'Áreas',
+          visible: esCuentaSistemas || esGerenteOperaciones,
+          icon: (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" />
             </svg>
           ),
         },
@@ -254,7 +264,7 @@ function Layout() {
         {
           to: '/gerentes',
           label: 'Gerentes de área',
-          visible: esAdmin,
+          visible: esAdmin || esGerenteOperaciones,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -265,7 +275,7 @@ function Layout() {
         {
           to: '/gerentes-operaciones',
           label: 'Gerentes de operaciones',
-          visible: esCuentaSistemas,
+          visible: esCuentaSistemas || esGerenteOperaciones,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -275,16 +285,7 @@ function Layout() {
             </svg>
           ),
         },
-        {
-          to: '/areas',
-          label: 'Áreas',
-          visible: esCuentaSistemas,
-          icon: (
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" />
-            </svg>
-          ),
-        },
+
       ],
     },
     {
@@ -294,7 +295,7 @@ function Layout() {
         {
           to: '/dashboard',
           label: 'Dashboard',
-          visible: esGerenteArea || esAdmin,
+          visible: esGerenteArea || esAdmin || esGerenteOperaciones,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="7" height="9" /><rect x="14" y="3" width="7" height="5" />
@@ -305,7 +306,7 @@ function Layout() {
         {
           to: '/reportes',
           label: 'Reportes',
-          visible: esGerenteArea || esAdmin,
+          visible: esGerenteArea || esAdmin || esGerenteOperaciones,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -522,7 +523,7 @@ function Layout() {
               <div className="sidebar-user-info">
                 <span className="sidebar-user-name">{perfil?.nombre || 'Usuario'}</span>
                 <span className="sidebar-user-role">
-                  {esAdmin ? 'Admin maestro' : esGerenteArea ? 'Gerente de área' : 'Gerente de sucursal'}
+                  {esAdmin ? 'Admin maestro' : esGerenteOperaciones ? 'Gerente de operaciones' : esGerenteArea ? 'Gerente de área' : 'Gerente de sucursal'}
                 </span>
               </div>
             )}
