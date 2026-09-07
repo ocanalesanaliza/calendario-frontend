@@ -9,8 +9,9 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('perfil')
     return getAccessToken()
   })
+  const [perfilOverride, setPerfilOverride] = useState(null)
 
-  const perfil = useMemo(() => {
+  const tokenPerfil = useMemo(() => {
     if (!accessToken) return null
     try {
       return decodeToken(accessToken).perfil
@@ -18,19 +19,29 @@ export function AuthProvider({ children }) {
       return null
     }
   }, [accessToken])
+  const perfil = perfilOverride ?? tokenPerfil
 
   function setAuthData(access, refresh, remember) {
     setTokens(access, refresh, remember)
+    setPerfilOverride(null)
     setAccessToken(access)
+  }
+
+  function revokeMyTasksAccess() {
+    setPerfilOverride((currentPerfil) => ({
+      ...(currentPerfil ?? tokenPerfil),
+      can_access_my_tasks: false,
+    }))
   }
 
   function logout() {
     clearTokens()
+    setPerfilOverride(null)
     setAccessToken(null)
   }
 
   return (
-    <AuthContext.Provider value={{ perfil, setAuthData, logout }}>
+    <AuthContext.Provider value={{ perfil, setAuthData, revokeMyTasksAccess, logout }}>
       {children}
     </AuthContext.Provider>
   )

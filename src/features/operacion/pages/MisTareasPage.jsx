@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { getMisTareas, registrarTarea, registrarTareasLote } from '../services/operacionService'
 import { getTrabajosCampo, aceptarTrabajoCampo, rechazarTrabajoCampo } from '../../trabajosCampo/services/trabajosCampoService'
 import { useAuth } from '../../auth/context/AuthContext'
-import { DepositDemoModal, DepositReviewDemo } from '../components/DepositDemoModal'
+import { DepositDemoModal } from '../components/DepositDemoModal'
 import './MisTareasPage.css'
 
 const ESTADO_BADGE = {
@@ -30,18 +31,27 @@ export default function MisTareasPage() {
   const [loteError, setLoteError] = useState('')
   const [depositTask, setDepositTask] = useState(null)
 
-  const { perfil } = useAuth()
+  const { perfil, revokeMyTasksAccess } = useAuth()
+  const navigate = useNavigate()
 
   const busy = savingId !== null || registrandoLote
-  const esGerenteArea = perfil?.type === 'gerente_area';
+  const esGerenteArea = perfil?.type === 'gerente_area'
+  const puedeAccederMisTareas = perfil?.can_access_my_tasks === true
 
   useEffect(() => {
-    if (esGerenteArea) {
-      return
-    }
+    if (!puedeAccederMisTareas) return
     loadTareas()
     loadTrabajosCampo()
-  }, [fecha, esGerenteArea])
+  }, [fecha, puedeAccederMisTareas])
+
+  if (!puedeAccederMisTareas) return <Navigate to="/" replace />
+
+  function handleForbidden(error) {
+    if (error?.status !== 403) return false
+    revokeMyTasksAccess()
+    navigate('/', { replace: true })
+    return true
+  }
 
   async function loadTareas() {
     setLoading(true)
@@ -52,6 +62,8 @@ export default function MisTareasPage() {
       if (!fecha && res.meta?.jornada_servidor) {
         setJornada(res.meta.jornada_servidor)
       }
+    } catch (error) {
+      handleForbidden(error)
     } finally {
       setLoading(false)
     }
@@ -63,8 +75,8 @@ export default function MisTareasPage() {
       if (fecha) params.fecha = fecha
       const res = await getTrabajosCampo(params)
       setTrabajosCampo(res.results ?? [])
-    } catch {
-      setTrabajosCampo([])
+    } catch (error) {
+      if (!handleForbidden(error)) setTrabajosCampo([])
     }
   }
 
@@ -74,7 +86,7 @@ export default function MisTareasPage() {
       await aceptarTrabajoCampo(id)
       await Promise.all([loadTareas(), loadTrabajosCampo()])
     } catch (err) {
-      alert(err.message)
+      if (!handleForbidden(err)) alert(err.message)
     } finally {
       setCampoAction(null)
     }
@@ -98,7 +110,7 @@ export default function MisTareasPage() {
       await rechazarTrabajoCampo(id)
       await loadTrabajosCampo()
     } catch (err) {
-      alert(err.message)
+      if (!handleForbidden(err)) alert(err.message)
     } finally {
       setCampoAction(null)
     }
@@ -118,6 +130,7 @@ export default function MisTareasPage() {
       setSeleccionadas([])
       await loadTareas()
     } catch (err) {
+      if (handleForbidden(err)) return
       setRegError(err.message)
     } finally {
       setSavingId(null)
@@ -163,6 +176,7 @@ export default function MisTareasPage() {
     const tareas = tareasFiltradas.filter((t) => seleccionadas.includes(t.id_sucursal_tarea))
     setRegistrandoLote(true)
     setLoteError('')
+    let accessRevoked = false
     try {
       const res = await registrarTareasLote({
         fecha:     data.meta?.fecha_consultada,
@@ -176,18 +190,17 @@ export default function MisTareasPage() {
         setLoteError(`No se pudieron registrar: ${nombres.join(', ')}`)
       }
     } catch (err) {
-      setLoteError(err.message)
+      accessRevoked = handleForbidden(err)
+      if (!accessRevoked) setLoteError(err.message)
     } finally {
       setSeleccionadas([])
-      await loadTareas()
+      if (!accessRevoked) await loadTareas()
       setRegistrandoLote(false)
     }
   }
 
   const tareasFiltradas = data?.results?.filter((t) => t.jornada === jornada) ?? []
   const resumen = data?.resumen
-
-  if (esGerenteArea) return <DepositReviewDemo />
 
   return (
     <div className="mis-tareas-page">

@@ -18,6 +18,7 @@ function Layout() {
   const esGerenteArea  = perfil?.type === 'gerente_area'
   const esSucursal     = perfil?.type === 'gerente_sucursal'
   const esAdmin        = perfil?.es_admin_maestro === true
+  const puedeAccederMisTareas = perfil?.can_access_my_tasks === true
   const esGerenteOperaciones = perfil?.type === 'gerente_operaciones'
   const esCuentaSistemas = perfil?.es_cuenta_sistemas === true
     && perfil?.activo !== false
@@ -122,7 +123,7 @@ function Layout() {
         {
           to: '/mis-tareas',
           label: 'Mis tareas',
-          visible: esSucursal || esGerenteArea,
+          visible: puedeAccederMisTareas,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 11l3 3L22 4" />

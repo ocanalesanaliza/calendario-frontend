@@ -53,9 +53,15 @@ export function GerentesOperacionesRoute({ children }) {
   return children
 }
 
+export function MisTareasRoute({ children }) {
+  const { perfil } = useAuth()
+  if (perfil?.can_access_my_tasks !== true) return <Navigate to="/" replace />
+  return children
+}
+
 function HomeRoute() {
   const { perfil } = useAuth()
-  if (perfil?.type === 'gerente_sucursal') return <Navigate to="/mis-tareas" replace />
+  if (perfil?.type === 'gerente_sucursal' && perfil?.can_access_my_tasks === true) return <Navigate to="/mis-tareas" replace />
   return <CalendarPage />
 }
 
@@ -90,7 +96,7 @@ function App() {
           <Route path="/gerentes" element={<GerentesPage />} />
           <Route path="/gerentes-operaciones" element={<GerentesOperacionesRoute><GerentesOperacionesPage /></GerentesOperacionesRoute>} />
           <Route path="/areas" element={<GerentesOperacionesRoute><AreasPage /></GerentesOperacionesRoute>} />
-          <Route path="/mis-tareas" element={<MisTareasPage />} />
+          <Route path="/mis-tareas" element={<MisTareasRoute><MisTareasPage /></MisTareasRoute>} />
           <Route path="/solicitudes-pendientes" element={<PendientesRoute><SolicitudesPendientesPage /></PendientesRoute>} />
           <Route path="/almuerzos" element={<AlmuerzosPage />} />
           <Route path="/coberturas" element={<CoberturasPage />} />

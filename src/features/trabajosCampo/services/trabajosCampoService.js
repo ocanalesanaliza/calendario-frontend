@@ -8,11 +8,18 @@ function parseDetail(detail) {
   return JSON.stringify(detail)
 }
 
+function createRequestError(res, data, fallbackMessage) {
+  return Object.assign(
+    new Error(parseDetail(data.detail) || fallbackMessage),
+    { status: res.status },
+  )
+}
+
 export async function getTrabajosCampo(params = {}) {
   const query = new URLSearchParams(params).toString()
   const res = await apiRequest(`/api/trabajos-campo/${query ? `?${query}` : ''}`)
   const data = await res.json()
-  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al cargar trabajos de campo')
+  if (!res.ok) throw createRequestError(res, data, 'Error al cargar trabajos de campo')
   return data
 }
 
@@ -22,14 +29,14 @@ export async function createTrabajoCampo(body) {
     body: JSON.stringify(body),
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al crear solicitud de trabajo de campo')
+  if (!res.ok) throw createRequestError(res, data, 'Error al crear solicitud de trabajo de campo')
   return data
 }
 
 export async function aceptarTrabajoCampo(id) {
   const res = await apiRequest(`/api/trabajos-campo/${id}/aceptar/`, { method: 'POST' })
   const data = await res.json()
-  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al aceptar trabajo de campo')
+  if (!res.ok) throw createRequestError(res, data, 'Error al aceptar trabajo de campo')
   return data
 }
 
@@ -39,13 +46,13 @@ export async function rechazarTrabajoCampo(id, motivo = '') {
     body: JSON.stringify(motivo ? { motivo } : {}),
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al rechazar trabajo de campo')
+  if (!res.ok) throw createRequestError(res, data, 'Error al rechazar trabajo de campo')
   return data
 }
 
 export async function cancelarTrabajoCampo(id) {
   const res = await apiRequest(`/api/trabajos-campo/${id}/cancelar/`, { method: 'POST' })
   const data = await res.json()
-  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al cancelar trabajo de campo')
+  if (!res.ok) throw createRequestError(res, data, 'Error al cancelar trabajo de campo')
   return data
 }
