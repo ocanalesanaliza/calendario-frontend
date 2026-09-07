@@ -13,6 +13,7 @@ import GerentesPage from "./features/gerentes/pages/GerentesPage";
 import GerentesOperacionesPage from "./features/gerentes_operaciones/pages/GerentesOperacionesPage";
 import AreasPage from "./features/areas/pages/AreasPage";
 import MisTareasPage from "./features/operacion/pages/MisTareasPage";
+import DepositosPendientesPage from "./features/operacion/pages/DepositosPendientesPage";
 import SolicitudesPendientesPage from "./features/trabajosCampo/pages/SolicitudesPendientesPage";
 import AlmuerzosPage from "./features/almuerzos/pages/AlmuerzosPage";
 import CoberturasPage from "./features/coberturas/pages/CoberturasPage";
@@ -59,6 +60,12 @@ export function MisTareasRoute({ children }) {
   return children
 }
 
+export function DepositosPendientesRoute({ children }) {
+  const { perfil } = useAuth()
+  if (perfil?.type !== 'gerente_area') return <Navigate to="/" replace />
+  return children
+}
+
 function HomeRoute() {
   const { perfil } = useAuth()
   if (perfil?.type === 'gerente_sucursal' && perfil?.can_access_my_tasks === true) return <Navigate to="/mis-tareas" replace />
@@ -97,6 +104,7 @@ function App() {
           <Route path="/gerentes-operaciones" element={<GerentesOperacionesRoute><GerentesOperacionesPage /></GerentesOperacionesRoute>} />
           <Route path="/areas" element={<GerentesOperacionesRoute><AreasPage /></GerentesOperacionesRoute>} />
           <Route path="/mis-tareas" element={<MisTareasRoute><MisTareasPage /></MisTareasRoute>} />
+          <Route path="/depositospendientes" element={<DepositosPendientesRoute><DepositosPendientesPage /></DepositosPendientesRoute>} />
           <Route path="/solicitudes-pendientes" element={<PendientesRoute><SolicitudesPendientesPage /></PendientesRoute>} />
           <Route path="/almuerzos" element={<AlmuerzosPage />} />
           <Route path="/coberturas" element={<CoberturasPage />} />

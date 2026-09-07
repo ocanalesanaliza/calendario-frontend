@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MisTareasRoute } from './App'
+import { DepositosPendientesRoute, MisTareasRoute } from './App'
 
 const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
 
@@ -40,5 +40,39 @@ describe('MisTareasRoute', () => {
     renderMisTareasRoute()
 
     expect(screen.getByText('Mis tareas autorizadas')).toBeInTheDocument()
+  })
+})
+
+describe('DepositosPendientesRoute', () => {
+  function renderDepositosPendientesRoute() {
+    render(
+      <MemoryRouter initialEntries={['/depositospendientes']}>
+        <Routes>
+          <Route path="/" element={<p>Inicio</p>} />
+          <Route path="/depositospendientes" element={<DepositosPendientesRoute><p>Depósitos autorizados</p></DepositosPendientesRoute>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+  }
+
+  beforeEach(() => useAuth.mockReset())
+
+  it('allows only an area manager', () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area' } })
+    renderDepositosPendientesRoute()
+
+    expect(screen.getByText('Depósitos autorizados')).toBeInTheDocument()
+  })
+
+  it.each([
+    { type: 'gerente_sucursal' },
+    { type: 'gerente_operaciones' },
+    { es_admin_maestro: true },
+  ])('redirects other profiles to home', async (perfil) => {
+    useAuth.mockReturnValue({ perfil })
+    renderDepositosPendientesRoute()
+
+    expect(await screen.findByText('Inicio')).toBeInTheDocument()
+    expect(screen.queryByText('Depósitos autorizados')).not.toBeInTheDocument()
   })
 })

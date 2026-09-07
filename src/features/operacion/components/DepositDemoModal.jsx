@@ -126,7 +126,7 @@ export function DepositReviewDemo() {
   return (
     <div className="deposit-review-page">
       <div className="page-header">
-        <div><h1>Mis tareas</h1><p>Revisión demostrativa de depósitos pendientes del día.</p></div>
+        <div><h1>Depósitos pendientes</h1><p>Revisión demostrativa de depósitos pendientes del día.</p></div>
       </div>
       {pendingDeposits.map((deposit, index) => (
         <div key={deposit.reference} className="deposit-review-card">

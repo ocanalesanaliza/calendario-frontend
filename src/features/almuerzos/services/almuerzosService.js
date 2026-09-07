@@ -15,10 +15,9 @@ export async function activarAlmuerzo() {
   return data
 }
 
-export async function cerrarAlmuerzo(body = {}) {
+export async function cerrarAlmuerzo() {
   const res = await apiRequest('/api/almuerzos/cerrar/', {
     method: 'POST',
-    body: JSON.stringify(body),
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.detail || 'Error al cerrar almuerzo')

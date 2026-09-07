@@ -25,6 +25,8 @@ describe('Layout Mis tareas navigation', () => {
     getTrabajosCampo.mockReset()
     getCoberturas.mockReset()
     getSolicitudesVacacion.mockReset()
+    getTrabajosCampo.mockResolvedValue({ results: [] })
+    getSolicitudesVacacion.mockResolvedValue({ results: [] })
   })
 
   it('hides Mis tareas for a Systems account without the capability', () => {
@@ -39,5 +41,20 @@ describe('Layout Mis tareas navigation', () => {
     )
 
     expect(screen.queryByTitle('Mis tareas')).not.toBeInTheDocument()
+    expect(screen.queryByTitle('Depósitos pendientes')).not.toBeInTheDocument()
+  })
+
+  it('shows Depósitos pendientes only for an area manager', () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area' }, logout: vi.fn() })
+
+    render(
+      <MemoryRouter>
+        <Routes>
+          <Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByTitle('Depósitos pendientes')).toBeInTheDocument()
   })
 })
