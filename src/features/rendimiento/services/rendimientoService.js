@@ -1,19 +1,32 @@
 import { apiRequest } from '../../../services/apiClient'
 
+function parseDetail(detail) {
+  if (typeof detail === 'string') return detail
+  if (Array.isArray(detail)) return detail.map(parseDetail).filter(Boolean).join(' ')
+  if (detail && typeof detail === 'object') return Object.values(detail).map(parseDetail).filter(Boolean).join(' ')
+  return ''
+}
+
+function resultadoConAcceso(data, key) {
+  const resultado = data[key]
+  if (!resultado || typeof resultado !== 'object') return resultado
+  return { ...resultado, acceso: data.acceso ?? resultado.acceso }
+}
+
 export async function getRendimientoDiario(params = {}) {
   const query = new URLSearchParams(params).toString()
   const res = await apiRequest(`/api/rendimiento/diario/${query ? `?${query}` : ''}`)
   const data = await res.json()
-  if (!res.ok) throw new Error(data.detail || 'Error al cargar rendimiento diario')
-  return data.rendimiento
+  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al cargar rendimiento diario')
+  return resultadoConAcceso(data, 'rendimiento')
 }
 
 export async function getRendimientoMensual(params = {}) {
   const query = new URLSearchParams(params).toString()
   const res = await apiRequest(`/api/rendimiento/mensual/${query ? `?${query}` : ''}`)
   const data = await res.json()
-  if (!res.ok) throw new Error(data.detail || 'Error al cargar rendimiento mensual')
-  return data.resumen
+  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al cargar rendimiento mensual')
+  return resultadoConAcceso(data, 'resumen')
 }
 
 export async function getAjustesRendimiento(params = {}) {

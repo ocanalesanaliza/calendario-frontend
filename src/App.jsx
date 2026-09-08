@@ -24,9 +24,10 @@ import ConfiguracionPage from "./features/configuracion/pages/ConfiguracionPage"
 import Layout from "./components/Layout/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 
-function SucursalRoute({ children }) {
+export function RendimientoRoute({ children }) {
   const { perfil } = useAuth()
-  if (perfil && perfil.type !== 'gerente_sucursal') return <Navigate to="/" replace />
+  const puedeConsultar = perfil?.type === 'gerente_sucursal' || perfil?.type === 'gerente_area'
+  if (perfil && !puedeConsultar) return <Navigate to="/" replace />
   return children
 }
 
@@ -101,7 +102,7 @@ function App() {
           <Route path="/almuerzos" element={<AlmuerzosPage />} />
           <Route path="/coberturas" element={<CoberturasPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/rendimiento" element={<SucursalRoute><RendimientoPage /></SucursalRoute>} />
+          <Route path="/rendimiento" element={<RendimientoRoute><RendimientoPage /></RendimientoRoute>} />
           <Route path="/situaciones" element={<SituacionesPage />} />
           <Route path="/reportes" element={<ReportesPage />} />
           <Route path="/configuracion" element={<AdminMaestroRoute><ConfiguracionPage /></AdminMaestroRoute>} />

@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/context/AuthContext'
 import { getDashboardOperativo } from '../services/dashboardService'
 import { getGerentes } from '../../gerentes/services/gerentesService'
@@ -27,12 +28,11 @@ const META_VACIA = { requiere_filtro: false, mensaje: '', resumen_areas: [] }
 
 export default function DashboardPage() {
   const { perfil } = useAuth()
+  const navigate = useNavigate()
   const esAdmin = perfil?.es_admin_maestro === true
 
-  const [results, setResults]       = useState([])
-  const [count, setCount]           = useState(0)
-  const [meta, setMeta]             = useState(META_VACIA)
-  const [loading, setLoading]       = useState(true)
+  const [carga, setCarga]           = useState({ clave: null, results: [], count: 0, meta: META_VACIA, error: '' })
+  const [revision, setRevision]     = useState(0)
   const [fecha, setFecha]           = useState('')
   const [buscar, setBuscar]         = useState('')
   const [filtroOp, setFiltroOp]     = useState('')
@@ -40,33 +40,47 @@ export default function DashboardPage() {
   const [idGerenteArea, setIdGerenteArea] = useState('')
   const [verTodos, setVerTodos]     = useState(false)
   const [gerentes, setGerentes]     = useState([])
+  const claveCarga = [fecha, buscar, filtroOp, filtroEstado, esAdmin, idGerenteArea, verTodos, revision].join(':')
+  const loading = carga.clave !== claveCarga
+  const results = loading ? [] : carga.results
+  const count = loading ? 0 : carga.count
+  const meta = loading ? META_VACIA : carga.meta
+  const error = loading ? '' : carga.error
 
   useEffect(() => {
     if (esAdmin) getGerentes().then(setGerentes).catch(() => {})
   }, [esAdmin])
 
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const params = {}
-      if (fecha)        params.fecha            = fecha
-      if (buscar)       params.buscar           = buscar
-      if (filtroOp)     params.estado_operativo = filtroOp
-      if (filtroEstado) params.estado           = filtroEstado
-      if (esAdmin) {
-        if (verTodos) params.todos = 'true'
-        else if (idGerenteArea) params.id_gerente_area = idGerenteArea
-      }
-      const data = await getDashboardOperativo(params)
-      setResults(data.results ?? [])
-      setCount(data.count ?? 0)
-      setMeta(data.meta ?? META_VACIA)
-    } finally {
-      setLoading(false)
+  useEffect(() => {
+    let vigente = true
+    const params = {}
+    if (fecha)        params.fecha            = fecha
+    if (buscar)       params.buscar           = buscar
+    if (filtroOp)     params.estado_operativo = filtroOp
+    if (filtroEstado) params.estado           = filtroEstado
+    if (esAdmin) {
+      if (verTodos) params.todos = 'true'
+      else if (idGerenteArea) params.id_gerente_area = idGerenteArea
     }
-  }, [fecha, buscar, filtroOp, filtroEstado, esAdmin, idGerenteArea, verTodos])
+    getDashboardOperativo(params)
+      .then((data) => {
+        if (vigente) setCarga({
+          clave: claveCarga,
+          results: data.results ?? [],
+          count: data.count ?? 0,
+          meta: data.meta ?? META_VACIA,
+          error: '',
+        })
+      })
+      .catch((err) => {
+        if (vigente) setCarga({ clave: claveCarga, results: [], count: 0, meta: META_VACIA, error: err.message })
+      })
+    return () => { vigente = false }
+  }, [fecha, buscar, filtroOp, filtroEstado, esAdmin, idGerenteArea, verTodos, claveCarga])
 
-  useEffect(() => { loadData() }, [loadData])
+  function loadData() {
+    setRevision((value) => value + 1)
+  }
 
   return (
     <div className="dashboard-page">
@@ -158,6 +172,8 @@ export default function DashboardPage() {
           </div>
           <span>Cargando dashboard...</span>
         </div>
+      ) : error ? (
+        <div role="alert" className="empty-state">{error}</div>
       ) : meta.requiere_filtro ? (
         <div className="empty-state">{meta.mensaje || 'Selecciona un filtro para ver el dashboard.'}</div>
       ) : results.length === 0 ? (
@@ -165,7 +181,12 @@ export default function DashboardPage() {
       ) : (
         <div className="dashboard-grid">
           {results.map((u, i) => (
-            <UserCard key={i} user={u} esAdmin={esAdmin} />
+            <UserCard
+              key={u.id_usuario ?? i}
+              user={u}
+              esAdmin={esAdmin}
+              onVerRendimiento={(idUsuario) => navigate(`/rendimiento?id_usuario=${idUsuario}`)}
+            />
           ))}
         </div>
       )}
@@ -173,7 +194,7 @@ export default function DashboardPage() {
   )
 }
 
-function UserCard({ user, esAdmin }) {
+function UserCard({ user, esAdmin, onVerRendimiento }) {
   const presencia    = PRESENCIA_BADGE[user.estado]
   const score        = parseFloat(user.rendimiento_hoy ?? 0)
   const colorClass   = LABEL_COLOR[user.estado_operativo_label] ?? 'estado-sin'
@@ -181,9 +202,23 @@ function UserCard({ user, esAdmin }) {
   const resultadoDia = user.resultado_dia
   const tareasCumplidas   = resultadoDia?.tareas_cumplidas ?? null
   const tareasProgramadas = resultadoDia?.tareas_programadas ?? null
+  const idRendimiento = user.detalle_rendimiento?.id_usuario ?? user.id_usuario
+  const puedeVerRendimiento = user.detalle_rendimiento?.disponible === true
+    && idRendimiento !== undefined
+    && idRendimiento !== null
+  const Card = puedeVerRendimiento ? 'button' : 'div'
 
   return (
-    <div className={`user-card ${colorClass}`}>
+    <Card
+      className={`user-card ${colorClass}${puedeVerRendimiento ? ' user-card-clickable' : ''}`}
+      {...(puedeVerRendimiento
+        ? {
+            type: 'button',
+            onClick: () => onVerRendimiento(idRendimiento),
+            'aria-label': `Ver rendimiento de ${user.nombre_usuario}`,
+          }
+        : {})}
+    >
       <div className="user-card-top">
         <div className="user-card-avatar">
           {user.nombre_usuario?.charAt(0).toUpperCase() ?? '?'}
@@ -231,6 +266,6 @@ function UserCard({ user, esAdmin }) {
           )}
         </div>
       </div>
-    </div>
+    </Card>
   )
 }
