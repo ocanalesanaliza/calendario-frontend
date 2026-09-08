@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { DepositosPendientesRoute, MisTareasRoute } from './App'
+import { CalendarioAreaRoute, DepositosPendientesRoute, MisTareasRoute } from './App'
 
 const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
 
@@ -74,5 +74,34 @@ describe('DepositosPendientesRoute', () => {
 
     expect(await screen.findByText('Inicio')).toBeInTheDocument()
     expect(screen.queryByText('Depósitos autorizados')).not.toBeInTheDocument()
+  })
+})
+
+describe('CalendarioAreaRoute', () => {
+  function renderCalendarioAreaRoute() {
+    render(
+      <MemoryRouter initialEntries={['/calendario-area']}>
+        <Routes>
+          <Route path="/" element={<p>Inicio</p>} />
+          <Route path="/calendario-area" element={<CalendarioAreaRoute><p>Calendario autorizado</p></CalendarioAreaRoute>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+  }
+
+  beforeEach(() => useAuth.mockReset())
+
+  it('allows only an area manager', () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area' } })
+    renderCalendarioAreaRoute()
+
+    expect(screen.getByText('Calendario autorizado')).toBeInTheDocument()
+  })
+
+  it('redirects other profiles to home', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_sucursal' } })
+    renderCalendarioAreaRoute()
+
+    expect(await screen.findByText('Inicio')).toBeInTheDocument()
   })
 })

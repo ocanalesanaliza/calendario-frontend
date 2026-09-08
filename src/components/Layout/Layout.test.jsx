@@ -42,6 +42,7 @@ describe('Layout Mis tareas navigation', () => {
 
     expect(screen.queryByTitle('Mis tareas')).not.toBeInTheDocument()
     expect(screen.queryByTitle('Depósitos pendientes')).not.toBeInTheDocument()
+    expect(screen.queryByTitle('Calendario del área')).not.toBeInTheDocument()
   })
 
   it('shows Depósitos pendientes only for an area manager', () => {
@@ -56,5 +57,6 @@ describe('Layout Mis tareas navigation', () => {
     )
 
     expect(screen.getByTitle('Depósitos pendientes')).toBeInTheDocument()
+    expect(screen.getByTitle('Calendario del área')).toBeInTheDocument()
   })
 })

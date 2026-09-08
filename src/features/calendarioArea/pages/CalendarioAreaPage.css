@@ -1,0 +1,66 @@
+.calendario-area-page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.calendario-area-calendar {
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.calendario-area-calendar .fc {
+  --fc-border-color: #e2e8f0;
+  --fc-button-bg-color: #4f46e5;
+  --fc-button-border-color: #4f46e5;
+  --fc-button-hover-bg-color: #4338ca;
+  --fc-button-hover-border-color: #4338ca;
+  --fc-today-bg-color: #eef2ff;
+  --fc-event-bg-color: #4f46e5;
+  --fc-event-border-color: #4f46e5;
+  --fc-event-text-color: #fff;
+}
+
+.calendario-area-calendar .fc-toolbar-title {
+  color: #0f172a;
+  font-size: 1.15rem;
+}
+
+.calendario-area-state,
+.calendario-area-error {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+}
+
+.calendario-area-state {
+  color: #475569;
+  background: #f8fafc;
+}
+
+.calendario-area-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.calendario-area-error button {
+  padding: 0.45rem 0.75rem;
+  border: 1px solid #b91c1c;
+  border-radius: 6px;
+  background: #fff;
+  color: inherit;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .calendario-area-calendar { padding: 0.5rem; }
+  .calendario-area-calendar .fc-toolbar { flex-wrap: wrap; gap: 0.75rem; }
+  .calendario-area-error { align-items: flex-start; flex-direction: column; }
+}
