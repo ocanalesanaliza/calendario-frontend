@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { CalendarioAreaRoute, DepositosPendientesRoute, MisTareasRoute } from './App'
+import { CalendarioAreaRoute, DepositosPendientesRoute, MisTareasRoute, RendimientoRoute } from './App'
 
 const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
 
@@ -103,5 +103,41 @@ describe('CalendarioAreaRoute', () => {
     renderCalendarioAreaRoute()
 
     expect(await screen.findByText('Inicio')).toBeInTheDocument()
+     expect(screen.queryByText('Calendario autorizado')).not.toBeInTheDocument()
+  })
+})
+describe('RendimientoRoute', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  it.each([
+    ['GA', { type: 'gerente_area' }],
+    ['GS', { type: 'gerente_sucursal' }],
+  ])('permite consultar rendimiento al %s', (_nombre, perfil) => {
+    useAuth.mockReturnValue({ perfil })
+    render(
+      <MemoryRouter initialEntries={['/rendimiento?id_usuario=12']}>
+        <Routes>
+          <Route path="/" element={<p>Inicio</p>} />
+          <Route path="/rendimiento" element={<RendimientoRoute><p>Detalle permitido</p></RendimientoRoute>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText('Detalle permitido')).toBeInTheDocument()
+  })
+
+  it('rechaza perfiles sin acceso al rendimiento', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_operaciones' } })
+    render(
+      <MemoryRouter initialEntries={['/rendimiento?id_usuario=12']}>
+        <Routes>
+          <Route path="/" element={<p>Inicio</p>} />
+          <Route path="/rendimiento" element={<RendimientoRoute><p>Detalle permitido</p></RendimientoRoute>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('Inicio')).toBeInTheDocument()
+    expect(screen.queryByText('Detalle permitido')).not.toBeInTheDocument()
   })
 })

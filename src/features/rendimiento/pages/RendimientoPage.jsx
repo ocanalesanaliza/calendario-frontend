@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   getRendimientoDiario,
   getRendimientoMensual,
@@ -15,19 +16,24 @@ const mesActual = () => {
   return { anio: d.getFullYear(), mes: d.getMonth() + 1 }
 }
 
-const ESTADO_BADGE = {
-  cumplida:   'badge-green',
-  incumplida: 'badge-red',
-  pendiente:  'badge-yellow',
+const ESTADO_TAREA = {
+  cumplida:     { clase: 'badge-green', label: 'Realizada' },
+  realizada:    { clase: 'badge-green', label: 'Realizada' },
+  incumplida:   { clase: 'badge-red', label: 'Incumplida' },
+  pendiente:    { clase: 'badge-yellow', label: 'Pendiente' },
+  no_puntua:    { clase: 'badge-tipo', label: 'No puntuable' },
+  no_puntuable: { clase: 'badge-tipo', label: 'No puntuable' },
+  no_puntuada:  { clase: 'badge-tipo', label: 'No puntuable' },
 }
 
 export default function RendimientoPage() {
   const { perfil } = useAuth()
   const esGerente = perfil?.type === 'gerente_area'
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [tab, setTab]           = useState('diario')
   const [usuarios, setUsuarios] = useState([])
-  const [idUsuario, setIdUsuario] = useState('')
+  const idUsuario = searchParams.get('id_usuario') ?? ''
 
   useEffect(() => {
     if (esGerente) getUsuarios().then(setUsuarios).catch(() => {})
@@ -44,7 +50,13 @@ export default function RendimientoPage() {
           <select
             className="filtro-select"
             value={idUsuario}
-            onChange={(e) => setIdUsuario(e.target.value)}
+            aria-label="Usuario"
+            onChange={(e) => {
+              const nextParams = new URLSearchParams(searchParams)
+              if (e.target.value) nextParams.set('id_usuario', e.target.value)
+              else nextParams.delete('id_usuario')
+              setSearchParams(nextParams)
+            }}
           >
             <option value="">Mi rendimiento</option>
             {usuarios.map((u) => (
@@ -80,35 +92,46 @@ export default function RendimientoPage() {
 /* ── Diario ── */
 function VistaDiaria({ esGerente, idUsuario }) {
   const [fecha, setFecha]       = useState(hoy())
-  const [data, setData]         = useState(null)
-  const [loading, setLoading]   = useState(true)
+  const [carga, setCarga]       = useState({ clave: null, data: null, error: '' })
+  const [revision, setRevision] = useState(0)
   const [modal, setModal]       = useState(null)
+  const claveCarga = `${idUsuario ?? ''}:${fecha}:${revision}`
+  const loading = carga.clave !== claveCarga
+  const data = loading ? null : carga.data
+  const error = loading ? '' : carga.error
 
-  useEffect(() => { loadDiario() }, [fecha, idUsuario])
+  useEffect(() => {
+    let vigente = true
+    const params = {}
+    if (idUsuario) params.id_usuario = idUsuario
+    params.fecha = fecha
+    getRendimientoDiario(params)
+      .then((resultado) => {
+        if (vigente) setCarga({ clave: claveCarga, data: resultado, error: '' })
+      })
+      .catch((err) => {
+        if (vigente) setCarga({ clave: claveCarga, data: null, error: err.message })
+      })
+    return () => { vigente = false }
+  }, [fecha, idUsuario, claveCarga])
 
-  async function loadDiario() {
-    setLoading(true)
-    try {
-      const params = { fecha }
-      if (idUsuario) params.id_usuario = idUsuario
-      const r = await getRendimientoDiario(params)
-      setData(r)
-    } catch {
-      setData(null)
-    } finally {
-      setLoading(false)
-    }
+  function loadDiario() {
+    setRevision((value) => value + 1)
   }
+
+  const acceso = data?.acceso
+  const soloLectura = acceso?.solo_lectura === true
+  const puedeGestionar = !soloLectura && acceso?.puede_registrar_tareas !== false
 
   async function handleReabrir(body) {
     await reabrirRendimientoDiario(body)
-    await loadDiario()
+    loadDiario()
     setModal(null)
   }
 
   async function handleCerrar(body) {
     await cerrarRendimientoDiario(body)
-    await loadDiario()
+    loadDiario()
     setModal(null)
   }
 
@@ -120,9 +143,10 @@ function VistaDiaria({ esGerente, idUsuario }) {
           className="fecha-picker"
           value={fecha}
           max={hoy()}
+          aria-label="Fecha"
           onChange={(e) => setFecha(e.target.value)}
         />
-        {esGerente && data && (
+        {esGerente && data && puedeGestionar && (
           <div className="acciones-dia">
             {data.cerrado_en ? (
               <button
@@ -145,6 +169,8 @@ function VistaDiaria({ esGerente, idUsuario }) {
 
       {loading ? (
         <div className="loading-state">Cargando rendimiento...</div>
+      ) : error ? (
+        <div role="alert" className="modal-error">{error}</div>
       ) : !data ? (
         <div className="empty-state">Sin datos para esta fecha.</div>
       ) : (
@@ -161,6 +187,9 @@ function VistaDiaria({ esGerente, idUsuario }) {
               )}
               {data.abierto_manual && (
                 <span className="badge badge-yellow cerrado-badge">Reabierto</span>
+              )}
+              {soloLectura && (
+                <span className="badge badge-tipo cerrado-badge">Solo lectura</span>
               )}
             </div>
           </div>
@@ -185,8 +214,8 @@ function VistaDiaria({ esGerente, idUsuario }) {
                         <td>{d.jornada === 'manana' ? 'Mañana' : 'Tarde'}</td>
                         <td>{d.hora_programada}</td>
                         <td>
-                          <span className={`badge ${ESTADO_BADGE[d.estado_final] ?? 'badge-tipo'}`}>
-                            {d.estado_final}
+                          <span className={`badge ${ESTADO_TAREA[d.estado_final]?.clase ?? 'badge-tipo'}`}>
+                            {ESTADO_TAREA[d.estado_final]?.label ?? d.estado_final}
                           </span>
                         </td>
                       </tr>
@@ -199,7 +228,7 @@ function VistaDiaria({ esGerente, idUsuario }) {
         </>
       )}
 
-      {modal?.type === 'reabrir' && data && (
+      {modal?.type === 'reabrir' && data && puedeGestionar && (
         <AjusteModal
           titulo="Reabrir día"
           descripcion={`Reabrir el día ${fecha} para ${data.usuario?.nombre ?? 'este usuario'}.`}
@@ -208,7 +237,7 @@ function VistaDiaria({ esGerente, idUsuario }) {
           onClose={() => setModal(null)}
         />
       )}
-      {modal?.type === 'cerrar' && data && (
+      {modal?.type === 'cerrar' && data && puedeGestionar && (
         <AjusteModal
           titulo="Cerrar día"
           descripcion={`Cerrar el día ${fecha} para ${data.usuario?.nombre ?? 'este usuario'}. Las tareas pendientes quedarán como incumplidas.`}
@@ -226,36 +255,39 @@ function VistaMensual({ idUsuario }) {
   const init = mesActual()
   const [anio, setAnio] = useState(init.anio)
   const [mes, setMes]   = useState(init.mes)
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [carga, setCarga] = useState({ clave: null, data: null, error: '' })
+  const claveCarga = `${idUsuario ?? ''}:${anio}:${mes}`
+  const loading = carga.clave !== claveCarga
+  const data = loading ? null : carga.data
+  const error = loading ? '' : carga.error
 
-  useEffect(() => { loadMensual() }, [anio, mes, idUsuario])
-
-  async function loadMensual() {
-    setLoading(true)
-    try {
-      const params = { anio, mes }
-      if (idUsuario) params.id_usuario = idUsuario
-      const r = await getRendimientoMensual(params)
-      setData(r)
-    } catch {
-      setData(null)
-    } finally {
-      setLoading(false)
-    }
-  }
+  useEffect(() => {
+    let vigente = true
+    const params = {}
+    if (idUsuario) params.id_usuario = idUsuario
+    params.anio = anio
+    params.mes = mes
+    getRendimientoMensual(params)
+      .then((resultado) => {
+        if (vigente) setCarga({ clave: claveCarga, data: resultado, error: '' })
+      })
+      .catch((err) => {
+        if (vigente) setCarga({ clave: claveCarga, data: null, error: err.message })
+      })
+    return () => { vigente = false }
+  }, [anio, mes, idUsuario, claveCarga])
 
   const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
   return (
     <div className="vista-mensual">
       <div className="vista-toolbar">
-        <select className="filtro-select" value={mes} onChange={(e) => setMes(Number(e.target.value))}>
+        <select className="filtro-select" aria-label="Mes" value={mes} onChange={(e) => setMes(Number(e.target.value))}>
           {MESES.map((m, i) => (
             <option key={i} value={i + 1}>{m}</option>
           ))}
         </select>
-        <select className="filtro-select" value={anio} onChange={(e) => setAnio(Number(e.target.value))}>
+        <select className="filtro-select" aria-label="Año" value={anio} onChange={(e) => setAnio(Number(e.target.value))}>
           {[2025, 2026, 2027].map((a) => (
             <option key={a} value={a}>{a}</option>
           ))}
@@ -264,6 +296,8 @@ function VistaMensual({ idUsuario }) {
 
       {loading ? (
         <div className="loading-state">Cargando rendimiento mensual...</div>
+      ) : error ? (
+        <div role="alert" className="modal-error">{error}</div>
       ) : !data ? (
         <div className="empty-state">Sin datos para este período.</div>
       ) : (
@@ -276,6 +310,9 @@ function VistaMensual({ idUsuario }) {
               <StatItem label="Peso logrado"
                 value={`${data.peso_total_cumplido} / ${data.peso_total_programado}`}
               />
+              {data.acceso?.solo_lectura === true && (
+                <span className="badge badge-tipo cerrado-badge">Solo lectura</span>
+              )}
             </div>
           </div>
 
