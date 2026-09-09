@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { CalendarioAreaRoute, DepositosPendientesRoute, MisTareasRoute, RendimientoRoute } from './App'
+import { AlmuerzosRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GerentesOperacionesRoute, MisTareasRoute, RendimientoRoute } from './App'
 
 const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
 
@@ -40,6 +40,85 @@ describe('MisTareasRoute', () => {
     renderMisTareasRoute()
 
     expect(screen.getByText('Mis tareas autorizadas')).toBeInTheDocument()
+  })
+
+  it('redirects a Systems account even when an obsolete profile grants the capability', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true, can_access_my_tasks: true } })
+    renderMisTareasRoute()
+
+    expect(await screen.findByText('Inicio')).toBeInTheDocument()
+  })
+})
+
+describe('Sistemas-only routes', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  it('allows an active Systems account to manage operations managers', () => {
+    useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true } })
+    render(
+      <MemoryRouter initialEntries={['/gerentes-operaciones']}>
+        <Routes>
+          <Route path="/" element={<p>Inicio</p>} />
+          <Route path="/gerentes-operaciones" element={<GerentesOperacionesRoute><p>Gestión GO</p></GerentesOperacionesRoute>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText('Gestión GO')).toBeInTheDocument()
+  })
+
+  it('blocks lunch for a Systems account that was previously a GA', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true } })
+    render(
+      <MemoryRouter initialEntries={['/almuerzos']}>
+        <Routes>
+          <Route path="/" element={<p>Inicio</p>} />
+          <Route path="/almuerzos" element={<AlmuerzosRoute><p>Almuerzo autorizado</p></AlmuerzosRoute>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('Inicio')).toBeInTheDocument()
+    expect(screen.queryByText('Almuerzo autorizado')).not.toBeInTheDocument()
+  })
+})
+
+describe('CapabilityRoute', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  const managedModules = [
+    ['Sucursales', 'canManageBranches', 'manage_branches'],
+    ['Usuarios', 'canManageUsers', 'manage_users'],
+    ['Plantillas', 'canManageTemplates', 'manage_templates'],
+    ['Situaciones especiales', 'canManageSpecialSituations', 'manage_special_situations'],
+    ['Dashboard', 'canAccessOperationalDashboard', 'access_operational_dashboard'],
+    ['Reportes', 'canAccessPerformanceReports', 'access_performance_reports'],
+  ]
+
+  function renderCapabilityRoute(capability) {
+    render(
+      <MemoryRouter initialEntries={['/modulo']}>
+        <Routes>
+          <Route path="/" element={<p>Inicio</p>} />
+          <Route path="/modulo" element={<CapabilityRoute capability={capability}><p>Módulo autorizado</p></CapabilityRoute>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+  }
+
+  it.each(managedModules)('allows %s when its capability is granted', (_, capability, profileCapability) => {
+    useAuth.mockReturnValue({ perfil: { capabilities: { [profileCapability]: true } } })
+    renderCapabilityRoute(capability)
+
+    expect(screen.getByText('Módulo autorizado')).toBeInTheDocument()
+  })
+
+  it.each(managedModules)('denies %s by default when its capability is absent', async (_, capability) => {
+    useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: false } })
+    renderCapabilityRoute(capability)
+
+    expect(await screen.findByText('Inicio')).toBeInTheDocument()
+    expect(screen.queryByText('Módulo autorizado')).not.toBeInTheDocument()
   })
 })
 
@@ -112,10 +191,11 @@ describe('RendimientoRoute', () => {
   it.each([
     ['GA', { type: 'gerente_area' }],
     ['GS', { type: 'gerente_sucursal' }],
+    ['Sistemas+Admin Maestro con scope global', { type: 'sistemas', capabilities: { has_global_scope: true } }],
   ])('permite consultar rendimiento al %s', (_nombre, perfil) => {
     useAuth.mockReturnValue({ perfil })
     render(
-      <MemoryRouter initialEntries={['/rendimiento?id_usuario=12']}>
+      <MemoryRouter initialEntries={['/rendimiento?id_usuario=27']}>
         <Routes>
           <Route path="/" element={<p>Inicio</p>} />
           <Route path="/rendimiento" element={<RendimientoRoute><p>Detalle permitido</p></RendimientoRoute>} />
@@ -127,9 +207,9 @@ describe('RendimientoRoute', () => {
   })
 
   it('rechaza perfiles sin acceso al rendimiento', async () => {
-    useAuth.mockReturnValue({ perfil: { type: 'gerente_operaciones' } })
+    useAuth.mockReturnValue({ perfil: { type: 'sistemas' } })
     render(
-      <MemoryRouter initialEntries={['/rendimiento?id_usuario=12']}>
+      <MemoryRouter initialEntries={['/rendimiento?id_usuario=27']}>
         <Routes>
           <Route path="/" element={<p>Inicio</p>} />
           <Route path="/rendimiento" element={<RendimientoRoute><p>Detalle permitido</p></RendimientoRoute>} />

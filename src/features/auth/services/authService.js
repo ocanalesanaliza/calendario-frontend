@@ -7,6 +7,21 @@ export function decodeToken(token) {
   return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')))
 }
 
+export function normalizeCurrentProfile(payload) {
+  if (payload?.perfil && typeof payload.perfil === 'object' && !Array.isArray(payload.perfil)) {
+    return payload.perfil
+  }
+
+  return payload
+}
+
+export async function getCurrentProfile() {
+  const res = await apiRequest('/api/auth/me/')
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.detail || 'No se pudo obtener el perfil actual.')
+  return normalizeCurrentProfile(data)
+}
+
 export async function login(email, password) {
   const res = await fetch(`${BASE_URL}/api/auth/login/`, {
     method: 'POST',

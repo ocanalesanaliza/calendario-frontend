@@ -4,6 +4,7 @@ import { useAuth } from '../../features/auth/context/AuthContext'
 import { getTrabajosCampo } from '../../features/trabajosCampo/services/trabajosCampoService'
 import { getCoberturas } from '../../features/coberturas/services/coberturasService'
 import { getSolicitudesVacacion } from '../../features/vacacionesProgramadas/services/vacacionesProgramadasService'
+import { getProfileCapabilities } from '../../features/auth/profilePolicies'
 import './Layout.css'
 
 const NAV_CATEGORY_KEYS = ['dia-a-dia', 'gestion', 'personas', 'analitica', 'administracion']
@@ -15,14 +16,22 @@ function Layout() {
   const location = useLocation()
   const { perfil, logout } = useAuth()
 
-  const esGerenteArea  = perfil?.type === 'gerente_area'
-  const esSucursal     = perfil?.type === 'gerente_sucursal'
-  const esAdmin        = perfil?.es_admin_maestro === true
-  const puedeAccederMisTareas = perfil?.can_access_my_tasks === true
-  const esGerenteOperaciones = perfil?.type === 'gerente_operaciones'
-  const esCuentaSistemas = perfil?.es_cuenta_sistemas === true
-    && perfil?.activo !== false
-    && perfil?.habilitado !== false
+  const {
+    isAreaManager: esGerenteArea,
+    isBranchManager: esSucursal,
+    isMasterAdmin: esAdmin,
+    isOperationsManager: esGerenteOperaciones,
+    canAccessLunch,
+    canAccessMyTasks: puedeAccederMisTareas,
+    canManageAreaManagers,
+    canManageOperationsManagers,
+    canManageBranches,
+    canManageTemplates,
+    canManageUsers,
+    canManageSpecialSituations,
+    canAccessOperationalDashboard,
+    canAccessPerformanceReports,
+  } = getProfileCapabilities(perfil)
 
   const [notifOpen, setNotifOpen]     = useState(false)
   const [notificaciones, setNotificaciones] = useState([])
@@ -158,7 +167,7 @@ function Layout() {
         {
           to: '/almuerzos',
           label: 'Mi almuerzo',
-          visible: true,
+          visible: canAccessLunch,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 8h1a4 4 0 0 1 0 8h-1" />
@@ -202,7 +211,7 @@ function Layout() {
         {
           to: '/tareas',
           label: 'Tareas',
-          visible: esGerenteArea || esAdmin || esGerenteOperaciones,
+          visible: canManageBranches,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 11l3 3L22 4" />
@@ -213,7 +222,7 @@ function Layout() {
         {
           to: '/sucursales',
           label: 'Sucursales',
-          visible: esGerenteArea || esAdmin || esGerenteOperaciones,
+          visible: canManageBranches,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
@@ -234,7 +243,7 @@ function Layout() {
         {
           to: '/plantillas',
           label: 'Plantillas',
-          visible: esGerenteArea || esAdmin,
+          visible: canManageTemplates,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="7" height="7" />
@@ -247,7 +256,7 @@ function Layout() {
         {
           to: '/situaciones',
           label: 'Situaciones especiales',
-          visible: esGerenteArea || esAdmin,
+          visible: canManageSpecialSituations,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" />
@@ -259,7 +268,7 @@ function Layout() {
         {
           to: '/coberturas',
           label: 'Cambio sucursal temporales',
-          visible: esGerenteArea || esAdmin,
+          visible: canManageUsers,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="16 18 22 12 16 6" />
@@ -276,7 +285,7 @@ function Layout() {
         {
           to: '/usuarios',
           label: 'Usuarios',
-          visible: esGerenteArea || esAdmin,
+          visible: canManageUsers,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -300,7 +309,7 @@ function Layout() {
         {
           to: '/gerentes-operaciones',
           label: 'Gerentes de operaciones',
-          visible: esCuentaSistemas || esGerenteOperaciones,
+          visible: canManageOperationsManagers,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -320,7 +329,7 @@ function Layout() {
         {
           to: '/dashboard',
           label: 'Dashboard',
-          visible: esGerenteArea || esAdmin || esGerenteOperaciones,
+          visible: canAccessOperationalDashboard,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="7" height="9" /><rect x="14" y="3" width="7" height="5" />
@@ -331,7 +340,7 @@ function Layout() {
         {
           to: '/reportes',
           label: 'Reportes',
-          visible: esGerenteArea || esAdmin || esGerenteOperaciones,
+          visible: canAccessPerformanceReports,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />

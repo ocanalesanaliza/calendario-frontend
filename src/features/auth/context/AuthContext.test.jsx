@@ -1,13 +1,13 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider, useAuth } from './AuthContext'
 
-const { decodeToken, getAccessToken } = vi.hoisted(() => ({
-  decodeToken: vi.fn(),
+const { apiRequest, getAccessToken } = vi.hoisted(() => ({
+  apiRequest: vi.fn(),
   getAccessToken: vi.fn(),
 }))
 
-vi.mock('../services/authService', () => ({ decodeToken }))
+vi.mock('../../../services/apiClient', () => ({ apiRequest }))
 vi.mock('../../../services/tokenStorage', () => ({
   clearTokens: vi.fn(),
   getAccessToken,
@@ -15,8 +15,8 @@ vi.mock('../../../services/tokenStorage', () => ({
 }))
 
 function ProfileProbe() {
-  const { perfil, revokeMyTasksAccess } = useAuth()
-  return <><p>{String(perfil.can_access_my_tasks)}</p><button onClick={revokeMyTasksAccess}>Revocar</button></>
+  const { perfil, perfilLoading } = useAuth()
+  return <><p>{perfil?.type ?? 'sin perfil'}</p><p>{String(perfilLoading)}</p></>
 }
 
 describe('AuthContext', () => {
@@ -26,16 +26,29 @@ describe('AuthContext', () => {
       value: { removeItem: vi.fn() },
     })
     getAccessToken.mockReset().mockReturnValue('access-token')
-    decodeToken.mockReset().mockReturnValue({ perfil: { can_access_my_tasks: true } })
+    apiRequest.mockReset().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ perfil: { type: 'gerente_area', can_access_my_tasks: true } }),
+    })
   })
 
-  it('removes Mis tareas access from the in-memory profile without changing the token', () => {
+  it('hydrates a flat profile from the wrapped /api/auth/me/ HTTP response', async () => {
     render(<AuthProvider><ProfileProbe /></AuthProvider>)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Revocar' }))
-
+    await waitFor(() => expect(screen.getByText('gerente_area')).toBeInTheDocument())
     expect(screen.getByText('false')).toBeInTheDocument()
     expect(getAccessToken).toHaveBeenCalledTimes(1)
-    expect(decodeToken).toHaveBeenCalledTimes(1)
+    expect(apiRequest).toHaveBeenCalledWith('/api/auth/me/')
+  })
+
+  it('replaces an obsolete area-manager token profile with the current Systems profile', async () => {
+    apiRequest.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true } }),
+    })
+
+    render(<AuthProvider><ProfileProbe /></AuthProvider>)
+
+    await waitFor(() => expect(screen.getByText('sistemas')).toBeInTheDocument())
   })
 })

@@ -10,6 +10,8 @@ const { useAuth, getTrabajosCampo, getCoberturas, getSolicitudesVacacion } = vi.
   getSolicitudesVacacion: vi.fn(),
 }))
 
+const capabilityModuleLabels = ['Sucursales', 'Usuarios', 'Plantillas', 'Situaciones especiales', 'Dashboard', 'Reportes']
+
 vi.mock('../../features/auth/context/AuthContext', () => ({ useAuth }))
 vi.mock('../../features/trabajosCampo/services/trabajosCampoService', () => ({ getTrabajosCampo }))
 vi.mock('../../features/coberturas/services/coberturasService', () => ({ getCoberturas }))
@@ -29,8 +31,8 @@ describe('Layout Mis tareas navigation', () => {
     getSolicitudesVacacion.mockResolvedValue({ results: [] })
   })
 
-  it('hides Mis tareas for a Systems account without the capability', () => {
-    useAuth.mockReturnValue({ perfil: { es_cuenta_sistemas: true, can_access_my_tasks: false }, logout: vi.fn() })
+  it('shows only the Systems management menu for an active Systems account that was previously a GA', () => {
+    useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true, can_access_my_tasks: true }, logout: vi.fn() })
 
     render(
       <MemoryRouter>
@@ -43,6 +45,54 @@ describe('Layout Mis tareas navigation', () => {
     expect(screen.queryByTitle('Mis tareas')).not.toBeInTheDocument()
     expect(screen.queryByTitle('Depósitos pendientes')).not.toBeInTheDocument()
     expect(screen.queryByTitle('Calendario del área')).not.toBeInTheDocument()
+    expect(screen.queryByTitle('Mi almuerzo')).not.toBeInTheDocument()
+    expect(screen.getByTitle('Gerentes de operaciones')).toBeInTheDocument()
+  })
+
+  it('shows the six capability-controlled modules to a Systems master admin with granted capabilities', () => {
+    useAuth.mockReturnValue({
+      perfil: {
+        type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true,
+        capabilities: {
+          has_global_scope: true,
+          manage_branches: true,
+          manage_users: true,
+          manage_templates: true,
+          manage_special_situations: true,
+          access_operational_dashboard: true,
+          access_performance_reports: true,
+        },
+      },
+      logout: vi.fn(),
+    })
+
+    render(
+      <MemoryRouter>
+        <Routes>
+          <Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    capabilityModuleLabels.forEach((label) => {
+      expect(screen.getByTitle(label)).toBeInTheDocument()
+    })
+  })
+
+  it('hides the six capability-controlled modules from a Systems profile without master admin or capabilities', () => {
+    useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: false }, logout: vi.fn() })
+
+    render(
+      <MemoryRouter>
+        <Routes>
+          <Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    capabilityModuleLabels.forEach((label) => {
+      expect(screen.queryByTitle(label)).not.toBeInTheDocument()
+    })
   })
 
   it('shows Depósitos pendientes only for an area manager', () => {
@@ -58,5 +108,6 @@ describe('Layout Mis tareas navigation', () => {
 
     expect(screen.getByTitle('Depósitos pendientes')).toBeInTheDocument()
     expect(screen.getByTitle('Calendario del área')).toBeInTheDocument()
+    expect(screen.getByTitle('Mi almuerzo')).toBeInTheDocument()
   })
 })

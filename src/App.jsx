@@ -25,17 +25,19 @@ import ConfiguracionPage from "./features/configuracion/pages/ConfiguracionPage"
 import CalendarioAreaPage from "./features/calendarioArea/pages/CalendarioAreaPage";
 import Layout from "./components/Layout/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { getProfileCapabilities } from './features/auth/profilePolicies'
 
 export function RendimientoRoute({ children }) {
   const { perfil } = useAuth()
-  const puedeConsultar = perfil?.type === 'gerente_sucursal' || perfil?.type === 'gerente_area'
+  const { canAccessPerformance: puedeConsultar } = getProfileCapabilities(perfil)
   if (perfil && !puedeConsultar) return <Navigate to="/" replace />
   return children
 }
 
 function PendientesRoute({ children }) {
   const { perfil } = useAuth()
-  if (perfil && perfil.type !== 'gerente_sucursal' && perfil.type !== 'gerente_area') {
+  const { canAccessPendingRequests } = getProfileCapabilities(perfil)
+  if (perfil && !canAccessPendingRequests) {
     return <Navigate to="/" replace />
   }
   return children
@@ -43,40 +45,51 @@ function PendientesRoute({ children }) {
 
 function AdminMaestroRoute({ children }) {
   const { perfil } = useAuth()
-  if (perfil && perfil.es_admin_maestro !== true) return <Navigate to="/" replace />
+  if (perfil && !getProfileCapabilities(perfil).isMasterAdmin) return <Navigate to="/" replace />
   return children
 }
 
 export function GerentesOperacionesRoute({ children }) {
   const { perfil } = useAuth()
-  const puedeGestionarGO = perfil?.es_cuenta_sistemas === true
-    && perfil?.activo !== false
-    && perfil?.habilitado !== false
+  const { canManageOperationsManagers: puedeGestionarGO } = getProfileCapabilities(perfil)
   if (!puedeGestionarGO) return <Navigate to="/" replace />
+  return children
+}
+
+export function CapabilityRoute({ capability, children }) {
+  const { perfil } = useAuth()
+  if (perfil && !getProfileCapabilities(perfil)[capability]) return <Navigate to="/" replace />
   return children
 }
 
 export function MisTareasRoute({ children }) {
   const { perfil } = useAuth()
-  if (perfil?.can_access_my_tasks !== true) return <Navigate to="/" replace />
+  if (!getProfileCapabilities(perfil).canAccessMyTasks) return <Navigate to="/" replace />
   return children
 }
 
 export function DepositosPendientesRoute({ children }) {
   const { perfil } = useAuth()
-  if (perfil?.type !== 'gerente_area') return <Navigate to="/" replace />
+  if (!getProfileCapabilities(perfil).canAccessPendingDeposits) return <Navigate to="/" replace />
   return children
 }
 
 export function CalendarioAreaRoute({ children }) {
   const { perfil } = useAuth()
-  if (perfil?.type !== 'gerente_area') return <Navigate to="/" replace />
+  if (!getProfileCapabilities(perfil).canAccessAreaCalendar) return <Navigate to="/" replace />
+  return children
+}
+
+export function AlmuerzosRoute({ children }) {
+  const { perfil } = useAuth()
+  if (!getProfileCapabilities(perfil).canAccessLunch) return <Navigate to="/" replace />
   return children
 }
 
 function HomeRoute() {
   const { perfil } = useAuth()
-  if (perfil?.type === 'gerente_sucursal' && perfil?.can_access_my_tasks === true) return <Navigate to="/mis-tareas" replace />
+  const { isBranchManager, canAccessMyTasks } = getProfileCapabilities(perfil)
+  if (isBranchManager && canAccessMyTasks) return <Navigate to="/mis-tareas" replace />
   return <CalendarPage />
 }
 
@@ -104,10 +117,10 @@ function App() {
         >
           <Route path="/" element={<HomeRoute />} />
           <Route path="/tareas" element={<TareasPage />} />
-          <Route path="/sucursales" element={<SucursalesPage />} />
-          <Route path="/usuarios" element={<UsuariosPage />} />
-          <Route path="/plantillas" element={<PlantillasPage />} />
-          <Route path="/plantillas/:id" element={<PlantillaDetallePage />} />
+          <Route path="/sucursales" element={<CapabilityRoute capability="canManageBranches"><SucursalesPage /></CapabilityRoute>} />
+          <Route path="/usuarios" element={<CapabilityRoute capability="canManageUsers"><UsuariosPage /></CapabilityRoute>} />
+          <Route path="/plantillas" element={<CapabilityRoute capability="canManageTemplates"><PlantillasPage /></CapabilityRoute>} />
+          <Route path="/plantillas/:id" element={<CapabilityRoute capability="canManageTemplates"><PlantillaDetallePage /></CapabilityRoute>} />
           <Route path="/gerentes" element={<GerentesPage />} />
           <Route path="/gerentes-operaciones" element={<GerentesOperacionesRoute><GerentesOperacionesPage /></GerentesOperacionesRoute>} />
           <Route path="/areas" element={<GerentesOperacionesRoute><AreasPage /></GerentesOperacionesRoute>} />
@@ -115,12 +128,12 @@ function App() {
           <Route path="/depositospendientes" element={<DepositosPendientesRoute><DepositosPendientesPage /></DepositosPendientesRoute>} />
           <Route path="/calendario-area" element={<CalendarioAreaRoute><CalendarioAreaPage /></CalendarioAreaRoute>} />
           <Route path="/solicitudes-pendientes" element={<PendientesRoute><SolicitudesPendientesPage /></PendientesRoute>} />
-          <Route path="/almuerzos" element={<AlmuerzosPage />} />
+          <Route path="/almuerzos" element={<AlmuerzosRoute><AlmuerzosPage /></AlmuerzosRoute>} />
           <Route path="/coberturas" element={<CoberturasPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/dashboard" element={<CapabilityRoute capability="canAccessOperationalDashboard"><DashboardPage /></CapabilityRoute>} />
           <Route path="/rendimiento" element={<RendimientoRoute><RendimientoPage /></RendimientoRoute>} />
-          <Route path="/situaciones" element={<SituacionesPage />} />
-          <Route path="/reportes" element={<ReportesPage />} />
+          <Route path="/situaciones" element={<CapabilityRoute capability="canManageSpecialSituations"><SituacionesPage /></CapabilityRoute>} />
+          <Route path="/reportes" element={<CapabilityRoute capability="canAccessPerformanceReports"><ReportesPage /></CapabilityRoute>} />
           <Route path="/configuracion" element={<AdminMaestroRoute><ConfiguracionPage /></AdminMaestroRoute>} />
         </Route>
       </Routes>

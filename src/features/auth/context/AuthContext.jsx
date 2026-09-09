@@ -1,5 +1,5 @@
-import { createContext, useContext, useMemo, useState } from 'react'
-import { decodeToken } from '../services/authService'
+import { createContext, useContext, useEffect, useState } from 'react'
+import { getCurrentProfile } from '../services/authService'
 import { clearTokens, getAccessToken, setTokens } from '../../../services/tokenStorage'
 
 const AuthContext = createContext(null)
@@ -9,44 +9,58 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('perfil')
     return getAccessToken()
   })
-  const [perfilOverride, setPerfilOverride] = useState(null)
+  const [perfil, setPerfil] = useState(null)
+  const [perfilLoading, setPerfilLoading] = useState(Boolean(accessToken))
 
-  const tokenPerfil = useMemo(() => {
-    if (!accessToken) return null
-    try {
-      return decodeToken(accessToken).perfil
-    } catch {
-      return null
+  useEffect(() => {
+    if (!accessToken) return undefined
+
+    let cancelled = false
+
+    getCurrentProfile()
+      .then((currentProfile) => {
+        if (!cancelled) setPerfil(currentProfile)
+      })
+      .catch(() => {
+        if (!cancelled) setPerfil(null)
+      })
+      .finally(() => {
+        if (!cancelled) setPerfilLoading(false)
+      })
+
+    return () => {
+      cancelled = true
     }
   }, [accessToken])
-  const perfil = perfilOverride ?? tokenPerfil
 
   function setAuthData(access, refresh, remember) {
     setTokens(access, refresh, remember)
-    setPerfilOverride(null)
+    setPerfil(null)
+    setPerfilLoading(true)
     setAccessToken(access)
   }
 
   function revokeMyTasksAccess() {
-    setPerfilOverride((currentPerfil) => ({
-      ...(currentPerfil ?? tokenPerfil),
+    setPerfil((currentProfile) => currentProfile && {
+      ...currentProfile,
       can_access_my_tasks: false,
-    }))
+    })
   }
 
   function logout() {
     clearTokens()
-    setPerfilOverride(null)
+    setPerfil(null)
     setAccessToken(null)
   }
 
   return (
-    <AuthContext.Provider value={{ perfil, setAuthData, revokeMyTasksAccess, logout }}>
+    <AuthContext.Provider value={{ perfil, perfilLoading, setAuthData, revokeMyTasksAccess, logout }}>
       {children}
     </AuthContext.Provider>
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   return useContext(AuthContext)
 }
