@@ -1,13 +1,19 @@
 ﻿import { useState, useEffect } from 'react'
 import { getGerentes, createGerente, updateGerente, desactivarGerente, prepararDesactivacionGerente, resetPasswordGerente } from '../services/gerentesService'
 import Toast from '../../../components/Toast/Toast'
+import { useAuth } from '../../auth/context/AuthContext'
+import AreaManagerAssignmentModal from '../../asignaciones/components/AreaManagerAssignmentModal'
+import { assignAreaToManager, getEligibleAreas, reassignAreaToManager } from '../../asignaciones/services/areaManagerAssignmentService'
+import { getProfileCapabilities } from '../../auth/profilePolicies'
 import './GerentesPage.css'
 
 export default function GerentesPage() {
+  const { perfil } = useAuth()
   const [gerentes, setGerentes] = useState([])
   const [loading, setLoading]   = useState(true)
   const [modal, setModal]       = useState(null)
   const [toast, setToast]       = useState(null)
+  const { canManageOperationsManagers: canManageGerentes, canManageAreaManagers: canManageAssignments, isSystemsAccount } = getProfileCapabilities(perfil)
 
   useEffect(() => { loadData() }, [])
 
@@ -56,6 +62,20 @@ export default function GerentesPage() {
     void loadData().catch(() => {})
   }
 
+  async function assignArea(gerente, areaId) {
+    await assignAreaToManager(gerente.id_gerente_area, areaId)
+    await loadData()
+    setModal(null)
+    setToast({ message: 'Área asignada correctamente.', type: 'success' })
+  }
+
+  async function reassignArea(gerente, areaId) {
+    await reassignAreaToManager(gerente.id_gerente_area, areaId)
+    await loadData()
+    setModal(null)
+    setToast({ message: 'Reasignación programada correctamente.', type: 'success' })
+  }
+
   return (
     <div className="gerentes-page">
       <div className="page-header">
@@ -63,12 +83,12 @@ export default function GerentesPage() {
           <h1>Gerentes de área</h1>
           <p>{gerentes.length} gerente{gerentes.length !== 1 ? 's' : ''} registrado{gerentes.length !== 1 ? 's' : ''}</p>
         </div>
-        <button className="btn-primary" onClick={() => setModal({ type: 'crear' })}>
+        {canManageGerentes && <button className="btn-primary" onClick={() => setModal({ type: 'crear' })}>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
           </svg>
           Nuevo gerente
-        </button>
+        </button>}
       </div>
 
       {loading ? (
@@ -111,7 +131,7 @@ export default function GerentesPage() {
                   </td>
                   <td>
                     <div className="row-actions">
-                      <button
+                      {canManageGerentes && <button
                         className="action-btn"
                         title="Editar"
                         onClick={() => setModal({ type: 'editar', gerente: g })}
@@ -120,8 +140,15 @@ export default function GerentesPage() {
                           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                         </svg>
-                      </button>
-                      <button
+                      </button>}
+                      {canManageAssignments && g.activo && (
+                        <button className="action-btn" title="Asignar área" aria-label={`Asignar área a ${g.nombre}`} onClick={() => setModal({ type: 'assign-area', gerente: g })}>
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /><path d="M16 14v4M14 16h4" />
+                          </svg>
+                        </button>
+                      )}
+                      {canManageGerentes && <button
                         className="action-btn"
                         title="Resetear contraseña"
                         onClick={() => setModal({ type: 'reset', gerente: g })}
@@ -130,8 +157,8 @@ export default function GerentesPage() {
                           <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                           <path d="M7 11V7a5 5 0 0 1 9.9-1" />
                         </svg>
-                      </button>
-                      {g.activo && (
+                      </button>}
+                      {canManageGerentes && g.activo && (
                         <button
                           className="action-btn action-btn-danger"
                           title="Desactivar"
@@ -182,6 +209,16 @@ export default function GerentesPage() {
           password={modal.password}
           correoEnviado={modal.correoEnviado}
           onClose={() => setModal(null)}
+        />
+      )}
+      {modal?.type === 'assign-area' && (
+        <AreaManagerAssignmentModal
+          target={modal.gerente}
+          targetType="manager"
+           loadEligible={() => getEligibleAreas(modal.gerente.id_gerente_area)}
+           onAssign={(areaId) => assignArea(modal.gerente, areaId)}
+           onReassign={isSystemsAccount ? (areaId) => reassignArea(modal.gerente, areaId) : undefined}
+           onClose={() => setModal(null)}
         />
       )}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

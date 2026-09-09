@@ -3,8 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AreasPage from './AreasPage'
 
 const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn() }))
+const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
 
 vi.mock('../../../services/apiClient', () => ({ apiRequest }))
+vi.mock('../../auth/context/AuthContext', () => ({ useAuth }))
 
 const response = (data, ok = true, status = ok ? 200 : 400) => ({
   ok,
@@ -13,7 +15,61 @@ const response = (data, ok = true, status = ok ? 200 : 400) => ({
 })
 
 describe('AreasPage', () => {
-  beforeEach(() => apiRequest.mockReset())
+  beforeEach(() => {
+    apiRequest.mockReset()
+    useAuth.mockReturnValue({ perfil: { es_cuenta_sistemas: true, activo: true, habilitado: true } })
+  })
+
+  it('assigns an eligible manager, closes the modal, reloads, and shows a toast', async () => {
+    apiRequest
+      .mockResolvedValueOnce(response({ results: [{ id: 3, nombre: 'Ventas', codigo: 'VEN', activa: true }] }))
+      .mockResolvedValueOnce(response({ results: [{ id_gerente_area: 7, nombre: 'Ana' }, { id_gerente_area: 1, nombre: 'Sistemas', es_cuenta_sistemas: true }] }))
+      .mockResolvedValueOnce(response({}))
+      .mockResolvedValueOnce(response({ results: [{ id: 3, nombre: 'Ventas', codigo: 'VEN', activa: true }] }))
+
+    render(<AreasPage />)
+    await screen.findByText('Ventas')
+    fireEvent.click(screen.getByRole('button', { name: 'Asignar gerente de área a Ventas' }))
+    expect(await screen.findByRole('option', { name: 'Ana' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Sistemas' })).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Gerente de área'), { target: { value: '7' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Asignar' }))
+
+    await waitFor(() => expect(apiRequest).toHaveBeenNthCalledWith(3, '/api/calendar/ga/7/areas/', {
+      method: 'POST', body: JSON.stringify({ area_id: 3 }),
+    }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByText('Gerente de área asignado correctamente.')).toBeInTheDocument()
+  })
+
+  it('keeps the assignment modal open for an occupied area conflict', async () => {
+    apiRequest
+      .mockResolvedValueOnce(response({ results: [{ id: 3, nombre: 'Ventas', codigo: 'VEN', activa: true }] }))
+      .mockResolvedValueOnce(response([{ id_gerente_area: 7, nombre: 'Ana' }]))
+      .mockResolvedValueOnce(response({ code: 'area_already_assigned' }, false, 409))
+
+    render(<AreasPage />)
+    await screen.findByText('Ventas')
+    fireEvent.click(screen.getByRole('button', { name: 'Asignar gerente de área a Ventas' }))
+    await screen.findByRole('option', { name: 'Ana' })
+    fireEvent.change(screen.getByLabelText('Gerente de área'), { target: { value: '7' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Asignar' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Asignar gerente de área a Ventas' })
+    expect(within(dialog).getByText('Esta área ya está asignada. ¿Deseas programar la reasignación desde mañana?')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Reasignar desde mañana' })).toBeEnabled()
+  })
+
+  it('shows only the assignment action to an authorized operations manager', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_operaciones', activo: true, habilitado: true } })
+    apiRequest.mockResolvedValue(response({ results: [{ id: 3, nombre: 'Ventas', codigo: 'VEN', activa: true }] }))
+
+    render(<AreasPage />)
+    await screen.findByText('Ventas')
+    expect(screen.getByRole('button', { name: 'Asignar gerente de área a Ventas' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Nueva área/ })).not.toBeInTheDocument()
+  })
 
   it('maps a nested field error on creation', async () => {
     apiRequest

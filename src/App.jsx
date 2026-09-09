@@ -62,6 +62,13 @@ export function CapabilityRoute({ capability, children }) {
   return children
 }
 
+export function AreaManagerAssignmentRoute({ children }) {
+  const { perfil } = useAuth()
+  const { canManageAreaManagers: canManage } = getProfileCapabilities(perfil)
+  if (!canManage) return <Navigate to="/" replace />
+  return children
+}
+
 export function MisTareasRoute({ children }) {
   const { perfil } = useAuth()
   if (!getProfileCapabilities(perfil).canAccessMyTasks) return <Navigate to="/" replace />
@@ -121,9 +128,9 @@ function App() {
           <Route path="/usuarios" element={<CapabilityRoute capability="canManageUsers"><UsuariosPage /></CapabilityRoute>} />
           <Route path="/plantillas" element={<CapabilityRoute capability="canManageTemplates"><PlantillasPage /></CapabilityRoute>} />
           <Route path="/plantillas/:id" element={<CapabilityRoute capability="canManageTemplates"><PlantillaDetallePage /></CapabilityRoute>} />
-          <Route path="/gerentes" element={<GerentesPage />} />
+          <Route path="/gerentes" element={<AreaManagerAssignmentRoute><GerentesPage /></AreaManagerAssignmentRoute>} />
           <Route path="/gerentes-operaciones" element={<GerentesOperacionesRoute><GerentesOperacionesPage /></GerentesOperacionesRoute>} />
-          <Route path="/areas" element={<GerentesOperacionesRoute><AreasPage /></GerentesOperacionesRoute>} />
+          <Route path="/areas" element={<AreaManagerAssignmentRoute><AreasPage /></AreaManagerAssignmentRoute>} />
           <Route path="/mis-tareas" element={<MisTareasRoute><MisTareasPage /></MisTareasRoute>} />
           <Route path="/depositospendientes" element={<DepositosPendientesRoute><DepositosPendientesPage /></DepositosPendientesRoute>} />
           <Route path="/calendario-area" element={<CalendarioAreaRoute><CalendarioAreaPage /></CalendarioAreaRoute>} />

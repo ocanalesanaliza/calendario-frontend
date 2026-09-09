@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { createArea, deactivateArea, getArea, getAreas, updateArea } from '../services/areasService'
+import { useAuth } from '../../auth/context/AuthContext'
+import Toast from '../../../components/Toast/Toast'
+import AreaManagerAssignmentModal from '../../asignaciones/components/AreaManagerAssignmentModal'
+import { assignAreaToManager, getEligibleAreaManagers, reassignAreaToManager } from '../../asignaciones/services/areaManagerAssignmentService'
+import { getProfileCapabilities } from '../../auth/profilePolicies'
 import './AreasPage.css'
 
 const fields = ['nombre', 'codigo']
@@ -164,10 +169,13 @@ function ConfirmModal({ area, onClose, onConfirm }) {
 }
 
 export default function AreasPage() {
+  const { perfil } = useAuth()
   const [areas, setAreas] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [modal, setModal] = useState(null)
+  const [toast, setToast] = useState(null)
+  const { canManageOperationsManagers: canManageAreas, canManageAreaManagers: canManageAssignments, isSystemsAccount } = getProfileCapabilities(perfil)
 
   async function load() {
     setLoading(true)
@@ -184,6 +192,7 @@ export default function AreasPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load()
   }, [])
 
@@ -204,6 +213,20 @@ export default function AreasPage() {
     }
   }
 
+  async function assignManager(area, gerenteAreaId) {
+    await assignAreaToManager(gerenteAreaId, area.id)
+    await load()
+    close()
+    setToast({ message: 'Gerente de área asignado correctamente.', type: 'success' })
+  }
+
+  async function reassignManager(area, gerenteAreaId) {
+    await reassignAreaToManager(gerenteAreaId, area.id)
+    await load()
+    close()
+    setToast({ message: 'Reasignación programada correctamente.', type: 'success' })
+  }
+
   return (
     <div className="areas-page">
       <header className="areas-page-header">
@@ -211,12 +234,12 @@ export default function AreasPage() {
           <h1>Áreas</h1>
           <p>{areas.length} área{areas.length !== 1 ? 's' : ''} registrada{areas.length !== 1 ? 's' : ''}</p>
         </div>
-        <button onClick={() => setModal({ type: 'create' })}>
+        {canManageAreas && <button onClick={() => setModal({ type: 'create' })}>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
           </svg>
           Nueva área
-        </button>
+        </button>}
       </header>
 
       {loading ? (
@@ -251,13 +274,20 @@ export default function AreasPage() {
                   </td>
                   <td className="areas-actions-cell">
                     <div className="row-actions">
-                      <button className="action-btn" title="Editar" aria-label="Editar" onClick={() => void openDetail(area)}>
+                      {canManageAreas && <button className="action-btn" title="Editar" aria-label="Editar" onClick={() => void openDetail(area)}>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                         </svg>
-                      </button>
-                      {area.activa !== false && (
+                      </button>}
+                      {canManageAssignments && area.activa !== false && (
+                        <button className="action-btn" title="Asignar gerente de área" aria-label={`Asignar gerente de área a ${area.nombre}`} onClick={() => setModal({ type: 'assign-manager', area })}>
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="7" r="4" /><path d="M5.5 21a6.5 6.5 0 0 1 13 0" /><path d="M19 8v6M16 11h6" />
+                          </svg>
+                        </button>
+                      )}
+                      {canManageAreas && area.activa !== false && (
                         <button className="action-btn action-btn-danger" title="Desactivar" aria-label="Desactivar" onClick={() => setModal({ type: 'deactivate', area })}>
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <circle cx="12" cy="12" r="10" />
@@ -291,6 +321,17 @@ export default function AreasPage() {
           onConfirm={() => mutation(() => deactivateArea(modal.area.id))}
         />
       )}
+      {modal?.type === 'assign-manager' && (
+        <AreaManagerAssignmentModal
+          target={modal.area}
+          targetType="area"
+           loadEligible={() => getEligibleAreaManagers(modal.area.id)}
+           onAssign={(gerenteAreaId) => assignManager(modal.area, gerenteAreaId)}
+           onReassign={isSystemsAccount ? (gerenteAreaId) => reassignManager(modal.area, gerenteAreaId) : undefined}
+           onClose={close}
+        />
+      )}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   )
 }

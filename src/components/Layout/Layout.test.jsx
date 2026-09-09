@@ -46,6 +46,8 @@ describe('Layout Mis tareas navigation', () => {
     expect(screen.queryByTitle('Depósitos pendientes')).not.toBeInTheDocument()
     expect(screen.queryByTitle('Calendario del área')).not.toBeInTheDocument()
     expect(screen.queryByTitle('Mi almuerzo')).not.toBeInTheDocument()
+    expect(screen.getByTitle('Áreas')).toBeInTheDocument()
+    expect(screen.getByTitle('Gerentes de área')).toBeInTheDocument()
     expect(screen.getByTitle('Gerentes de operaciones')).toBeInTheDocument()
   })
 
