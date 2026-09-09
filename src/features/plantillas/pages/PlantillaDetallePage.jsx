@@ -12,15 +12,19 @@ export default function PlantillaDetallePage() {
   const navigate = useNavigate()
   const [plantilla, setPlantilla] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [modal, setModal] = useState(null)
 
   useEffect(() => { loadData() }, [id])
 
   async function loadData() {
     setLoading(true)
+    setError('')
     try {
       const data = await getPlantilla(id)
       setPlantilla(data)
+    } catch (requestError) {
+      setError(requestError.message || 'No se pudo cargar la plantilla.')
     } finally {
       setLoading(false)
     }
@@ -67,6 +71,7 @@ export default function PlantillaDetallePage() {
   }
 
   if (loading) return <div className="loading-state">Cargando plantilla...</div>
+  if (error) return <div className="empty-state" role="alert">{error} <button className="btn-secondary" onClick={loadData}>Reintentar</button></div>
   if (!plantilla) return <div className="loading-state">Plantilla no encontrada.</div>
 
   const tareasActivas = plantilla.tareas?.filter((t) => t.activa) ?? []
@@ -338,7 +343,7 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    getTareas().then(setCatalogoTareas).catch(() => {})
+    getTareas('sucursal').then(setCatalogoTareas).catch(() => {})
   }, [])
 
   useEffect(() => {

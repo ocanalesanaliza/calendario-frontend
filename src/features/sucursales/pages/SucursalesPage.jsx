@@ -17,6 +17,7 @@ export default function SucursalesPage() {
   const esAdmin = perfil?.es_admin_maestro === true
   const [sucursales, setSucursales] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [busqueda, setBusqueda] = useState('')
   const [modal, setModal] = useState(null)
 
@@ -24,9 +25,12 @@ export default function SucursalesPage() {
 
   async function loadData() {
     setLoading(true)
+    setError('')
     try {
       const data = await getSucursales()
       setSucursales(data)
+    } catch (requestError) {
+      setError(requestError.message || 'No se pudieron cargar las sucursales.')
     } finally {
       setLoading(false)
     }
@@ -100,6 +104,8 @@ export default function SucursalesPage() {
 
       {loading ? (
         <div className="loading-state">Cargando sucursales...</div>
+      ) : error ? (
+        <div className="empty-state" role="alert">{error} <button className="btn-secondary" onClick={loadData}>Reintentar</button></div>
       ) : filtradas.length === 0 ? (
         <div className="empty-state">
           {busqueda ? 'Sin resultados para tu búsqueda.' : 'No hay sucursales registradas.'}
