@@ -11,71 +11,6 @@ import { getMonthlyAreaOccurrences } from '../services/calendarioAreaService'
 
 import './CalendarioAreaPage.css'
 
- const MOCK_EVENTS = [
-  {
-    id: '1',
-    title: 'Revisión de depósito',
-    start: '2026-09-09',
-    extendedProps: {
-      descripcion: 'Depósito de sucursal Tres Caminos y Morazan',
-      estado: 'Pendiente',
-    },
-  },
-  {
-    id: '2',
-    title: 'Revisión de depósito',
-    start: '2026-09-10',
-    extendedProps: {
-      descripcion: 'Depósito de sucursal Tres Caminos y Morazan',
-      estado: 'Pendiente',
-    },
-  },
-  {
-    id: '3',
-    title: 'Revisión de depósito',
-    start: '2026-09-11',
-    extendedProps: {
-      descripcion: 'Depósito de sucursal Tres Caminos y Morazan',
-      estado: 'Pendiente',
-    },
-  },
-  {
-    id: '4',
-    title: 'Revisión de depósito',
-    start: '2026-09-12',
-  },
-  {
-    id: '5',
-    title: 'Revisión de depósito',
-    start: '2026-09-14',
-  },
-  {
-    id: '6',
-    title: 'Revisión de depósito',
-    start: '2026-09-16',
-  },
-  {
-    id: '7',
-    title: 'Revisión de depósito',
-    start: '2026-09-17',
-  },
-  {
-    id: '8',
-    title: 'Revisión de depósito',
-    start: '2026-09-18',
-  },
-  {
-    id: '9',
-    title: 'Visita a Aeroplaza',
-    start: '2026-09-18',
-    extendedProps: {
-      descripcion: 'Visita a sucursal',
-      estado: 'Programada',
-    },
-  },
-
-]
-
 function monthFromDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 }
@@ -85,15 +20,15 @@ export default function CalendarioAreaPage() {
   
 
   const [month, setMonth] = useState(() => monthFromDate(new Date()))
-  const [events, setEvents] = useState(MOCK_EVENTS)
-  const [loading, setLoading] = useState(false)
+  const [events, setEvents] = useState([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [retryKey, setRetryKey] = useState(0)
   const [modal, setModal] = useState(null)
 
  
 
- /*  useEffect(() => {
+  useEffect(() => {
     let active = true
 
     async function loadOccurrences() {
@@ -114,7 +49,7 @@ export default function CalendarioAreaPage() {
 
     loadOccurrences()
     return () => { active = false }
-  }, [month, retryKey]) */
+  }, [month, retryKey])
 
   function handleEventClick(info) {
     setModal({

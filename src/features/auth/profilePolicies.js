@@ -10,7 +10,7 @@ export function getProfileCapabilities(profile) {
   const isAreaManager = profile?.type === 'gerente_area'
   const isBranchManager = profile?.type === 'gerente_sucursal'
   const isOperationsManager = profile?.type === 'gerente_operaciones'
-  const isMasterAdmin = capabilities?.has_global_scope === true
+  const isMasterAdmin = profile?.es_admin_maestro === true || capabilities?.has_global_scope === true
 
   return {
     isAreaManager,

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AlmuerzosRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GerentesOperacionesRoute, MisTareasRoute, RendimientoRoute } from './App'
+import { AdminMaestroRoute, AlmuerzosRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GerentesOperacionesRoute, MisTareasRoute, RendimientoRoute } from './App'
 
 const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
 
@@ -219,5 +219,32 @@ describe('RendimientoRoute', () => {
 
     expect(await screen.findByText('Inicio')).toBeInTheDocument()
     expect(screen.queryByText('Detalle permitido')).not.toBeInTheDocument()
+  })
+})
+
+describe('AdminMaestroRoute', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  it('permite la analítica al administrador maestro', () => {
+    useAuth.mockReturnValue({ perfil: { es_admin_maestro: true } })
+    render(<MemoryRouter><AdminMaestroRoute><p>Analítica de guardias</p></AdminMaestroRoute></MemoryRouter>)
+    expect(screen.getByText('Analítica de guardias')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['GA', { type: 'gerente_area' }],
+    ['GS', { type: 'gerente_sucursal' }],
+  ])('redirige al %s', async (_nombre, perfil) => {
+    useAuth.mockReturnValue({ perfil })
+    render(
+      <MemoryRouter initialEntries={['/analitica/revisiones-guardia']}>
+        <Routes>
+          <Route path="/" element={<p>Inicio</p>} />
+          <Route path="/analitica/revisiones-guardia" element={<AdminMaestroRoute><p>Analítica de guardias</p></AdminMaestroRoute>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText('Inicio')).toBeInTheDocument()
+    expect(screen.queryByText('Analítica de guardias')).not.toBeInTheDocument()
   })
 })
