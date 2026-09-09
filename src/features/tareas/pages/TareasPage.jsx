@@ -12,12 +12,15 @@ const RECURRENCIA_LABEL = {
   'variable':       'Variable',
 }
 
+const AMBITO_LABEL = { sucursal: 'Sucursal', area: 'Área' }
+
 export default function TareasPage() {
   const [tareas, setTareas] = useState([])
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
   const [filtroTipo, setFiltroTipo] = useState('todos')
   const [filtroEstado, setFiltroEstado] = useState('todos')
+  const [filtroAmbito, setFiltroAmbito] = useState('todos')
   const [modal, setModal] = useState(null)
 
   useEffect(() => { loadData() }, [])
@@ -57,7 +60,8 @@ export default function TareasPage() {
       filtroEstado === 'todos' ||
       (filtroEstado === 'activa' && t.activa) ||
       (filtroEstado === 'inactiva' && !t.activa)
-    return matchBusqueda && matchTipo && matchEstado
+    const matchAmbito = filtroAmbito === 'todos' || t.ambito === filtroAmbito
+    return matchBusqueda && matchTipo && matchEstado && matchAmbito
   })
 
   return (
@@ -98,13 +102,19 @@ export default function TareasPage() {
           <option value="activa">Activas</option>
           <option value="inactiva">Inactivas</option>
         </select>
+        <select className="filtro-select" value={filtroAmbito} onChange={(e) => setFiltroAmbito(e.target.value)}>
+          <option value="todos">Todos los ámbitos</option>
+          {Object.entries(AMBITO_LABEL).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
       </div>
 
       {loading ? (
         <div className="loading-state">Cargando tareas...</div>
       ) : filtradas.length === 0 ? (
         <div className="empty-state">
-          {busqueda || filtroTipo !== 'todos' || filtroEstado !== 'todos'
+          {busqueda || filtroTipo !== 'todos' || filtroEstado !== 'todos' || filtroAmbito !== 'todos'
             ? 'Sin resultados para los filtros aplicados.'
             : 'No hay tareas registradas.'}
         </div>
@@ -114,6 +124,7 @@ export default function TareasPage() {
             <thead>
               <tr>
                 <th>Nombre</th>
+                <th>Ámbito</th>
                 <th>Recurrencia</th>
                 <th>Peso</th>
                 <th>Recordatorio</th>
@@ -126,6 +137,7 @@ export default function TareasPage() {
               {filtradas.map((t) => (
                 <tr key={t.id_tarea}>
                   <td className="td-nombre">{t.nombre}</td>
+                  <td>{AMBITO_LABEL[t.ambito] ?? t.ambito}</td>
                   <td><span className="badge badge-tipo">{t.recurrencia_label ?? RECURRENCIA_LABEL[t.tipo_recurrencia] ?? t.tipo_recurrencia}</span></td>
                   <td><span className="peso-val">{t.peso}</span></td>
                   <td>{t.es_recordatorio ? <span className="badge badge-blue">Sí</span> : <span className="td-no">No</span>}</td>
@@ -205,6 +217,7 @@ function ModalWrapper({ title, onClose, children, wide }) {
 function TareaModal({ inicial, onSubmit, onClose }) {
   const [form, setForm] = useState({
     nombre:                   inicial?.nombre ?? '',
+    ambito:                   inicial?.ambito ?? 'sucursal',
     tipo_recurrencia:         inicial?.tipo_recurrencia ?? 'diario',
     valor_recurrencia:        inicial?.valor_recurrencia ?? '',
     peso:                     inicial?.peso ?? '1.00',
@@ -237,6 +250,14 @@ function TareaModal({ inicial, onSubmit, onClose }) {
         <div className="form-group">
           <label>Nombre</label>
           <input type="text" value={form.nombre} onChange={set('nombre')} required />
+        </div>
+        <div className="form-group">
+          <label>Ámbito</label>
+          <select value={form.ambito} onChange={set('ambito')} required>
+            {Object.entries(AMBITO_LABEL).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
         </div>
         <div className="form-row">
           <div className="form-group">

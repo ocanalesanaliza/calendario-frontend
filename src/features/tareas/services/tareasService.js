@@ -1,7 +1,8 @@
 import { apiRequest } from '../../../services/apiClient'
 
-export async function getTareas() {
-  const res = await apiRequest('/api/tareas/')
+export async function getTareas(ambito) {
+  const query = ambito ? `?${new URLSearchParams({ ambito })}` : ''
+  const res = await apiRequest(`/api/tareas/${query}`)
   const data = await res.json()
   if (!res.ok) throw new Error(data.detail || 'Error al cargar tareas')
   return data.results
