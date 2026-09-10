@@ -23,6 +23,7 @@ import SituacionesPage from "./features/situaciones/pages/SituacionesPage";
 import ReportesPage from "./features/reportes/pages/ReportesPage";
 import ConfiguracionPage from "./features/configuracion/pages/ConfiguracionPage";
 import CalendarioAreaPage from "./features/calendarioArea/pages/CalendarioAreaPage";
+import InventarioDemoPage from './features/inventario/pages/InventarioDemoPage'
 import Layout from "./components/Layout/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { getProfileCapabilities } from './features/auth/profilePolicies'
@@ -124,6 +125,7 @@ function App() {
         >
           <Route path="/" element={<HomeRoute />} />
           <Route path="/tareas" element={<TareasPage />} />
+          <Route path="/inventario-demo" element={<CapabilityRoute capability="canManageBranches"><InventarioDemoPage /></CapabilityRoute>} />
           <Route path="/sucursales" element={<CapabilityRoute capability="canManageBranches"><SucursalesPage /></CapabilityRoute>} />
           <Route path="/usuarios" element={<CapabilityRoute capability="canManageUsers"><UsuariosPage /></CapabilityRoute>} />
           <Route path="/plantillas" element={<CapabilityRoute capability="canManageTemplates"><PlantillasPage /></CapabilityRoute>} />

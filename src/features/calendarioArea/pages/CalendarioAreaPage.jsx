@@ -168,14 +168,14 @@ export default function CalendarioAreaPage() {
             multiMonthPlugin
           ]}
           headerToolbar={{
-            start: 'add prev,today,next',
+            start: 'prev,today,next',
             center: 'title',
             end: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek,multiMonthYear',
           }}
 
           initialView="dayGridMonth"
           locale="es"
-          buttonText={{ today: 'Hoy', month: 'Mes' }}
+          buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día', list: 'Lista', year: 'Año' }}
           events={events}
           eventClick={handleEventClick}
           dateClick={handleDateClick}
