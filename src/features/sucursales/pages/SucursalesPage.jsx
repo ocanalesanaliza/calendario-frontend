@@ -7,6 +7,7 @@ import {
 import { getGerentes } from '../../gerentes/services/gerentesService'
 import { getPlantillas, asignarSucursales } from '../../plantillas/services/plantillasService'
 import { useAuth } from '../../auth/context/AuthContext'
+import { getProfileCapabilities } from '../../auth/profilePolicies'
 import './SucursalesPage.css'
 
 const DIAS = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
@@ -14,7 +15,7 @@ const JORNADA_LABEL = { manana: 'Mañana', tarde: 'Tarde' }
 
 export default function SucursalesPage() {
   const { perfil } = useAuth()
-  const esAdmin = perfil?.es_admin_maestro === true
+  const esAdmin = getProfileCapabilities(perfil).isMasterAdmin
   const [sucursales, setSucursales] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -118,6 +119,7 @@ export default function SucursalesPage() {
                 <th>Nombre</th>
                 <th>Código</th>
                 <th>Gerente de área</th>
+                {esAdmin && <th>Guardias</th>}
                 <th>Estado</th>
                 <th>Acciones</th>
               </tr>
@@ -135,6 +137,7 @@ export default function SucursalesPage() {
                       </div>
                     ) : <span className="td-empty">—</span>}
                   </td>
+                  {esAdmin && <td>{s.numero_guardias ?? 0}</td>}
                   <td>
                     <span className={`badge ${s.activa ? 'badge-green' : 'badge-red'}`}>
                       {s.activa ? 'Activa' : 'Inactiva'}
@@ -208,10 +211,10 @@ export default function SucursalesPage() {
 function ModalWrapper({ title, onClose, children, wide, xl }) {
   return (
     <div className="modal-overlay">
-      <div className={`modal${wide ? ' modal-wide' : ''}${xl ? ' modal-xl' : ''}`} onClick={(e) => e.stopPropagation()}>
+      <div className={`modal${wide ? ' modal-wide' : ''}${xl ? ' modal-xl' : ''}`} role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{title}</h2>
-          <button className="modal-close" onClick={onClose}>
+          <button className="modal-close" aria-label="Cerrar" onClick={onClose}>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -230,6 +233,7 @@ function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
     nombre:          inicial?.nombre ?? '',
     codigo:          inicial?.codigo ?? '',
     id_gerente_area: inicial?.gerente_area?.id_gerente_area ?? '',
+    numero_guardias: inicial?.numero_guardias ?? 0,
   })
   const [idPlantilla, setIdPlantilla]   = useState('')
   const [fechaPlantilla, setFechaPlantilla] = useState('')
@@ -246,10 +250,16 @@ function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+    const numeroGuardias = Number(form.numero_guardias)
+    if (esAdmin && (!Number.isInteger(numeroGuardias) || numeroGuardias < 0 || numeroGuardias > 4)) {
+      setError('El número de guardias debe ser un entero entre 0 y 4.')
+      return
+    }
     setLoading(true)
     try {
       const body = { nombre: form.nombre, codigo: form.codigo }
       if (esAdmin && form.id_gerente_area) body.id_gerente_area = Number(form.id_gerente_area)
+      if (esAdmin) body.numero_guardias = numeroGuardias
       await onSubmit(body, idPlantilla ? Number(idPlantilla) : null, fechaPlantilla || null)
     } catch (err) {
       setError(err.message)
@@ -270,15 +280,31 @@ function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
           <input type="text" value={form.codigo} onChange={set('codigo')} required placeholder="ej. CENTRO-001" />
         </div>
         {esAdmin && (
-          <div className="form-group">
-            <label>Gerente de área {!inicial && <span className="label-required">*</span>}</label>
-            <select value={form.id_gerente_area} onChange={set('id_gerente_area')} required={!inicial}>
-              <option value="">Seleccionar gerente</option>
-              {gerentes.filter((g) => g.activo).map((g) => (
-                <option key={g.id_gerente_area} value={g.id_gerente_area}>{g.nombre}</option>
-              ))}
-            </select>
-          </div>
+          <>
+            <div className="form-group">
+              <label>Gerente de área {!inicial && <span className="label-required">*</span>}</label>
+              <select value={form.id_gerente_area} onChange={set('id_gerente_area')} required={!inicial}>
+                <option value="">Seleccionar gerente</option>
+                {gerentes.filter((g) => g.activo).map((g) => (
+                  <option key={g.id_gerente_area} value={g.id_gerente_area}>{g.nombre}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label htmlFor="numero-guardias">Número de guardias</label>
+              <input
+                id="numero-guardias"
+                type="number"
+                min="0"
+                max="4"
+                step="1"
+                value={form.numero_guardias}
+                onChange={set('numero_guardias')}
+                required
+              />
+              <span className="label-optional">De 0 a 4. Con 0 no se programa la Revisión de Guardia.</span>
+            </div>
+          </>
         )}
         {conPlantilla && plantillas.length > 0 && (
           <>

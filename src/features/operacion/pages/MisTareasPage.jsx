@@ -4,6 +4,7 @@ import { getMisTareas, registrarTarea, registrarTareasLote } from '../services/o
 import { getTrabajosCampo, aceptarTrabajoCampo, rechazarTrabajoCampo } from '../../trabajosCampo/services/trabajosCampoService'
 import { useAuth } from '../../auth/context/AuthContext'
 import { DepositDemoModal } from '../components/DepositDemoModal'
+import { RevisionGuardiaModal } from '../components/RevisionGuardiaModal'
 import './MisTareasPage.css'
 
 const ESTADO_BADGE = {
@@ -13,6 +14,10 @@ const ESTADO_BADGE = {
   programada:    'badge-yellow',
   bloqueada:     'badge-tipo',
   no_disponible: 'badge-tipo',
+}
+
+function esRevisionGuardia(tarea) {
+  return tarea.tarea?.es_revision_guardia === true
 }
 
 export default function MisTareasPage() {
@@ -30,6 +35,7 @@ export default function MisTareasPage() {
   const [registrandoLote, setRegistrandoLote] = useState(false)
   const [loteError, setLoteError] = useState('')
   const [depositTask, setDepositTask] = useState(null)
+  const [revisionGuardiaTask, setRevisionGuardiaTask] = useState(null)
 
   const { perfil, revokeMyTasksAccess } = useAuth()
   const navigate = useNavigate()
@@ -93,6 +99,10 @@ export default function MisTareasPage() {
   }
 
   function handleCardClick(event, tarea){
+    if (esRevisionGuardia(tarea)) {
+      if (!busy) setRevisionGuardiaTask(tarea)
+      return
+    }
     if (!tarea.disponible_para_registro || busy) return
 
     const clickedInteractiveElement = event.target.closest(
@@ -158,6 +168,10 @@ export default function MisTareasPage() {
   }
 
   function startRegistration(tarea) {
+    if (esRevisionGuardia(tarea)) {
+      setRevisionGuardiaTask(tarea)
+      return
+    }
     if (tarea.tarea?.id_tarea === 18) {
       setDepositTask(tarea)
       return
@@ -361,11 +375,11 @@ export default function MisTareasPage() {
           {tareasFiltradas.map((t) => (
             <div key={t.id_sucursal_tarea} className={['tarea-card',
                     `estado-${t.estado_ui}`,
-                    t.disponible_para_registro && !busy && 'tarea-card--selectable',
+                    (t.disponible_para_registro || esRevisionGuardia(t)) && !busy && 'tarea-card--selectable',
                     seleccionadas.includes(t.id_sucursal_tarea) && 'tarea-card--selected',
                     ].filter(Boolean).join(' ')} onClick={(event) => handleCardClick(event, t)}>
               <div className="tarea-card-top">
-                {t.disponible_para_registro && (
+                {t.disponible_para_registro && !esRevisionGuardia(t) && (
                   <input
                     type="checkbox"
                     className="tarea-checkbox"
@@ -397,6 +411,17 @@ export default function MisTareasPage() {
         </div>
       )}
       {depositTask && <DepositDemoModal tarea={depositTask} fecha={data?.meta?.fecha_consultada} sucursal={perfil?.sucursal?.nombre || 'Sucursal asignada'} onClose={() => setDepositTask(null)} />}
+      {revisionGuardiaTask && (
+        <RevisionGuardiaModal
+          tarea={revisionGuardiaTask}
+          fecha={data?.meta?.fecha_consultada}
+          onClose={() => setRevisionGuardiaTask(null)}
+          onSaved={async () => {
+            await loadTareas()
+            setRevisionGuardiaTask(null)
+          }}
+        />
+      )}
     </div>
   )
 }

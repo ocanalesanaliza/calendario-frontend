@@ -28,6 +28,7 @@ describe('Layout Mis tareas navigation', () => {
     getCoberturas.mockReset()
     getSolicitudesVacacion.mockReset()
     getTrabajosCampo.mockResolvedValue({ results: [] })
+    getCoberturas.mockResolvedValue({ results: [] })
     getSolicitudesVacacion.mockResolvedValue({ results: [] })
   })
 
@@ -111,5 +112,20 @@ describe('Layout Mis tareas navigation', () => {
     expect(screen.getByTitle('Depósitos pendientes')).toBeInTheDocument()
     expect(screen.getByTitle('Calendario del área')).toBeInTheDocument()
     expect(screen.getByTitle('Mi almuerzo')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['GA', { type: 'gerente_area' }],
+    ['GS', { type: 'gerente_sucursal', can_access_my_tasks: true }],
+  ])('oculta Revisiones de guardia para %s', (_nombre, perfil) => {
+    useAuth.mockReturnValue({ perfil, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+    expect(screen.queryByTitle('Revisiones de guardia')).not.toBeInTheDocument()
+  })
+
+  it('muestra Revisiones de guardia únicamente al administrador maestro', () => {
+    useAuth.mockReturnValue({ perfil: { es_admin_maestro: true }, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+    expect(screen.getByTitle('Revisiones de guardia')).toHaveAttribute('href', '/analitica/revisiones-guardia')
   })
 })

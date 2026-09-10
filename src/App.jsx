@@ -24,6 +24,7 @@ import ReportesPage from "./features/reportes/pages/ReportesPage";
 import ConfiguracionPage from "./features/configuracion/pages/ConfiguracionPage";
 import CalendarioAreaPage from "./features/calendarioArea/pages/CalendarioAreaPage";
 import InventarioDemoPage from './features/inventario/pages/InventarioDemoPage'
+import RevisionesGuardiaPage from "./features/revisionesGuardia/pages/RevisionesGuardiaPage";
 import Layout from "./components/Layout/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { getProfileCapabilities } from './features/auth/profilePolicies'
@@ -44,7 +45,7 @@ function PendientesRoute({ children }) {
   return children
 }
 
-function AdminMaestroRoute({ children }) {
+export function AdminMaestroRoute({ children }) {
   const { perfil } = useAuth()
   if (perfil && !getProfileCapabilities(perfil).isMasterAdmin) return <Navigate to="/" replace />
   return children
@@ -143,6 +144,7 @@ function App() {
           <Route path="/rendimiento" element={<RendimientoRoute><RendimientoPage /></RendimientoRoute>} />
           <Route path="/situaciones" element={<CapabilityRoute capability="canManageSpecialSituations"><SituacionesPage /></CapabilityRoute>} />
           <Route path="/reportes" element={<CapabilityRoute capability="canAccessPerformanceReports"><ReportesPage /></CapabilityRoute>} />
+          <Route path="/analitica/revisiones-guardia" element={<AdminMaestroRoute><RevisionesGuardiaPage /></AdminMaestroRoute>} />
           <Route path="/configuracion" element={<AdminMaestroRoute><ConfiguracionPage /></AdminMaestroRoute>} />
         </Route>
       </Routes>
