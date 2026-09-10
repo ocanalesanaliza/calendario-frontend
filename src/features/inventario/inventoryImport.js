@@ -38,6 +38,7 @@ export function parseInventoryRows(rows) {
   const columns = new Map(rows[headerRowIndex].map((header, index) => [normalizeHeader(header), index]))
   const products = []
   const codes = new Map()
+  const branches = new Map()
 
   rows.slice(headerRowIndex + 1).forEach((row, index) => {
     const excelRow = headerRowIndex + index + 2
@@ -51,6 +52,9 @@ export function parseInventoryRows(rows) {
     if (!product) throw new Error(`Fila ${excelRow}: Producto es obligatorio.`)
     if (!branch) throw new Error(`Fila ${excelRow}: Sucursal es obligatoria.`)
 
+    const normalizedBranch = branch.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase()
+    branches.set(normalizedBranch, branch)
+
     const cost = parseNonNegativeNumber(valueFor('Costo'), 'Costo', excelRow)
     const systemStock = parseNonNegativeNumber(valueFor('Existencia'), 'Existencia', excelRow)
     const normalizedCode = code.normalize('NFKC').trim().toLocaleLowerCase()
@@ -63,6 +67,10 @@ export function parseInventoryRows(rows) {
       products.push({ code, product, branch, cost, systemStock, excelRow })
     }
   })
+
+  if (branches.size > 1) {
+    throw new Error('El archivo contiene productos de más de una sucursal. Importe un archivo con una sola sucursal.')
+  }
 
   return products
 }
@@ -108,4 +116,8 @@ export function calculateSummary(counts) {
       netImpact: summary.netImpact + impact,
     }
   }, { shortageImpact: 0, surplusImpact: 0, netImpact: 0 })
+}
+
+export function formatCurrency(amount) {
+  return `L ${new Intl.NumberFormat('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount ?? 0)}`
 }
