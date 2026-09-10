@@ -2,6 +2,13 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { getPlantilla, updatePlantilla, desactivarPlantilla, addTarea, updateTarea, desactivarTarea, asignarSucursales } from '../services/plantillasService'
 import { getTareas } from '../../tareas/services/tareasService'
+import RecurrenceSelector from '../../tareas/components/RecurrenceSelector'
+import {
+  construirReglasRecurrencia,
+  obtenerLabelReglas,
+  recurrenciaDesdeReglas,
+  validarValorRecurrencia,
+} from '../../tareas/recurrenceConfig'
 import { getSucursales } from '../../sucursales/services/sucursalesService'
 import './PlantillaDetallePage.css'
 
@@ -162,7 +169,11 @@ export default function PlantillaDetallePage() {
               {[...tareasActivas, ...tareasInactivas].map((pt) => (
                 <tr key={pt.id_plantilla_tarea} className={!pt.activa ? 'row-inactive' : ''}>
                   <td className="td-nombre">{pt.tarea?.nombre ?? '—'}</td>
-                  <td><span className="badge badge-tipo">{pt.tarea?.recurrencia_label ?? '—'}</span></td>
+                  <td>
+                    <span className="badge badge-tipo">
+                      {obtenerLabelReglas(pt.reglas_recurrencia, pt.tarea?.recurrencia_label ?? '—')}
+                    </span>
+                  </td>
                   <td>
                     <span className={`badge ${pt.jornada === 'manana' ? 'badge-blue' : 'badge-orange'}`}>
                       {JORNADA_LABEL[pt.jornada] ?? pt.jornada}
@@ -329,6 +340,10 @@ function normalizarHora(hora) {
 }
 
 function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
+  const reglasIniciales = inicial?.reglas_recurrencia?.length
+    ? inicial.reglas_recurrencia
+    : inicial?.tarea?.reglas_sugeridas ?? []
+  const recurrenciaInicial = recurrenciaDesdeReglas(reglasIniciales)
   const [catalogoTareas, setCatalogoTareas] = useState([])
   const [seleccionadas, setSeleccionadas] = useState([])
   const [buscar, setBuscar] = useState('')
@@ -338,20 +353,16 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
     hora_manana: HORAS_MANANA[0],
     hora_tarde: HORAS_TARDE[0],
     aplica_ambas_jornadas: inicial?.aplica_ambas_jornadas ?? false,
+    tipo_recurrencia: recurrenciaInicial.tipo,
+    valor_recurrencia: recurrenciaInicial.valor,
   })
+  const [recurrenciaModificada, setRecurrenciaModificada] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     getTareas('sucursal').then(setCatalogoTareas).catch(() => {})
   }, [])
-
-  useEffect(() => {
-    if (inicial) return
-    setSeleccionadas((prev) =>
-      prev.filter((idTarea) => !calcDuplicada(idTarea, form.aplica_ambas_jornadas, form.jornada))
-    )
-  }, [form.aplica_ambas_jornadas, form.jornada])
 
   function calcDuplicada(idTarea, ambas, jornada) {
     if (ambas) {
@@ -364,11 +375,38 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
   }
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
-  const setCheck = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.checked }))
-
   function handleJornadaChange(e) {
     const jornada = e.target.value
     setForm((f) => ({ ...f, jornada, hora_sugerida: jornada === 'tarde' ? HORAS_TARDE[0] : HORAS_MANANA[0] }))
+    if (!inicial) {
+      setSeleccionadas((prev) =>
+        prev.filter((idTarea) => !calcDuplicada(idTarea, form.aplica_ambas_jornadas, jornada))
+      )
+    }
+  }
+
+  function handleAmbasJornadasChange(e) {
+    const aplicaAmbas = e.target.checked
+    setForm((actual) => ({ ...actual, aplica_ambas_jornadas: aplicaAmbas }))
+    if (!inicial) {
+      setSeleccionadas((prev) =>
+        prev.filter((idTarea) => !calcDuplicada(idTarea, aplicaAmbas, form.jornada))
+      )
+    }
+  }
+
+  function handleTipoRecurrenciaChange(tipo) {
+    setRecurrenciaModificada(true)
+    setForm((actual) => ({
+      ...actual,
+      tipo_recurrencia: tipo,
+      valor_recurrencia: tipo === actual.tipo_recurrencia ? actual.valor_recurrencia : '',
+    }))
+  }
+
+  function handleValorRecurrenciaChange(valor) {
+    setRecurrenciaModificada(true)
+    setForm((actual) => ({ ...actual, valor_recurrencia: valor }))
   }
 
   function toggleTarea(idTarea) {
@@ -388,17 +426,36 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
       setError('Selecciona al menos una tarea.')
       return
     }
+    if (inicial && recurrenciaModificada) {
+      const errorRecurrencia = validarValorRecurrencia(
+        form.tipo_recurrencia,
+        form.valor_recurrencia,
+      )
+      if (errorRecurrencia) {
+        setError(errorRecurrencia)
+        return
+      }
+    }
     setLoading(true)
     try {
       if (inicial) {
-        await onSubmit({
+        const body = {
           id_tarea: inicial.tarea.id_tarea,
           jornada: form.jornada,
           hora_sugerida: form.hora_sugerida || null,
           hora_manana: form.hora_manana || null,
           hora_tarde: form.hora_tarde || null,
           aplica_ambas_jornadas: form.aplica_ambas_jornadas,
-        })
+        }
+        if (recurrenciaModificada) {
+          const reglas = construirReglasRecurrencia(
+            form.tipo_recurrencia,
+            form.valor_recurrencia,
+            reglasIniciales.length === 1 ? reglasIniciales[0] : null,
+          )
+          if (reglas !== null) body.reglas_recurrencia = reglas
+        }
+        await onSubmit(body)
       } else {
         await onSubmit({
           ids_tareas: seleccionadas,
@@ -472,7 +529,7 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
         )}
 
         <label className="check-label" style={{ marginTop: '0.25rem' }}>
-          <input type="checkbox" checked={form.aplica_ambas_jornadas} onChange={setCheck('aplica_ambas_jornadas')} disabled={!!inicial} />
+          <input type="checkbox" checked={form.aplica_ambas_jornadas} onChange={handleAmbasJornadasChange} disabled={!!inicial} />
           Aplica ambas jornadas
         </label>
 
@@ -507,6 +564,17 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
               </select>
             </div>
           </div>
+        )}
+
+        {inicial && (
+          <RecurrenceSelector
+            tipo={form.tipo_recurrencia}
+            valor={form.valor_recurrencia}
+            onTipoChange={handleTipoRecurrenciaChange}
+            onValorChange={handleValorRecurrenciaChange}
+            permitirManual
+            permitirEspecial={recurrenciaInicial.especial}
+          />
         )}
 
         {error && <p className="modal-error">{error}</p>}

@@ -1,5 +1,14 @@
 import { apiRequest } from '../../../services/apiClient'
 
+function parseDetail(detail) {
+  if (typeof detail === 'string') return detail
+  if (Array.isArray(detail)) return detail.map(parseDetail).filter(Boolean).join(' ')
+  if (detail && typeof detail === 'object') {
+    return Object.values(detail).map(parseDetail).filter(Boolean).join(' ')
+  }
+  return ''
+}
+
 export async function getSucursales() {
   const res = await apiRequest('/api/sucursales/')
   const data = await res.json()
@@ -31,6 +40,13 @@ export async function desactivarSucursal(id) {
   const res = await apiRequest(`/api/sucursales/${id}/desactivar/`, { method: 'POST' })
   const data = await res.json()
   if (!res.ok) throw new Error(data.detail || 'Error al desactivar sucursal')
+  return data
+}
+
+export async function quitarGsSucursal(id) {
+  const res = await apiRequest(`/api/sucursales/${id}/quitar-gs/`, { method: 'POST' })
+  const data = await res.json()
+  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al quitar el GS de la sucursal')
   return data
 }
 

@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   getRendimientoDiario,
   getRendimientoMensual,
@@ -36,6 +36,8 @@ function pesoObtenido(detalle) {
 export default function RendimientoPage() {
   const { perfil } = useAuth()
   const esGerente = perfil?.type === 'gerente_area'
+  const puedeVolverDashboard = esGerente || perfil?.es_admin_maestro === true
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [tab, setTab]           = useState('diario')
@@ -48,6 +50,16 @@ export default function RendimientoPage() {
 
   return (
     <div className="rendimiento-page">
+      {idUsuario && puedeVolverDashboard && (
+        <button
+          type="button"
+          className="btn-regresar-dashboard"
+          onClick={() => navigate('/dashboard')}
+        >
+          <span aria-hidden="true">←</span>
+          Regresar al dashboard
+        </button>
+      )}
       <div className="page-header">
         <div>
           <h1>Rendimiento</h1>

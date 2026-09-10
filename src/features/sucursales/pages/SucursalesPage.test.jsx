@@ -88,4 +88,38 @@ describe('SucursalesPage: número de guardias', () => {
       body: JSON.stringify({ nombre: 'Sucursal Centro', codigo: 'CENTRO-01', id_gerente_area: 2, numero_guardias: 4 }),
     }))
   })
+
+  it('permite quitar el GS asignado sin desactivar su cuenta', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', es_admin_maestro: false } })
+    let tieneTitular = true
+    const sucursal = {
+      id_sucursal: 15,
+      nombre: 'Sucursal Centro',
+      codigo: 'CENTRO-01',
+      activa: true,
+      gerente_area: { id_gerente_area: 2, nombre: 'GA Centro' },
+      usuario_titular: { id_usuario: 12, nombre: 'GS Ana', habilitado: true },
+    }
+    apiRequest.mockImplementation(async (path, options = {}) => {
+      if (path === '/api/sucursales/15/quitar-gs/' && options.method === 'POST') {
+        tieneTitular = false
+        return response({ detail: 'GS retirado de la sucursal correctamente.' })
+      }
+      if (path === '/api/sucursales/') {
+        return response({ results: [{ ...sucursal, usuario_titular: tieneTitular ? sucursal.usuario_titular : null }] })
+      }
+      throw new Error(`Unexpected request: ${options.method ?? 'GET'} ${path}`)
+    })
+
+    render(<SucursalesPage />)
+    expect(await screen.findByRole('cell', { name: /GS Ana/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByTitle('Quitar GS'))
+    const dialog = screen.getByRole('dialog', { name: 'Quitar GS de la sucursal' })
+    expect(within(dialog).getByText(/La cuenta del GS permanecerá activa/)).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Quitar GS' }))
+
+    await waitFor(() => expect(apiRequest).toHaveBeenCalledWith('/api/sucursales/15/quitar-gs/', { method: 'POST' }))
+    expect(await screen.findByRole('cell', { name: 'Sin GS' })).toBeInTheDocument()
+    expect(screen.queryByTitle('Quitar GS')).not.toBeInTheDocument()
+  })
 })

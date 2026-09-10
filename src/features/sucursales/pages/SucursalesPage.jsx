@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect } from 'react'
 import {
   getSucursales, createSucursal, updateSucursal, desactivarSucursal,
+  quitarGsSucursal,
   getHorarios, saveHorarios, updateHorario,
   getTareasSucursal,
 } from '../services/sucursalesService'
@@ -67,6 +68,12 @@ export default function SucursalesPage() {
     setModal(null)
   }
 
+  async function handleQuitarGs(id) {
+    await quitarGsSucursal(id)
+    await loadData()
+    setModal(null)
+  }
+
   const filtradas = sucursales.filter((s) =>
     s.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
     s.codigo.toLowerCase().includes(busqueda.toLowerCase())
@@ -119,6 +126,7 @@ export default function SucursalesPage() {
                 <th>Nombre</th>
                 <th>Código</th>
                 <th>Gerente de área</th>
+                <th>GS asignado</th>
                 {esAdmin && <th>Guardias</th>}
                 <th>Estado</th>
                 <th>Acciones</th>
@@ -136,6 +144,14 @@ export default function SucursalesPage() {
                         <span>{s.gerente_area.nombre}</span>
                       </div>
                     ) : <span className="td-empty">—</span>}
+                  </td>
+                  <td>
+                    {s.usuario_titular ? (
+                      <div className="gerente-cell">
+                        <div className="gerente-avatar gs-avatar">{s.usuario_titular.nombre.charAt(0).toUpperCase()}</div>
+                        <span>{s.usuario_titular.nombre}</span>
+                      </div>
+                    ) : <span className="td-empty">Sin GS</span>}
                   </td>
                   {esAdmin && <td>{s.numero_guardias ?? 0}</td>}
                   <td>
@@ -162,6 +178,20 @@ export default function SucursalesPage() {
                           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                         </svg>
                       </button>
+                      {s.usuario_titular && (
+                        <button
+                          className="action-btn action-btn-danger"
+                          title="Quitar GS"
+                          aria-label={`Quitar a ${s.usuario_titular.nombre} de ${s.nombre}`}
+                          onClick={() => setModal({ type: 'quitar-gs', sucursal: s })}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                            <circle cx="9" cy="7" r="4" />
+                            <line x1="17" y1="11" x2="23" y2="11" />
+                          </svg>
+                        </button>
+                      )}
                       {s.activa && (
                         <button className="action-btn action-btn-danger" title="Desactivar" onClick={() => setModal({ type: 'desactivar', sucursal: s })}>
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -193,6 +223,13 @@ export default function SucursalesPage() {
         <DesactivarModal
           nombre={modal.sucursal.nombre}
           onConfirm={() => handleDesactivar(modal.sucursal.id_sucursal)}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal?.type === 'quitar-gs' && (
+        <QuitarGsModal
+          sucursal={modal.sucursal}
+          onConfirm={() => handleQuitarGs(modal.sucursal.id_sucursal)}
           onClose={() => setModal(null)}
         />
       )}
@@ -360,6 +397,40 @@ function DesactivarModal({ nombre, onConfirm, onClose }) {
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
           <button className="btn-danger" onClick={handleConfirm} disabled={loading}>
             {loading ? 'Desactivando...' : 'Desactivar'}
+          </button>
+        </div>
+      </div>
+    </ModalWrapper>
+  )
+}
+
+function QuitarGsModal({ sucursal, onConfirm, onClose }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleConfirm() {
+    setLoading(true)
+    setError('')
+    try {
+      await onConfirm()
+    } catch (err) {
+      setError(err.message)
+      setLoading(false)
+    }
+  }
+
+  return (
+    <ModalWrapper title="Quitar GS de la sucursal" onClose={onClose}>
+      <div className="modal-form">
+        <p className="modal-confirm-text">
+          ¿Deseas quitar a <strong>{sucursal.usuario_titular.nombre}</strong> de la sucursal <strong>{sucursal.nombre}</strong>?
+        </p>
+        <p className="modal-confirm-help">La cuenta del GS permanecerá activa y podrás asignarla nuevamente.</p>
+        {error && <p className="modal-error" role="alert">{error}</p>}
+        <div className="modal-footer">
+          <button type="button" className="btn-secondary" onClick={onClose} disabled={loading}>Cancelar</button>
+          <button type="button" className="btn-danger" onClick={handleConfirm} disabled={loading}>
+            {loading ? 'Quitando...' : 'Quitar GS'}
           </button>
         </div>
       </div>

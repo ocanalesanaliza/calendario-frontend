@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import RendimientoPage from './RendimientoPage'
 
@@ -38,7 +38,14 @@ const rendimiento = {
 }
 
 function renderPage(entry = '/rendimiento?id_usuario=12') {
-  render(<MemoryRouter initialEntries={[entry]}><RendimientoPage /></MemoryRouter>)
+  render(
+    <MemoryRouter initialEntries={[entry]}>
+      <Routes>
+        <Route path="/rendimiento" element={<RendimientoPage />} />
+        <Route path="/dashboard" element={<p>Dashboard operativo</p>} />
+      </Routes>
+    </MemoryRouter>,
+  )
 }
 
 describe('RendimientoPage: consulta por usuario', () => {
@@ -82,6 +89,15 @@ describe('RendimientoPage: consulta por usuario', () => {
     expect(screen.queryByRole('button', { name: 'Cerrar día' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Reabrir día' })).not.toBeInTheDocument()
     expect(apiRequest).toHaveBeenCalledWith(`/api/rendimiento/diario/?id_usuario=12&fecha=${HOY}`)
+  })
+
+  it('permite regresar al dashboard al consultar el rendimiento de un GS', async () => {
+    renderPage()
+    await screen.findByText('Solo lectura')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Regresar al dashboard' }))
+
+    expect(await screen.findByText('Dashboard operativo')).toBeInTheDocument()
   })
 
   it('conserva id_usuario al abrir el resumen mensual', async () => {
