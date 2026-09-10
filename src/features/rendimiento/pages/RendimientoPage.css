@@ -222,6 +222,8 @@
 
 .td-nombre { font-weight: 500; color: #1e293b; }
 .td-mono   { font-family: monospace; color: #475569; }
+.td-peso-rendimiento { font-weight: 700; white-space: nowrap; }
+.td-nota-rendimiento { min-width: 220px; white-space: normal; }
 
 /* ── Días grid (mensual) ── */
 .dias-grid {

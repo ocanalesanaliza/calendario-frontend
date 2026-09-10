@@ -26,6 +26,13 @@ const ESTADO_TAREA = {
   no_puntuada:  { clase: 'badge-tipo', label: 'No puntuable' },
 }
 
+function pesoObtenido(detalle) {
+  const realizada = detalle.estado_final === 'cumplida' || detalle.estado_final === 'realizada'
+  if (!realizada || detalle.cuenta_en_rendimiento === false) return '0.00'
+  const peso = Number(detalle.peso_obtenido ?? detalle.peso_programado ?? detalle.peso ?? detalle.peso_base ?? 0)
+  return Number.isFinite(peso) ? peso.toFixed(2) : '0.00'
+}
+
 export default function RendimientoPage() {
   const { perfil } = useAuth()
   const esGerente = perfil?.type === 'gerente_area'
@@ -205,6 +212,8 @@ function VistaDiaria({ esGerente, idUsuario }) {
                       <th>Jornada</th>
                       <th>Hora</th>
                       <th>Estado</th>
+                      <th>Peso obtenido</th>
+                      <th>Nota</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -218,6 +227,8 @@ function VistaDiaria({ esGerente, idUsuario }) {
                             {ESTADO_TAREA[d.estado_final]?.label ?? d.estado_final}
                           </span>
                         </td>
+                        <td className="td-mono td-peso-rendimiento">{pesoObtenido(d)}</td>
+                        <td className="td-nota-rendimiento">{d.revision_guardia?.notas || '—'}</td>
                       </tr>
                     ))}
                   </tbody>

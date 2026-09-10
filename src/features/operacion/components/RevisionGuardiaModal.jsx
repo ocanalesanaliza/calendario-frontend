@@ -46,6 +46,8 @@ export function RevisionGuardiaModal({ tarea, fecha, onClose, onSaved }) {
   const idSucursalTarea = tarea.revision_guardia?.id_sucursal_tarea ?? tarea.id_sucursal_tarea
   const [formulario, setFormulario] = useState(null)
   const [guardias, setGuardias] = useState([])
+  const [reportandoAusencia, setReportandoAusencia] = useState(false)
+  const [notaAusencia, setNotaAusencia] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -59,6 +61,7 @@ export function RevisionGuardiaModal({ tarea, fecha, onClose, onSaved }) {
           ?? Array.from({ length: data.numero_guardias ?? 0 }, (_, index) => index + 1)
         const existentes = data.revision?.guardias ?? []
         setFormulario(data)
+        setNotaAusencia(data.revision?.notas ?? '')
         setGuardias(requeridos.map((numero) => crearGuardia(
           numero,
           existentes.find((guardia) => guardia.numero_guardia === numero),
@@ -140,7 +143,32 @@ export function RevisionGuardiaModal({ tarea, fecha, onClose, onSaved }) {
     }
   }
 
+  async function handleGuardarAusencia() {
+    if (!formulario?.puede_guardar || saving) return
+    const notas = notaAusencia.trim()
+    if (!notas) {
+      setError('La nota es requerida cuando el guardia no se presentó.')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const result = await guardarRevisionGuardia({
+        id_sucursal_tarea: Number(idSucursalTarea),
+        fecha: formulario.fecha,
+        no_se_presento_guardia: true,
+        notas,
+      })
+      await onSaved(result)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const puedeGuardar = formulario?.puede_guardar === true
+  const ausenciaRegistrada = formulario?.revision?.no_se_presento_guardia === true
 
   return (
     <div className="modal-overlay revision-guardia-overlay">
@@ -159,15 +187,42 @@ export function RevisionGuardiaModal({ tarea, fecha, onClose, onSaved }) {
           <div className="revision-guardia-status">No se pudo cargar el formulario.</div>
         ) : (
           <form className="revision-guardia-form" onSubmit={handleSubmit}>
-            {!puedeGuardar && (
+            {!puedeGuardar && !ausenciaRegistrada && (
               <p className="revision-guardia-notice">
                 {formulario.motivo_no_disponible || 'Esta revisión no está disponible para registro.'}
               </p>
             )}
 
-            {guardias.map((guardia, index) => (
-              <fieldset key={guardia.numero_guardia} className="guardia-fieldset" disabled={!puedeGuardar || saving}>
-                <legend>Guardia {guardia.numero_guardia}</legend>
+            {ausenciaRegistrada && (
+              <div className="revision-guardia-ausencia-registrada">
+                <strong>No se presentó guardia.</strong>
+                <span>Nota: {formulario.revision.notas}</span>
+                <small>Esta tarea se registró como realizada y sumó su peso completo.</small>
+              </div>
+            )}
+
+            {reportandoAusencia && !ausenciaRegistrada && (
+              <div className="revision-guardia-ausencia-form">
+                <p>La tarea se mostrará como realizada, sumará su peso completo y la nota será visible para el gerente.</p>
+                <label htmlFor="revision-guardia-nota-ausencia">Nota *</label>
+                <textarea
+                  id="revision-guardia-nota-ausencia"
+                  value={notaAusencia}
+                  onChange={(event) => setNotaAusencia(event.target.value)}
+                  maxLength={500}
+                  rows={4}
+                  placeholder="Explica por qué no se presentó el guardia..."
+                  disabled={saving}
+                />
+                <small>{notaAusencia.length}/500</small>
+              </div>
+            )}
+
+            {!reportandoAusencia && !ausenciaRegistrada && (
+              <div className="guardia-cards">
+                {guardias.map((guardia, index) => (
+                  <fieldset key={guardia.numero_guardia} className="guardia-fieldset" disabled={!puedeGuardar || saving}>
+                    <legend>Guardia {guardia.numero_guardia}</legend>
                 <div className="guardia-datos-grid">
                   <label>Primer nombre *<input value={guardia.primer_nombre} onChange={(e) => setCampo(index, 'primer_nombre', e.target.value)} required /></label>
                   <label>Segundo nombre<input value={guardia.segundo_nombre} onChange={(e) => setCampo(index, 'segundo_nombre', e.target.value)} /></label>
@@ -194,16 +249,43 @@ export function RevisionGuardiaModal({ tarea, fecha, onClose, onSaved }) {
                     ))}
                   </div>
                 </div>
-              </fieldset>
-            ))}
+                  </fieldset>
+                ))}
+              </div>
+            )}
 
             {error && <p role="alert" className="modal-error">{error}</p>}
             <div className="modal-footer">
               <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cerrar</button>
-              {puedeGuardar && (
-                <button type="submit" className="btn-primary" disabled={saving}>
-                  {saving ? 'Guardando...' : 'Guardar revisión'}
-                </button>
+              {puedeGuardar && !reportandoAusencia && (
+                <>
+                  <button
+                    type="button"
+                    className="btn-no-presento"
+                    onClick={() => { setReportandoAusencia(true); setError('') }}
+                    disabled={saving}
+                  >
+                    No se presentó guardia
+                  </button>
+                  <button type="submit" className="btn-primary" disabled={saving}>
+                    {saving ? 'Guardando...' : 'Guardar revisión'}
+                  </button>
+                </>
+              )}
+              {puedeGuardar && reportandoAusencia && (
+                <>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => { setReportandoAusencia(false); setError('') }}
+                    disabled={saving}
+                  >
+                    Volver al formulario
+                  </button>
+                  <button type="button" className="btn-primary" onClick={handleGuardarAusencia} disabled={saving}>
+                    {saving ? 'Guardando...' : 'Guardar ausencia'}
+                  </button>
+                </>
               )}
             </div>
           </form>

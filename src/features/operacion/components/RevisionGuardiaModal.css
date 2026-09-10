@@ -5,8 +5,21 @@
 .revision-guardia-status { color: #64748b; padding: 3rem; text-align: center; }
 .revision-guardia-form { display: flex; flex-direction: column; gap: 1rem; padding: 0 1.5rem 1.5rem; }
 .revision-guardia-notice { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; color: #92400e; font-size: .86rem; padding: .75rem; }
-.guardia-fieldset { border: 1px solid #e2e8f0; border-radius: 10px; display: flex; flex-direction: column; gap: 1rem; padding: 1rem; }
-.guardia-fieldset legend { color: #1e293b; font-size: .95rem; font-weight: 700; padding: 0 .4rem; }
+.revision-guardia-ausencia-form, .revision-guardia-ausencia-registrada { border-radius: 10px; display: flex; flex-direction: column; gap: .55rem; padding: 1rem; }
+.revision-guardia-ausencia-form { background: #fffbeb; border: 1px solid #fde68a; color: #78350f; }
+.revision-guardia-ausencia-form p, .revision-guardia-ausencia-registrada span { font-size: .86rem; }
+.revision-guardia-ausencia-form label { font-size: .82rem; font-weight: 700; }
+.revision-guardia-ausencia-form textarea { border: 1.5px solid #fbbf24; border-radius: 8px; color: #1e293b; font: inherit; padding: .65rem .75rem; resize: vertical; }
+.revision-guardia-ausencia-form textarea:focus { border-color: #d97706; outline: none; }
+.revision-guardia-ausencia-form small { align-self: flex-end; color: #92400e; }
+.revision-guardia-ausencia-registrada { background: #f8fafc; border: 1px solid #cbd5e1; color: #334155; }
+.revision-guardia-ausencia-registrada small { color: #64748b; }
+.btn-no-presento { background: #ffedd5; border: 1px solid #fdba74; border-radius: 7px; color: #9a3412; cursor: pointer; font-size: .85rem; font-weight: 600; padding: .5rem .9rem; }
+.btn-no-presento:hover { background: #fed7aa; }
+.btn-no-presento:disabled { cursor: not-allowed; opacity: .6; }
+.guardia-cards { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); }
+.guardia-fieldset { background: #fff; border: 1px solid #dbe4f0; border-radius: 12px; box-shadow: 0 3px 12px rgb(15 23 42 / 7%); display: flex; flex-direction: column; gap: 1rem; min-width: 0; padding: 1rem; }
+.guardia-fieldset legend { background: #eef2ff; border-radius: 999px; color: #3730a3; font-size: .85rem; font-weight: 700; padding: .3rem .7rem; }
 .guardia-datos-grid { display: grid; gap: .75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .guardia-datos-grid label { color: #475569; display: flex; flex-direction: column; font-size: .8rem; font-weight: 600; gap: .3rem; }
 .guardia-datos-grid input { border: 1.5px solid #e2e8f0; border-radius: 7px; color: #1e293b; font: inherit; padding: .55rem .7rem; }

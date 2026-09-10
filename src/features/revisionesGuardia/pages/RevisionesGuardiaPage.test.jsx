@@ -64,4 +64,22 @@ describe('RevisionesGuardiaPage', () => {
     fireEvent.change(screen.getByLabelText('Por página'), { target: { value: '50' } })
     await waitFor(() => expect(getAnalitica).toHaveBeenLastCalledWith({ page: 1, page_size: 50 }))
   })
+
+  it('muestra la nota cuando se reportó que el guardia no se presentó', async () => {
+    getAnalitica.mockResolvedValue({
+      count: 1,
+      results: [{
+        ...revision,
+        id_revision_guardia: 10,
+        no_se_presento_guardia: true,
+        notas: 'El guardia asignado no se presentó al turno.',
+        guardias: [],
+      }],
+    })
+
+    render(<RevisionesGuardiaPage />)
+
+    expect(await screen.findByText('No se presentó guardia')).toBeInTheDocument()
+    expect(screen.getByText('El guardia asignado no se presentó al turno.')).toBeInTheDocument()
+  })
 })

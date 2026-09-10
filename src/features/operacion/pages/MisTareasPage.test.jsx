@@ -144,6 +144,8 @@ describe('MisTareasPage deposit demonstrations', () => {
 
     expect(await screen.findByRole('dialog', { name: 'Revisión de Guardia' })).toBeInTheDocument()
     expect(getRevisionGuardia).toHaveBeenCalledWith(15, '2026-09-09')
+    expect(screen.getByRole('group', { name: 'Guardia 1' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Guardia 2' })).toBeInTheDocument()
     const primerosNombres = screen.getAllByLabelText(/Primer nombre/)
     const primerosApellidos = screen.getAllByLabelText(/Primer apellido/)
     const identidades = screen.getAllByLabelText(/Identidad/)
@@ -172,6 +174,55 @@ describe('MisTareasPage deposit demonstrations', () => {
         expect.objectContaining({ numero_guardia: 2, primer_nombre: 'Beto', identidad: '0801-2001-54321' }),
       ],
     }))
+    expect(registrarTarea).not.toHaveBeenCalled()
+    expect(registrarTareasLote).not.toHaveBeenCalled()
+  })
+
+  it('registra que el guardia no se presentó solamente cuando se escribe una nota', async () => {
+    const revisionTask = {
+      id_sucursal_tarea: 15,
+      jornada: 'manana',
+      hora: '09:00',
+      disponible_para_registro: true,
+      estado_ui: 'disponible',
+      estado_ui_label: 'Disponible',
+      tarea: { id_tarea: 30, nombre: 'Registro de Guardia', es_revision_guardia: true },
+      revision_guardia: { requiere_formulario: true, numero_guardias: 2, id_sucursal_tarea: 15 },
+    }
+    getMisTareas.mockResolvedValue({
+      ...taskResponse,
+      meta: { ...taskResponse.meta, fecha_consultada: '2026-09-09' },
+      results: [revisionTask],
+    })
+    getRevisionGuardia.mockResolvedValue({
+      fecha: '2026-09-09',
+      numero_guardias: 2,
+      guardias_requeridos: [1, 2],
+      puede_guardar: true,
+      motivo_no_disponible: null,
+      revision: null,
+    })
+    guardarRevisionGuardia.mockResolvedValue({ revision: { id_revision_guardia: 9 } })
+
+    render(<MemoryRouter><MisTareasPage /></MemoryRouter>)
+    fireEvent.click(await screen.findByText('Registro de Guardia'))
+    fireEvent.click(await screen.findByRole('button', { name: 'No se presentó guardia' }))
+    expect(screen.getByText(/sumará su peso completo/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar ausencia' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('La nota es requerida')
+
+    fireEvent.change(screen.getByLabelText('Nota *'), {
+      target: { value: 'El guardia asignado no se presentó al turno.' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar ausencia' }))
+
+    expect(guardarRevisionGuardia).toHaveBeenCalledWith({
+      id_sucursal_tarea: 15,
+      fecha: '2026-09-09',
+      no_se_presento_guardia: true,
+      notas: 'El guardia asignado no se presentó al turno.',
+    })
     expect(registrarTarea).not.toHaveBeenCalled()
     expect(registrarTareasLote).not.toHaveBeenCalled()
   })

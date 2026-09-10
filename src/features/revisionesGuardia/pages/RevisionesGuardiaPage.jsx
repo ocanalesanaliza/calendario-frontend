@@ -28,6 +28,8 @@ function filasRevision(revision, revisionIndex) {
     codigo: revision.sucursal?.codigo ?? revision.codigo_sucursal ?? '—',
     gerente: nombre(revision.gerente_area),
     usuario: nombre(revision.usuario) !== '—' ? nombre(revision.usuario) : nombre(revision.gerente_sucursal),
+    resultado: revision.no_se_presento_guardia ? 'No se presentó guardia' : 'Revisión realizada',
+    notas: revision.notas || '—',
   }
   if (guardias.length === 0) return [{ ...base, key: `${base.id}-sin-guardia`, guardia: null }]
   return guardias.map((guardia, index) => ({
@@ -124,7 +126,7 @@ export default function RevisionesGuardiaPage() {
         <label>Sucursal<select value={draft.id_sucursal} onChange={(e) => setFiltro('id_sucursal', e.target.value)}><option value="">Todas</option>{catalogos.sucursales.map((item) => <option key={item.id_sucursal} value={item.id_sucursal}>{item.nombre}</option>)}</select></label>
         <label>Gerente de área<select value={draft.id_gerente_area} onChange={(e) => setFiltro('id_gerente_area', e.target.value)}><option value="">Todos</option>{catalogos.gerentes.map((item) => <option key={item.id_gerente_area} value={item.id_gerente_area}>{item.nombre}</option>)}</select></label>
         <label>GS<select value={draft.id_usuario} onChange={(e) => setFiltro('id_usuario', e.target.value)}><option value="">Todos</option>{catalogos.usuarios.map((item) => <option key={item.id_usuario} value={item.id_usuario}>{item.nombre}</option>)}</select></label>
-        <label className="revisiones-buscar">Buscar<input type="search" value={draft.buscar} onChange={(e) => setFiltro('buscar', e.target.value)} placeholder="Sucursal, código, GS, guardia, identidad o teléfono" /></label>
+        <label className="revisiones-buscar">Buscar<input type="search" value={draft.buscar} onChange={(e) => setFiltro('buscar', e.target.value)} placeholder="Sucursal, código, GS, guardia, identidad, teléfono o nota" /></label>
         <div className="revisiones-filter-actions">
           <button type="button" className="btn-secondary" onClick={limpiarFiltros}>Limpiar</button>
           <button type="submit" className="btn-primary">Aplicar filtros</button>
@@ -140,11 +142,12 @@ export default function RevisionesGuardiaPage() {
       ) : (
         <div className="table-card revisiones-table-wrap">
           <table className="revisiones-table">
-            <thead><tr><th>Fecha</th><th>Sucursal</th><th>Código</th><th>Gerente de área</th><th>GS</th><th>Guardia</th><th>Nombre</th><th>Identidad</th><th>Teléfono</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Sucursal</th><th>Código</th><th>Gerente de área</th><th>GS</th><th>Resultado</th><th>Nota</th><th>Guardia</th><th>Nombre</th><th>Identidad</th><th>Teléfono</th></tr></thead>
             <tbody>
               {filas.map((fila) => (
                 <tr key={fila.key}>
                   <td>{fila.fecha}</td><td>{fila.sucursal}</td><td>{fila.codigo}</td><td>{fila.gerente}</td><td>{fila.usuario}</td>
+                  <td>{fila.resultado}</td><td className="revisiones-nota">{fila.notas}</td>
                   <td>{fila.guardia?.numero_guardia ?? '—'}</td>
                   <td>{fila.guardia ? [fila.guardia.primer_nombre, fila.guardia.segundo_nombre, fila.guardia.primer_apellido, fila.guardia.segundo_apellido].filter(Boolean).join(' ') : '—'}</td>
                   <td>{fila.guardia?.identidad ?? '—'}</td><td>{fila.guardia?.telefono || '—'}</td>
