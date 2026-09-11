@@ -1,7 +1,9 @@
 import { getCalendarArea, postCalendarArea } from './calendarAreaApi'
+import { normalizeMonthlyAreaOccurrencesResponse } from './monthlyAreaOccurrence'
 
-export function getMonthlyAreaOccurrences(month) {
-  return getCalendarArea(`/api/calendar/my-area/monthly-occurrences/?month=${encodeURIComponent(month)}`, 'No se pudo cargar el calendario del área.')
+export async function getMonthlyAreaOccurrences(month) {
+  const response = await getCalendarArea(`/api/calendar/my-area/monthly-occurrences/?month=${encodeURIComponent(month)}`, 'No se pudo cargar el calendario del área.')
+  return normalizeMonthlyAreaOccurrencesResponse(response)
 }
 
 export function getMonthlyAreaPerformance(month) {

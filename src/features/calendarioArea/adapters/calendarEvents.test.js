@@ -4,7 +4,11 @@ import { occurrenceToCalendarEvent, occurrencesToCalendarEvents } from './calend
 describe('calendar event adapter', () => {
   it('uses the effective ISO date as start and preserves the scheduled date', () => {
     const occurrence = {
-      id: 8,
+      occurrence_id: 8,
+      status: 'scheduled',
+      template: { id: 7, name: 'Apertura' },
+      template_version: { id: 9, number: 3 },
+      coverage_snapshot: { jornada: 'morning', aplica_ambas_jornadas: false, known: true },
       area: 'Operaciones',
       task: 'Inventario',
       scheduled_date: '2026-09-12',
@@ -21,6 +25,11 @@ describe('calendar event adapter', () => {
       editable: false,
       extendedProps: {
         area: 'Operaciones',
+        occurrence_id: 8,
+        status: 'scheduled',
+        template: { id: 7, name: 'Apertura' },
+        template_version: { id: 9, number: 3 },
+        coverage_snapshot: { jornada: 'morning', aplica_ambas_jornadas: false, known: true },
         task: 'Inventario',
         scheduled_date: '2026-09-12',
         effective_date: '2026-09-15',
