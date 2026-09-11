@@ -361,7 +361,11 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    getTareas('sucursal').then(setCatalogoTareas).catch(() => {})
+    getTareas('sucursal')
+      .then((tareas) => setCatalogoTareas(
+        tareas.filter((tarea) => tarea.es_revision_guardia !== true),
+      ))
+      .catch(() => {})
   }, [])
 
   function calcDuplicada(idTarea, ambas, jornada) {

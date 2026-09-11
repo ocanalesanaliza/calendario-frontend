@@ -83,4 +83,25 @@ describe('PlantillaDetallePage: recurrencia por tarea', () => {
       }),
     ))
   })
+
+  it('no ofrece Registro de Guardia para agregarlo a una plantilla', async () => {
+    getTareas.mockResolvedValueOnce([
+      { id_tarea: 30, nombre: 'Registro de Guardia', es_revision_guardia: true },
+      { id_tarea: 31, nombre: 'Apertura', es_revision_guardia: false },
+    ])
+
+    render(
+      <MemoryRouter initialEntries={['/plantillas/10']}>
+        <Routes>
+          <Route path="/plantillas/:id" element={<PlantillaDetallePage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await screen.findByText(/Solo d.as seleccionados: lunes/)
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar tarea' }))
+
+    expect(await screen.findByText('Apertura')).toBeInTheDocument()
+    expect(screen.queryByText('Registro de Guardia')).not.toBeInTheDocument()
+  })
 })
