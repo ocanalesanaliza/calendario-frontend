@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PlantillasAreaPage from './PlantillasAreaPage'
 
@@ -12,6 +13,7 @@ vi.mock('../../calendarArea/services/areaTemplatesService', () => ({ createAreaT
 vi.mock('../../tareas/services/tareasService', () => ({ getTareas }))
 
 describe('PlantillasAreaPage', () => {
+  const renderPage = () => render(<MemoryRouter><PlantillasAreaPage /></MemoryRouter>)
   beforeEach(() => {
     getAreaTemplates.mockReset().mockResolvedValue([])
     createAreaTemplate.mockReset().mockResolvedValue({})
@@ -21,7 +23,7 @@ describe('PlantillasAreaPage', () => {
   it('muestra el estado de carga y el vacío', async () => {
     let resolveTemplates
     getAreaTemplates.mockReturnValue(new Promise((resolve) => { resolveTemplates = resolve }))
-    render(<PlantillasAreaPage />)
+    renderPage()
 
     expect(screen.getByRole('status')).toHaveTextContent('Cargando plantillas de área...')
     resolveTemplates([])
@@ -31,7 +33,7 @@ describe('PlantillasAreaPage', () => {
 
   it('muestra el error y reintenta la carga', async () => {
     getAreaTemplates.mockRejectedValueOnce(new Error('Servicio no disponible')).mockResolvedValueOnce([])
-    render(<PlantillasAreaPage />)
+    renderPage()
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Servicio no disponible')
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
@@ -48,7 +50,7 @@ describe('PlantillasAreaPage', () => {
       active: true,
       current_version: { version: 3, tasks: [{ task_id: 4 }] },
     }])
-    render(<PlantillasAreaPage />)
+    renderPage()
 
     expect(await screen.findByText('Apertura de área')).toBeInTheDocument()
     expect(screen.getByText('Tareas de apertura')).toBeInTheDocument()
@@ -56,11 +58,12 @@ describe('PlantillasAreaPage', () => {
     expect(screen.getByText('3')).toBeInTheDocument()
     expect(screen.getByText('1')).toBeInTheDocument()
     expect(screen.getByRole('table', { name: 'Plantillas de área registradas' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Apertura de área' })).toHaveAttribute('href', '/plantillas-area/8')
   })
 
   it('crea la plantilla con la tarea inicial y la jornada seleccionada', async () => {
     getTareas.mockResolvedValue([{ id_tarea: 4, nombre: 'Abrir caja' }])
-    render(<PlantillasAreaPage />)
+    renderPage()
     await screen.findByText('No hay plantillas de área registradas.')
 
     fireEvent.click(screen.getByRole('button', { name: 'Nueva plantilla de área' }))

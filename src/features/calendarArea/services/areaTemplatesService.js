@@ -25,3 +25,8 @@ export function createAreaTemplateVersion(templateId, body) {
 export function archiveAreaTemplate(templateId) {
   return postCalendarArea(`${basePath}${templateId}/archive/`, undefined, 'No se pudo archivar la plantilla del área.')
 }
+
+// Explicit WU8.3 names keep the versioning contract readable at call sites.
+export const getAreaTemplateDetail = getAreaTemplate
+export const getAreaTemplateVersionHistory = getAreaTemplateVersions
+export const publishAreaTemplateVersion = createAreaTemplateVersion

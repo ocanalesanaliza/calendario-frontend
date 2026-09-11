@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { createAreaTemplate, getAreaTemplates } from '../../calendarArea/services/areaTemplatesService'
 import { getTareas } from '../../tareas/services/tareasService'
 import './PlantillasAreaPage.css'
@@ -83,7 +84,7 @@ export default function PlantillasAreaPage() {
             <tbody>
               {templates.map((template) => (
                 <tr key={templateId(template)}>
-                  <td className="td-nombre">{templateName(template)}</td>
+                  <td className="td-nombre"><Link to={`/plantillas-area/${templateId(template)}`}>{templateName(template)}</Link></td>
                   <td className="td-desc">{templateDescription(template) || <span className="td-empty">—</span>}</td>
                   <td><span className={`badge ${templateActive(template) ? 'badge-green' : 'badge-red'}`}>{templateActive(template) ? 'Activa' : 'Inactiva'}</span></td>
                   <td>{templateVersion(template) ?? <span className="td-empty">—</span>}</td>

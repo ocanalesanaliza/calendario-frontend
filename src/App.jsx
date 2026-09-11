@@ -10,6 +10,7 @@ import UsuariosPage from "./features/usuarios/pages/UsuariosPage";
 import PlantillasPage from "./features/plantillas/pages/PlantillasPage";
 import PlantillaDetallePage from "./features/plantillas/pages/PlantillaDetallePage";
 import PlantillasAreaPage from "./features/plantillasArea/pages/PlantillasAreaPage";
+import PlantillaAreaDetallePage from './features/plantillasArea/pages/PlantillaAreaDetallePage'
 import GerentesPage from "./features/gerentes/pages/GerentesPage";
 import GerentesOperacionesPage from "./features/gerentes_operaciones/pages/GerentesOperacionesPage";
 import AreasPage from "./features/areas/pages/AreasPage";
@@ -140,6 +141,7 @@ function App() {
           <Route path="/plantillas" element={<CapabilityRoute capability="canManageTemplates"><PlantillasPage /></CapabilityRoute>} />
           <Route path="/plantillas/:id" element={<CapabilityRoute capability="canManageTemplates"><PlantillaDetallePage /></CapabilityRoute>} />
           <Route path="/plantillas-area" element={<PlantillasAreaRoute><PlantillasAreaPage /></PlantillasAreaRoute>} />
+          <Route path="/plantillas-area/:id" element={<PlantillasAreaRoute><PlantillaAreaDetallePage /></PlantillasAreaRoute>} />
           <Route path="/gerentes" element={<AreaManagerAssignmentRoute><GerentesPage /></AreaManagerAssignmentRoute>} />
           <Route path="/gerentes-operaciones" element={<GerentesOperacionesRoute><GerentesOperacionesPage /></GerentesOperacionesRoute>} />
           <Route path="/areas" element={<AreaManagerAssignmentRoute><AreasPage /></AreaManagerAssignmentRoute>} />
