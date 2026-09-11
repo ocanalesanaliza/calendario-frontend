@@ -3,6 +3,7 @@ import { createArea, deactivateArea, getArea, getAreas, updateArea } from '../se
 import { useAuth } from '../../auth/context/AuthContext'
 import Toast from '../../../components/Toast/Toast'
 import AreaManagerAssignmentModal from '../../asignaciones/components/AreaManagerAssignmentModal'
+import AreaTemplateAssignmentModal from '../components/AreaTemplateAssignmentModal'
 import { assignAreaToManager, getEligibleAreaManagers, reassignAreaToManager } from '../../asignaciones/services/areaManagerAssignmentService'
 import { getProfileCapabilities } from '../../auth/profilePolicies'
 import './AreasPage.css'
@@ -175,7 +176,7 @@ export default function AreasPage() {
   const [error, setError] = useState('')
   const [modal, setModal] = useState(null)
   const [toast, setToast] = useState(null)
-  const { canManageOperationsManagers: canManageAreas, canManageAreaManagers: canManageAssignments, isSystemsAccount } = getProfileCapabilities(perfil)
+  const { canManageOperationsManagers: canManageAreas, canManageAreaManagers: canManageAssignments, canManageAreaTemplateAssignments, isSystemsAccount } = getProfileCapabilities(perfil)
 
   async function load() {
     setLoading(true)
@@ -287,6 +288,13 @@ export default function AreasPage() {
                           </svg>
                         </button>
                       )}
+                      {canManageAreaTemplateAssignments && area.activa !== false && (
+                        <button className="action-btn" title="Asignar plantilla de área" aria-label={`Asignar plantilla de área a ${area.nombre}`} onClick={() => setModal({ type: 'assign-template', area })}>
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="5" y="3" width="14" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" />
+                          </svg>
+                        </button>
+                      )}
                       {canManageAreas && area.activa !== false && (
                         <button className="action-btn action-btn-danger" title="Desactivar" aria-label="Desactivar" onClick={() => setModal({ type: 'deactivate', area })}>
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -331,6 +339,7 @@ export default function AreasPage() {
            onClose={close}
         />
       )}
+      {modal?.type === 'assign-template' && <AreaTemplateAssignmentModal area={modal.area} onClose={close} />}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   )

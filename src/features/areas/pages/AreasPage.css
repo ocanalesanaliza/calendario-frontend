@@ -279,6 +279,17 @@
   background: #dc2626;
 }
 
+.area-template-assignment-modal { width: min(100%, 560px); }
+.area-template-assignment-modal .areas-modal-content { display: grid; gap: 1rem; }
+.area-template-assignment-modal form { display: grid; gap: .75rem; padding: 0; }
+.area-template-assignment-modal label { display: grid; gap: .35rem; }
+.area-template-assignment-modal select, .area-template-assignment-modal input { box-sizing: border-box; padding: .6rem; border: 1px solid #cbd5e1; border-radius: 7px; width: 100%; }
+.area-template-assignment-modal h3 { font-size: .95rem; margin: 0; }
+.area-template-assignment-modal .area-template-state { background: #f8fafc; border-radius: 8px; display: grid; gap: .35rem; padding: .75rem; }
+.area-template-assignment-modal .area-template-state p { margin: 0; }
+.area-template-assignment-modal .area-template-confirm { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
+.area-template-assignment-modal .area-template-confirm p { flex-basis: 100%; }
+
 @media (max-width: 640px) {
   .areas-page-header {
     flex-direction: column;

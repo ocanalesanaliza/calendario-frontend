@@ -34,5 +34,6 @@ export function getProfileCapabilities(profile) {
     canAccessPendingDeposits: isAreaManager,
     canManageAreaManagers: isSystemsAccount || (isOperationsManager && isActiveProfile(profile)),
     canManageOperationsManagers: isSystemsAccount,
+    canManageAreaTemplateAssignments: isSystemsAccount || isMasterAdmin || (isOperationsManager && isActiveProfile(profile)),
   }
 }

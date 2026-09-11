@@ -69,7 +69,7 @@ export function CapabilityRoute({ capability, children }) {
 export function AreaManagerAssignmentRoute({ children }) {
   const { perfil } = useAuth()
   const { canManageAreaManagers: canManage } = getProfileCapabilities(perfil)
-  if (!canManage) return <Navigate to="/" replace />
+  if (!canManage && !getProfileCapabilities(perfil).isMasterAdmin) return <Navigate to="/" replace />
   return children
 }
 

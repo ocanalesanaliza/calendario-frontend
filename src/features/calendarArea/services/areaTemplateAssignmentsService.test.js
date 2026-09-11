@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   assignAreaTemplate,
   cancelAreaTemplateAssignment,
+  getAssignableAreaTemplates,
   getAreaTemplateAssignment,
 } from './areaTemplateAssignmentsService'
 
@@ -17,6 +18,7 @@ describe('areaTemplateAssignmentsService', () => {
     await getAreaTemplateAssignment(8)
     await assignAreaTemplate(8, { template_id: 3, version: 2, fecha_inicio: '2026-10-01' })
     await cancelAreaTemplateAssignment(8, 12)
+    await getAssignableAreaTemplates(8)
 
     expect(apiRequest).toHaveBeenNthCalledWith(1, '/api/calendar/areas/8/template-assignment/')
     expect(apiRequest).toHaveBeenNthCalledWith(2, '/api/calendar/areas/8/template-assignments/', {
@@ -25,5 +27,6 @@ describe('areaTemplateAssignmentsService', () => {
     expect(apiRequest).toHaveBeenNthCalledWith(3, '/api/calendar/areas/8/template-assignments/12/cancel/', {
       method: 'POST', body: JSON.stringify({ confirm: true }),
     })
+    expect(apiRequest).toHaveBeenNthCalledWith(4, '/api/calendar/areas/8/assignable-templates/')
   })
 })

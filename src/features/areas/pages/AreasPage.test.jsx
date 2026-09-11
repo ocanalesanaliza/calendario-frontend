@@ -69,6 +69,20 @@ describe('AreasPage', () => {
     expect(screen.getByRole('button', { name: 'Asignar gerente de área a Ventas' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Nueva área/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Asignar plantilla de área a Ventas' })).toBeInTheDocument()
+  })
+
+  it.each([
+    ['GA', { type: 'gerente_area' }],
+    ['GS', { type: 'gerente_sucursal' }],
+  ])('does not expose Area template assignment to %s', async (_role, perfil) => {
+    useAuth.mockReturnValue({ perfil })
+    apiRequest.mockResolvedValue(response({ results: [{ id: 3, nombre: 'Ventas', codigo: 'VEN', activa: true }] }))
+
+    render(<AreasPage />)
+    await screen.findByText('Ventas')
+
+    expect(screen.queryByRole('button', { name: 'Asignar plantilla de área a Ventas' })).not.toBeInTheDocument()
   })
 
   it('maps a nested field error on creation', async () => {
