@@ -27,6 +27,7 @@ import ConfiguracionPage from "./features/configuracion/pages/ConfiguracionPage"
 import CalendarioAreaPage from "./features/calendarioArea/pages/CalendarioAreaPage";
 import InventarioDemoPage from './features/inventario/pages/InventarioDemoPage'
 import RevisionesGuardiaPage from "./features/revisionesGuardia/pages/RevisionesGuardiaPage";
+import AusenciasAreaPage from './features/ausenciasArea/pages/AusenciasAreaPage'
 import Layout from "./components/Layout/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { getProfileCapabilities } from './features/auth/profilePolicies'
@@ -98,6 +99,12 @@ export function CalendarioAreaRoute({ children }) {
   return children
 }
 
+export function AusenciasAreaRoute({ children }) {
+  const { perfil } = useAuth()
+  if (!getProfileCapabilities(perfil).canAccessAreaAbsences) return <Navigate to="/" replace />
+  return children
+}
+
 export function AlmuerzosRoute({ children }) {
   const { perfil } = useAuth()
   if (!getProfileCapabilities(perfil).canAccessLunch) return <Navigate to="/" replace />
@@ -148,6 +155,7 @@ function App() {
           <Route path="/mis-tareas" element={<MisTareasRoute><MisTareasPage /></MisTareasRoute>} />
           <Route path="/depositospendientes" element={<DepositosPendientesRoute><DepositosPendientesPage /></DepositosPendientesRoute>} />
           <Route path="/calendario-area" element={<CalendarioAreaRoute><CalendarioAreaPage /></CalendarioAreaRoute>} />
+          <Route path="/ausencias-area" element={<AusenciasAreaRoute><AusenciasAreaPage /></AusenciasAreaRoute>} />
           <Route path="/solicitudes-pendientes" element={<PendientesRoute><SolicitudesPendientesPage /></PendientesRoute>} />
           <Route path="/almuerzos" element={<AlmuerzosRoute><AlmuerzosPage /></AlmuerzosRoute>} />
           <Route path="/coberturas" element={<CoberturasPage />} />

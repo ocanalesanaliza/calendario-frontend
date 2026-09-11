@@ -31,6 +31,8 @@ export function getProfileCapabilities(profile) {
     canAccessPendingRequests: isBranchManager || isAreaManager,
     canAccessPerformance: isBranchManager || isAreaManager || isMasterAdmin,
     canAccessAreaCalendar: isAreaManager,
+    canAccessAreaAbsences: isAreaManager || isOperationsManager || isMasterAdmin || isSystemsAccount,
+    canManageAreaAbsences: isOperationsManager || isMasterAdmin || isSystemsAccount,
     canAccessPendingDeposits: isAreaManager,
     canManageAreaManagers: isSystemsAccount || (isOperationsManager && isActiveProfile(profile)),
     canManageOperationsManagers: isSystemsAccount,
