@@ -184,3 +184,30 @@
   cursor: pointer; 
 }
 
+.occurrence-details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.5rem 1rem;
+}
+
+.occurrence-details dt {
+  font-weight: 700;
+}
+
+.occurrence-details dd {
+  margin: 0;
+}
+
+.occurrence-actions,
+.calendar-modal form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.calendar-modal form label,
+.calendar-modal form input,
+.calendar-modal form textarea {
+  width: 100%;
+}
