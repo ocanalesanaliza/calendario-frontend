@@ -16,16 +16,16 @@ describe('areaTemplateAssignmentsService', () => {
 
   it('uses the singular state and scoped assignment endpoints', async () => {
     await getAreaTemplateAssignment(8)
-    await assignAreaTemplate(8, { template_id: 3, version: 2, fecha_inicio: '2026-10-01' })
-    await cancelAreaTemplateAssignment(8, 12)
+    await assignAreaTemplate(8, { template_id: 3, version: 2, fecha_inicio: '2026-10-01' }, 'assign-key')
+    await cancelAreaTemplateAssignment(8, 12, 'cancel-key')
     await getAssignableAreaTemplates(8)
 
     expect(apiRequest).toHaveBeenNthCalledWith(1, '/api/calendar/areas/8/template-assignment/')
     expect(apiRequest).toHaveBeenNthCalledWith(2, '/api/calendar/areas/8/template-assignments/', {
-      method: 'POST', body: JSON.stringify({ template_id: 3, version: 2, fecha_inicio: '2026-10-01' }),
+      method: 'POST', headers: { 'Idempotency-Key': 'assign-key' }, body: JSON.stringify({ template_id: 3, version: 2, fecha_inicio: '2026-10-01' }),
     })
     expect(apiRequest).toHaveBeenNthCalledWith(3, '/api/calendar/areas/8/template-assignments/12/cancel/', {
-      method: 'POST', body: JSON.stringify({ confirm: true }),
+      method: 'POST', headers: { 'Idempotency-Key': 'cancel-key' }, body: JSON.stringify({ confirm: true }),
     })
     expect(apiRequest).toHaveBeenNthCalledWith(4, '/api/calendar/areas/8/assignable-templates/')
   })

@@ -1,10 +1,49 @@
-.ausencias-area-page section { margin-top: 2rem; }
-.ausencias-area-page table { width: 100%; border-collapse: collapse; background: white; }
-.ausencias-area-page th, .ausencias-area-page td { padding: .75rem; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: top; }
-.ausencias-area-page button { margin-right: .5rem; }
-.ausencias-modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 1rem; background: rgb(0 0 0 / .45); }
-.ausencias-modal { width: min(42rem, 100%); max-height: 90vh; overflow: auto; padding: 1.25rem; border-radius: .5rem; background: white; }
-.ausencias-modal header, .ausencias-modal footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-.ausencias-modal label { display: grid; gap: .35rem; margin: 1rem 0; }
-.ausencias-modal fieldset { display: grid; grid-template-columns: 1fr 1fr auto; gap: .75rem; margin: .75rem 0; }
-@media (max-width: 700px) { .ausencias-area-page { overflow-x: auto; } .ausencias-modal fieldset { grid-template-columns: 1fr; } }
+.ausencias-area-section { margin-top: 2rem; }
+.ausencias-area-section table { width: 100%; border-collapse: collapse; background: white; }
+.ausencias-area-section th, .ausencias-area-section td { padding: .75rem; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: top; }
+.ausencias-area-section td > button + button { margin-left: .5rem; }
+.ausencias-area-page__new-request { padding: .625rem 1rem; border: 1px solid #6d28d9; border-radius: .5rem; background: #6d28d9; color: #fff; font-weight: 700; box-shadow: 0 1px 2px rgb(76 29 149 / .2); }
+.ausencias-area-page__new-request:hover { background: #5b21b6; border-color: #5b21b6; }
+.ausencias-area-page__new-request:focus-visible, .ausencias-area-request-card__cancel:focus-visible { outline: 2px solid #7c3aed; outline-offset: 2px; }
+.ausencias-area-request-list { display: grid; gap: .75rem; }
+.ausencias-area-request-card { padding: .875rem 1rem; border: 1px solid #e5e7eb; border-radius: .75rem; background: #fff; box-shadow: 0 1px 2px rgb(15 23 42 / .06); }
+.ausencias-area-request-card__header { display: flex; align-items: center; gap: .75rem; }
+.ausencias-area-request-card__summary { min-width: 0; flex: 1; }
+.ausencias-area-request-card__title-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: .25rem .5rem; }
+.ausencias-area-request-card__header h3 { margin: 0; color: #1e293b; font-size: 1rem; }
+.ausencias-area-request-card__title-row span, .ausencias-area-request-card__summary p { margin: 0; color: #64748b; font-size: .875rem; }
+.ausencias-area-request-card__summary p { display: flex; flex-wrap: wrap; gap: .25rem .5rem; }
+.ausencias-area-request-card__summary p span + span::before { content: '·'; margin-right: .5rem; }
+.ausencias-area-status-badge { display: inline-flex; flex: none; align-items: center; min-height: 1.5rem; padding: .125rem .5rem; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: .8125rem; font-weight: 700; }
+.ausencias-area-request-card__cancel { display: inline-grid; width: 1.75rem; height: 1.75rem; flex: none; place-items: center; padding: 0; border: 0; border-radius: 999px; background: transparent; color: #64748b; font-size: 1.25rem; line-height: 1; cursor: pointer; }
+.ausencias-area-request-card__cancel:hover { background: #f1f5f9; color: #334155; }
+.ausencias-modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 1rem; background: rgb(15 23 42 / .52); }
+.ausencias-modal { width: min(42rem, 100%); max-height: min(90vh, 48rem); overflow: auto; border: 1px solid #e2e8f0; border-radius: 1rem; background: #fff; box-shadow: 0 20px 45px rgb(15 23 42 / .22); color: #1e293b; }
+.ausencias-modal > header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem; border-bottom: 1px solid #e2e8f0; }
+.ausencias-modal > header h2 { margin: 0; font-size: 1.25rem; line-height: 1.4; }
+.ausencias-modal > header button { display: inline-grid; width: 2rem; height: 2rem; flex: none; place-items: center; padding: 0; border: 0; border-radius: .5rem; background: transparent; color: #64748b; font-size: 1.5rem; line-height: 1; cursor: pointer; }
+.ausencias-modal > header button:hover { background: #f1f5f9; color: #334155; }
+.ausencias-modal form { padding: 1.25rem 1.5rem 1.5rem; }
+.ausencias-modal form > p:first-child { margin-top: 0; color: #475569; line-height: 1.5; }
+.ausencias-modal label { display: grid; gap: .4rem; margin: 1rem 0; color: #334155; font-size: .875rem; font-weight: 600; }
+.ausencias-modal label span { color: #64748b; font-weight: 400; }
+.ausencias-modal input, .ausencias-modal select, .ausencias-modal textarea { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: .5rem; background: #fff; color: #1e293b; font: inherit; font-weight: 400; line-height: 1.5; }
+.ausencias-modal input, .ausencias-modal select { min-height: 2.625rem; padding: .5rem .75rem; }
+.ausencias-modal textarea { min-height: 6.5rem; padding: .625rem .75rem; resize: vertical; }
+.ausencias-modal input:hover, .ausencias-modal select:hover, .ausencias-modal textarea:hover { border-color: #94a3b8; }
+.ausencias-modal input:focus-visible, .ausencias-modal select:focus-visible, .ausencias-modal textarea:focus-visible, .ausencias-modal button:focus-visible { outline: 2px solid #7c3aed; outline-offset: 2px; }
+.ausencias-modal input:disabled, .ausencias-modal select:disabled, .ausencias-modal textarea:disabled, .ausencias-modal button:disabled { cursor: not-allowed; opacity: .55; }
+.ausencias-modal fieldset { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: .75rem; align-items: end; margin: 1rem 0; padding: 1rem; border: 1px solid #e2e8f0; border-radius: .75rem; background: #f8fafc; }
+.ausencias-modal fieldset legend { padding: 0 .375rem; color: #475569; font-size: .8125rem; font-weight: 700; }
+.ausencias-modal fieldset label { margin: 0; }
+.ausencias-modal fieldset button, .ausencias-modal form > button[type="button"] { min-height: 2.625rem; padding: .5rem .75rem; border: 1px solid #c4b5fd; border-radius: .5rem; background: #f5f3ff; color: #6d28d9; font: inherit; font-weight: 700; cursor: pointer; }
+.ausencias-modal fieldset button:hover, .ausencias-modal form > button[type="button"]:hover { border-color: #a78bfa; background: #ede9fe; color: #5b21b6; }
+.ausencias-modal [role="alert"] { margin: 1rem 0; padding: .75rem 1rem; border: 1px solid #fecaca; border-radius: .5rem; background: #fef2f2; color: #b91c1c; }
+.ausencias-modal [role="alert"] p { margin: 0; }
+.ausencias-modal footer { display: flex; align-items: center; justify-content: flex-end; gap: .75rem; margin: 1.5rem -1.5rem -1.5rem; padding: 1rem 1.5rem; border-top: 1px solid #e2e8f0; background: #f8fafc; }
+.ausencias-modal footer button { min-height: 2.625rem; padding: .5rem 1rem; border-radius: .5rem; font: inherit; font-weight: 700; cursor: pointer; }
+.ausencias-modal footer button[type="button"] { border: 1px solid #cbd5e1; background: #fff; color: #334155; }
+.ausencias-modal footer button[type="button"]:hover { border-color: #94a3b8; background: #f8fafc; }
+.ausencias-modal footer button[type="submit"] { border: 1px solid #6d28d9; background: #6d28d9; color: #fff; box-shadow: 0 1px 2px rgb(76 29 149 / .2); }
+.ausencias-modal footer button[type="submit"]:hover { border-color: #5b21b6; background: #5b21b6; }
+@media (max-width: 700px) { .ausencias-area-section { overflow-x: auto; } .ausencias-area-request-card__header { align-items: flex-start; gap: .5rem; } .ausencias-modal-backdrop { padding: .75rem; } .ausencias-modal > header, .ausencias-modal form { padding-right: 1rem; padding-left: 1rem; } .ausencias-modal fieldset { grid-template-columns: 1fr; } .ausencias-modal footer { flex-direction: column-reverse; align-items: stretch; margin-right: -1rem; margin-left: -1rem; padding-right: 1rem; padding-left: 1rem; } .ausencias-modal footer button { width: 100%; } }

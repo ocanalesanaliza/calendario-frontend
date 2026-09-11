@@ -1,4 +1,4 @@
-import { getCalendarArea, postCalendarArea } from './calendarAreaApi'
+import { commandCalendarArea, getCalendarArea } from './calendarAreaApi'
 
 const basePath = '/api/calendar/area-templates/'
 
@@ -6,8 +6,8 @@ export function getAreaTemplates() {
   return getCalendarArea(basePath, 'No se pudieron cargar las plantillas del área.')
 }
 
-export function createAreaTemplate(body) {
-  return postCalendarArea(basePath, body, 'No se pudo crear la plantilla del área.')
+export function createAreaTemplate(body, idempotencyKey) {
+  return commandCalendarArea(basePath, body, 'No se pudo crear la plantilla del área.', idempotencyKey)
 }
 
 export function getAreaTemplate(templateId) {
@@ -18,12 +18,12 @@ export function getAreaTemplateVersions(templateId) {
   return getCalendarArea(`${basePath}${templateId}/versions/`, 'No se pudieron cargar las versiones de la plantilla.')
 }
 
-export function createAreaTemplateVersion(templateId, body) {
-  return postCalendarArea(`${basePath}${templateId}/versions/`, body, 'No se pudo publicar la versión de la plantilla.')
+export function createAreaTemplateVersion(templateId, body, idempotencyKey) {
+  return commandCalendarArea(`${basePath}${templateId}/versions/`, body, 'No se pudo publicar la versión de la plantilla.', idempotencyKey)
 }
 
-export function archiveAreaTemplate(templateId) {
-  return postCalendarArea(`${basePath}${templateId}/archive/`, undefined, 'No se pudo archivar la plantilla del área.')
+export function archiveAreaTemplate(templateId, idempotencyKey) {
+  return commandCalendarArea(`${basePath}${templateId}/archive/`, undefined, 'No se pudo archivar la plantilla del área.', idempotencyKey)
 }
 
 // Explicit WU8.3 names keep the versioning contract readable at call sites.

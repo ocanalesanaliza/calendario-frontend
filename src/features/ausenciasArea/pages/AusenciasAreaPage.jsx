@@ -15,10 +15,12 @@ const errorText = (error, fallback) => {
   if (error?.status === 400) return `Revisa los datos enviados. ${error.message || ''}`.trim()
   return error?.message || fallback
 }
+const invalidatesCommandKey = (error) => [400, 403, 409].includes(error?.status)
 const status = (item) => item?.status ?? item?.estado ?? 'pending'
 const dateOf = (item) => item?.date ?? item?.fecha ?? item?.created_at?.slice(0, 10) ?? '—'
 const reasonOf = (item) => item?.reason ?? item?.motivo ?? '—'
 const isPending = (item) => ['pending', 'pendiente'].includes(status(item))
+const statusLabel = (item) => ({ pending: 'Pendiente', pendiente: 'Pendiente', approved: 'Aprobada', aprobada: 'Aprobada', rejected: 'Rechazada', rechazada: 'Rechazada', cancelled: 'Cancelada', cancelada: 'Cancelada' }[status(item)] ?? status(item))
 const gaOf = (item) => item?.gerente_area ?? item?.area_manager ?? item?.ga
 const gaId = (item) => gaOf(item)?.id ?? gaOf(item)?.id_gerente_area ?? item?.gerente_area_id
 const gaName = (item) => gaOf(item)?.nombre ?? gaOf(item)?.name ?? item?.gerente_area_nombre ?? `GA #${gaId(item)}`
@@ -69,7 +71,8 @@ function Modal({ title, children, onClose }) {
   )
 }
 
-function VacationForm({ onClose, onSubmit }) {
+function VacationForm({ onClose, onConflict, onSubmit }) {
+  const idempotencyKey = useRef(null)
   const [segments, setSegments] = useState([{ date: '', slot: 'full_day' }])
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
@@ -88,9 +91,14 @@ function VacationForm({ onClose, onSubmit }) {
     }
     setSaving(true)
     try {
-      await onSubmit({ segments, ...(reason.trim() ? { reason: reason.trim() } : {}) }, createIdempotencyKey())
+      idempotencyKey.current ??= createIdempotencyKey()
+      await onSubmit({ segments, ...(reason.trim() ? { reason: reason.trim() } : {}) }, idempotencyKey.current)
       onClose()
     } catch (requestError) {
+      if (invalidatesCommandKey(requestError)) {
+        idempotencyKey.current = null
+        if (requestError.status === 409) await onConflict()
+      }
       setError(errorText(requestError, 'No se pudo crear la solicitud.'))
     } finally {
       setSaving(false)
@@ -117,7 +125,8 @@ function VacationForm({ onClose, onSubmit }) {
   )
 }
 
-function ResolveForm({ request, action, onClose, onSubmit }) {
+function ResolveForm({ request, action, onClose, onConflict, onSubmit }) {
+  const idempotencyKey = useRef(null)
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -127,9 +136,14 @@ function ResolveForm({ request, action, onClose, onSubmit }) {
     setSaving(true)
     setError('')
     try {
-      await onSubmit(idOf(request), action, { reason: reason.trim() }, createIdempotencyKey())
+      idempotencyKey.current ??= createIdempotencyKey()
+      await onSubmit(idOf(request), action, { reason: reason.trim() }, idempotencyKey.current)
       onClose()
     } catch (requestError) {
+      if (invalidatesCommandKey(requestError)) {
+        idempotencyKey.current = null
+        if (requestError.status === 409) await onConflict()
+      }
       setError(errorText(requestError, 'No se pudo actualizar la solicitud.'))
     } finally {
       setSaving(false)
@@ -147,7 +161,8 @@ function ResolveForm({ request, action, onClose, onSubmit }) {
   )
 }
 
-function Confirmation({ title, message, confirmLabel, onClose, onConfirm }) {
+function Confirmation({ title, message, confirmLabel, onClose, onConflict, onConfirm }) {
+  const idempotencyKey = useRef(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -155,9 +170,14 @@ function Confirmation({ title, message, confirmLabel, onClose, onConfirm }) {
     setSaving(true)
     setError('')
     try {
-      await onConfirm()
+      idempotencyKey.current ??= createIdempotencyKey()
+      await onConfirm(idempotencyKey.current)
       onClose()
     } catch (requestError) {
+      if (invalidatesCommandKey(requestError)) {
+        idempotencyKey.current = null
+        if (requestError.status === 409) await onConflict()
+      }
       setError(errorText(requestError, 'No se pudo completar la acción.'))
     } finally {
       setSaving(false)
@@ -174,7 +194,8 @@ function Confirmation({ title, message, confirmLabel, onClose, onConfirm }) {
   )
 }
 
-function SituationForm({ catalog, catalogError, catalogLoading, onCatalogDateChange, onCatalogRetry, onClose, onSubmit }) {
+function SituationForm({ catalog, catalogError, catalogLoading, onCatalogDateChange, onCatalogRetry, onClose, onConflict, onSubmit }) {
+  const idempotencyKey = useRef(null)
   const [form, setForm] = useState({ gerente_area_id: '', date: '', type: '', reason: '', slot: 'full_day' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -195,9 +216,14 @@ function SituationForm({ catalog, catalogError, catalogLoading, onCatalogDateCha
     setSaving(true)
     setError('')
     try {
-      await onSubmit(form, createIdempotencyKey())
+      idempotencyKey.current ??= createIdempotencyKey()
+      await onSubmit(form, idempotencyKey.current)
       onClose()
     } catch (requestError) {
+      if (invalidatesCommandKey(requestError)) {
+        idempotencyKey.current = null
+        if (requestError.status === 409) await onConflict()
+      }
       setError(errorText(requestError, 'No se pudo crear la situación.'))
     } finally {
       setSaving(false)
@@ -235,18 +261,23 @@ export default function AusenciasAreaPage() {
   const [catalog, setCatalog] = useState(null)
   const [catalogLoading, setCatalogLoading] = useState(canManageAreaAbsences)
   const [catalogError, setCatalogError] = useState('')
+  const catalogRequest = useRef(0)
 
   async function loadCatalog(date) {
     if (!canManageAreaAbsences) return
+    const request = ++catalogRequest.current
     setCatalogLoading(true)
     setCatalogError('')
     try {
-      setCatalog(await getCatalog(date))
+      const nextCatalog = await getCatalog(date)
+      if (request !== catalogRequest.current) return
+      setCatalog(nextCatalog)
     } catch (requestError) {
+      if (request !== catalogRequest.current) return
       setCatalog(null)
       setCatalogError(errorText(requestError, 'No se pudo cargar el catálogo de situaciones especiales.'))
     } finally {
-      setCatalogLoading(false)
+      if (request === catalogRequest.current) setCatalogLoading(false)
     }
   }
 
@@ -274,30 +305,54 @@ export default function AusenciasAreaPage() {
     await load()
   }
 
+  async function refreshAfterConflict() {
+    await Promise.all([load(), canManageAreaAbsences ? loadCatalog() : Promise.resolve()])
+  }
+
   function renderContent() {
     if (error) return <div role="alert"><p>{error}</p><button onClick={() => setRetry((value) => value + 1)}>Reintentar</button></div>
     if (loading) return <p role="status">Cargando ausencias...</p>
 
     return (
       <>
-        <section>
+        <section className="ausencias-area-section">
           <h2>{isAreaManager ? 'Mis solicitudes' : 'Solicitudes de vacaciones'}</h2>
           {vacations.length === 0 ? <p>No hay solicitudes de vacaciones.</p> : (
-            <table>
-              <thead><tr><th>Fecha</th><th>Segmentos</th><th>Motivo</th><th>Estado</th><th>Acciones</th></tr></thead>
-              <tbody>{vacations.map((request) => (
-                <tr key={idOf(request)}>
-                  <td>{dateOf(request)}</td>
-                  <td>{(request.segments ?? request.segmentos ?? []).map((segment) => `${segment.date ?? segment.fecha} · ${slotLabel(segment.slot ?? segment.jornada)}`).join(', ') || '—'}</td>
-                  <td>{reasonOf(request)}</td><td>{status(request)}</td>
-                  <td>{isAreaManager && isPending(request) ? <button onClick={() => setModal({ type: 'cancel', request })}>Cancelar</button> : canManageAreaAbsences && isPending(request) ? <><button onClick={() => setModal({ type: 'resolve', action: 'approve', request })}>Aprobar</button><button onClick={() => setModal({ type: 'resolve', action: 'reject', request })}>Rechazar</button></> : '—'}</td>
-                </tr>
-              ))}</tbody>
-            </table>
+            isAreaManager ? (
+              <div className="ausencias-area-request-list">
+                {vacations.map((request) => (
+                  <article key={idOf(request)} className="ausencias-area-request-card">
+                    <div className="ausencias-area-request-card__header">
+                      <div className="ausencias-area-request-card__summary">
+                        <div className="ausencias-area-request-card__title-row">
+                          <h3>Solicitud de vacaciones</h3>
+                          <span>{dateOf(request)}</span>
+                        </div>
+                        <p><span>{(request.segments ?? request.segmentos ?? []).map((segment) => `${segment.date ?? segment.fecha} · ${slotLabel(segment.slot ?? segment.jornada)}`).join(', ') || '—'}</span><span>{reasonOf(request)}</span></p>
+                      </div>
+                      <span className="ausencias-area-status-badge">{statusLabel(request)}</span>
+                      {isPending(request) && <button className="ausencias-area-request-card__cancel" type="button" aria-label="Cancelar solicitud" title="Cancelar solicitud" onClick={() => setModal({ type: 'cancel', request })}><span aria-hidden="true">×</span></button>}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <table>
+                <thead><tr><th>Fecha</th><th>Segmentos</th><th>Motivo</th><th>Estado</th><th>Acciones</th></tr></thead>
+                <tbody>{vacations.map((request) => (
+                  <tr key={idOf(request)}>
+                    <td>{dateOf(request)}</td>
+                    <td>{(request.segments ?? request.segmentos ?? []).map((segment) => `${segment.date ?? segment.fecha} · ${slotLabel(segment.slot ?? segment.jornada)}`).join(', ') || '—'}</td>
+                    <td>{reasonOf(request)}</td><td>{status(request)}</td>
+                    <td>{isPending(request) ? <><button onClick={() => setModal({ type: 'resolve', action: 'approve', request })}>Aprobar</button><button onClick={() => setModal({ type: 'resolve', action: 'reject', request })}>Rechazar</button></> : '—'}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            )
           )}
         </section>
         {canManageAreaAbsences && (
-          <section>
+          <section className="ausencias-area-section">
             <h2>Situaciones especiales de GA</h2>
             <p>Las ocurrencias se justificarán automáticamente por el backend.</p>
             {situations.length === 0 ? <p>No hay situaciones especiales registradas.</p> : (
@@ -321,17 +376,17 @@ export default function AusenciasAreaPage() {
 
   return (
     <section className="ausencias-area-page">
-      <header className="page-header">
+      <header className="page-header ausencias-area-page__header">
         <div><h1>Vacaciones y situaciones del área</h1><p>{isAreaManager ? 'Gestiona tus solicitudes de vacaciones.' : 'Resuelve vacaciones y administra situaciones especiales de gerentes de área.'}</p></div>
-        {isAreaManager && <button onClick={() => setModal({ type: 'vacation' })}>Nueva solicitud</button>}
+        {isAreaManager && <button className="ausencias-area-page__new-request" type="button" onClick={() => setModal({ type: 'vacation' })}>Nueva solicitud</button>}
         {canManageAreaAbsences && <button onClick={() => setModal({ type: 'situation' })}>Nueva situación</button>}
       </header>
       {renderContent()}
-      {modal?.type === 'vacation' && <VacationForm onClose={() => setModal(null)} onSubmit={(body, key) => command(createGAVacationRequest, body, key)} />}
-      {modal?.type === 'resolve' && <ResolveForm request={modal.request} action={modal.action} onClose={() => setModal(null)} onSubmit={(...args) => command(actOnGAVacationRequest, ...args)} />}
-      {modal?.type === 'cancel' && <Confirmation title="Cancelar solicitud" message="¿Deseas cancelar esta solicitud pendiente?" confirmLabel="Confirmar cancelación" onClose={() => setModal(null)} onConfirm={() => command(actOnGAVacationRequest, idOf(modal.request), 'cancel', { reason: '' }, createIdempotencyKey())} />}
-      {modal?.type === 'situation' && <SituationForm catalog={catalog} catalogError={catalogError} catalogLoading={catalogLoading} onCatalogDateChange={loadCatalog} onCatalogRetry={loadCatalog} onClose={() => setModal(null)} onSubmit={(body, key) => command(createGASpecialSituation, body, key)} />}
-      {modal?.type === 'deactivate' && <Confirmation title="Desactivar situación" message="¿Deseas desactivar esta situación especial?" confirmLabel="Confirmar desactivación" onClose={() => setModal(null)} onConfirm={() => command(deactivateGASpecialSituation, idOf(modal.situation), createIdempotencyKey())} />}
+      {modal?.type === 'vacation' && <VacationForm onClose={() => setModal(null)} onConflict={refreshAfterConflict} onSubmit={(body, key) => command(createGAVacationRequest, body, key)} />}
+      {modal?.type === 'resolve' && <ResolveForm request={modal.request} action={modal.action} onClose={() => setModal(null)} onConflict={refreshAfterConflict} onSubmit={(...args) => command(actOnGAVacationRequest, ...args)} />}
+      {modal?.type === 'cancel' && <Confirmation title="Cancelar solicitud" message="¿Deseas cancelar esta solicitud pendiente?" confirmLabel="Confirmar cancelación" onClose={() => setModal(null)} onConflict={refreshAfterConflict} onConfirm={(key) => command(actOnGAVacationRequest, idOf(modal.request), 'cancel', { reason: '' }, key)} />}
+      {modal?.type === 'situation' && <SituationForm catalog={catalog} catalogError={catalogError} catalogLoading={catalogLoading} onCatalogDateChange={loadCatalog} onCatalogRetry={loadCatalog} onClose={() => setModal(null)} onConflict={refreshAfterConflict} onSubmit={(body, key) => command(createGASpecialSituation, body, key)} />}
+      {modal?.type === 'deactivate' && <Confirmation title="Desactivar situación" message="¿Deseas desactivar esta situación especial?" confirmLabel="Confirmar desactivación" onClose={() => setModal(null)} onConflict={refreshAfterConflict} onConfirm={(key) => command(deactivateGASpecialSituation, idOf(modal.situation), key)} />}
     </section>
   )
 }

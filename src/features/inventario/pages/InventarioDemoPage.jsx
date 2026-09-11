@@ -2,9 +2,9 @@ import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { Button, TextField } from '@mui/material'
-import { DataGrid } from '@mui/x-data-grid'
+import { DataGrid, gridPaginatedVisibleSortedGridRowIdsSelector, useGridApiRef } from '@mui/x-data-grid'
 import { calculateSummary, formatCurrency, getCountDetails, parseInventoryWorkbook } from '../inventoryImport'
-import { filterInventoryGridRows, toInventoryGridRows } from '../inventoryGrid'
+import { applyInventoryGridRowUpdate, filterInventoryGridRows, getInventoryEditCellTargetAfterCommit, isInventoryExpirationDateValid, isInventoryPhysicalStockValid, toInventoryGridRows } from '../inventoryGrid'
 import '../styles/InventarioDemo.css'
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024
@@ -16,17 +16,46 @@ const STATUS_FILTERS = [
   ['coincide', 'Coincide'],
 ]
 
-function PhysicalStockEditCell({ id, field, value, api }) {
-  return <input className="inventory-demo-grid-input" type="number" min="0" step="any" inputMode="decimal" autoFocus aria-label="Existencia física" value={value ?? ''} onChange={(event) => api.setEditCellValue({ id, field, value: event.target.value }, event)} />
+function InventoryEditCell({ id, field, value, api, inputProps }) {
+  async function handleKeyDown(event) {
+    if (event.key !== 'Tab') return
+
+    const latestValue = event.currentTarget.value
+    event.preventDefault()
+    event.stopPropagation()
+    event.defaultMuiPrevented = true
+
+    const target = await getInventoryEditCellTargetAfterCommit({
+      api,
+      id,
+      field,
+      value: latestValue,
+      event,
+      visibleRowIds: gridPaginatedVisibleSortedGridRowIdsSelector({ current: api }),
+      shiftKey: event.shiftKey,
+    })
+    if (!target) return
+    if (target.id === id && target.field === field) return
+
+    api.stopCellEditMode({ id, field })
+    api.startCellEditMode(target)
+  }
+
+  return <input className="inventory-demo-grid-input" autoFocus value={value ?? ''} onKeyDown={handleKeyDown} onChange={(event) => api.setEditCellValue({ id, field, value: event.target.value }, event)} {...inputProps} />
+}
+
+function PhysicalStockEditCell(props) {
+  return <InventoryEditCell {...props} inputProps={{ type: 'number', min: '0', step: 'any', inputMode: 'decimal', 'aria-label': 'Existencia física' }} />
 }
 
 function ExpirationDateEditCell({ id, field, value, api }) {
-  return <input className="inventory-demo-grid-input" type="date" autoFocus aria-label="Vencimiento manual" value={value ?? ''} onChange={(event) => api.setEditCellValue({ id, field, value: event.target.value }, event)} />
+  return <InventoryEditCell id={id} field={field} value={value} api={api} inputProps={{ type: 'date', 'aria-label': 'Vencimiento manual' }} />
 }
 
 export default function InventarioDemoPage() {
   const navigate = useNavigate()
   const inputRef = useRef(null)
+  const apiRef = useGridApiRef()
   const [counts, setCounts] = useState([])
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -46,8 +75,8 @@ export default function InventarioDemoPage() {
     { field: 'product', headerName: 'Producto', minWidth: 190, flex: 1.4 },
     { field: 'cost', headerName: 'Costo', minWidth: 125, flex: 0.7 },
     { field: 'systemStock', headerName: 'Esperado', minWidth: 115, type: 'number', flex: 0.6 },
-    { field: 'physicalStock', headerName: 'Existencia física', minWidth: 155, editable: true, flex: 0.9, renderEditCell: PhysicalStockEditCell },
-    { field: 'expirationDate', headerName: 'Vencimiento manual', minWidth: 170, editable: true, flex: 1, renderEditCell: ExpirationDateEditCell },
+    { field: 'physicalStock', headerName: 'Existencia física', minWidth: 155, editable: true, flex: 0.9, renderEditCell: PhysicalStockEditCell, preProcessEditCellProps: ({ props }) => ({ ...props, error: !isInventoryPhysicalStockValid(props.value) }) },
+    { field: 'expirationDate', headerName: 'Vencimiento manual', minWidth: 170, editable: true, flex: 1, renderEditCell: ExpirationDateEditCell, preProcessEditCellProps: ({ props }) => ({ ...props, error: !isInventoryExpirationDateValid(props.value) }) },
     { field: 'difference', headerName: 'Diferencia', minWidth: 115, type: 'number', flex: 0.6, valueFormatter: (value) => value ?? '—' },
     { field: 'status', headerName: 'Estado', minWidth: 120, flex: 0.7, renderCell: ({ value }) => value ? <span className={`inventory-demo-status ${value}`}>{value}</span> : '—' },
     { field: 'impact', headerName: 'Impacto', minWidth: 130, flex: 0.8, valueFormatter: (value) => value === null ? '—' : formatCurrency(value) },
@@ -81,11 +110,10 @@ export default function InventarioDemoPage() {
   }
 
   function processRowUpdate(updatedRow) {
-    setCounts((current) => current.map((count) => count.product.code === updatedRow.id
-      ? { ...count, physicalStock: updatedRow.physicalStock, expirationDate: updatedRow.expirationDate }
-      : count))
+    const update = applyInventoryGridRowUpdate(counts, updatedRow)
+    setCounts(update.counts)
     setConfirmed(false)
-    return updatedRow
+    return update.row
   }
 
   function reset() {
@@ -133,6 +161,12 @@ export default function InventarioDemoPage() {
           <DataGrid
             rows={filteredRows}
             columns={columns}
+            apiRef={apiRef}
+            onCellClick={(params, event) => {
+              if (!params.colDef.editable) return
+              event.defaultMuiPrevented = true
+              apiRef.current.startCellEditMode({ id: params.id, field: params.field })
+            }}
             processRowUpdate={processRowUpdate}
             onProcessRowUpdateError={(updateError) => setError(updateError instanceof Error ? updateError.message : 'No fue posible actualizar el conteo.')}
             pagination
@@ -145,7 +179,7 @@ export default function InventarioDemoPage() {
         </div>
         <div className="inventory-demo-summary" aria-live="polite"><div><span>Impacto por faltantes</span><strong>{formatCurrency(summary.shortageImpact)}</strong></div><div><span>Impacto por sobrantes</span><strong>{formatCurrency(summary.surplusImpact)}</strong></div><div><span>Impacto neto firmado</span><strong>{formatCurrency(summary.netImpact)}</strong></div></div>
         <footer className="inventory-demo-actions"><button type="button" className="inventory-demo-secondary" onClick={reset}>Reiniciar</button><button type="button" className="inventory-demo-primary" disabled={!isComplete} onClick={confirm}>Confirmar resumen local</button></footer>
-        {!isComplete && <p className="inventory-demo-help" aria-live="polite">Complete una existencia física no negativa y una fecha de vencimiento manual para cada producto visible.</p>}
+        {!isComplete && <p className="inventory-demo-help inventory-demo-help-warning" aria-live="polite">Complete una existencia física no negativa y una fecha de vencimiento manual para cada producto visible.</p>}
         {confirmed && <section className="inventory-demo-confirmation" role="status"><h2>Resumen confirmado localmente</h2><p>{counts.length} productos revisados. Impacto neto: <strong>{formatCurrency(summary.netImpact)}</strong>.</p></section>}
       </>}
     </section>
