@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AdminMaestroRoute, AlmuerzosRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GerentesOperacionesRoute, MisTareasRoute, RendimientoRoute } from './App'
+import { AdminMaestroRoute, AlmuerzosRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GerentesOperacionesRoute, MisTareasRoute, PlantillasAreaRoute, RendimientoRoute } from './App'
 
 const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
 
@@ -246,5 +246,38 @@ describe('AdminMaestroRoute', () => {
     )
     expect(await screen.findByText('Inicio')).toBeInTheDocument()
     expect(screen.queryByText('Analítica de guardias')).not.toBeInTheDocument()
+  })
+})
+
+describe('PlantillasAreaRoute', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  function renderPlantillasAreaRoute() {
+    render(
+      <MemoryRouter initialEntries={['/plantillas-area']}>
+        <Routes>
+          <Route path="/" element={<p>Inicio</p>} />
+          <Route path="/plantillas-area" element={<PlantillasAreaRoute><p>Plantillas de área autorizadas</p></PlantillasAreaRoute>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+  }
+
+  it.each([
+    ['una cuenta activa de Sistemas', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }],
+    ['un administrador maestro', { es_admin_maestro: true }],
+  ])('permite el acceso a %s', (_, perfil) => {
+    useAuth.mockReturnValue({ perfil })
+    renderPlantillasAreaRoute()
+
+    expect(screen.getByText('Plantillas de área autorizadas')).toBeInTheDocument()
+  })
+
+  it('redirige a un perfil no autorizado', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area' } })
+    renderPlantillasAreaRoute()
+
+    expect(await screen.findByText('Inicio')).toBeInTheDocument()
+    expect(screen.queryByText('Plantillas de área autorizadas')).not.toBeInTheDocument()
   })
 })

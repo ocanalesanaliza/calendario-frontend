@@ -9,6 +9,7 @@ import SucursalesPage from "./features/sucursales/pages/SucursalesPage";
 import UsuariosPage from "./features/usuarios/pages/UsuariosPage";
 import PlantillasPage from "./features/plantillas/pages/PlantillasPage";
 import PlantillaDetallePage from "./features/plantillas/pages/PlantillaDetallePage";
+import PlantillasAreaPage from "./features/plantillasArea/pages/PlantillasAreaPage";
 import GerentesPage from "./features/gerentes/pages/GerentesPage";
 import GerentesOperacionesPage from "./features/gerentes_operaciones/pages/GerentesOperacionesPage";
 import AreasPage from "./features/areas/pages/AreasPage";
@@ -68,6 +69,13 @@ export function AreaManagerAssignmentRoute({ children }) {
   const { perfil } = useAuth()
   const { canManageAreaManagers: canManage } = getProfileCapabilities(perfil)
   if (!canManage) return <Navigate to="/" replace />
+  return children
+}
+
+export function PlantillasAreaRoute({ children }) {
+  const { perfil } = useAuth()
+  const { isMasterAdmin, isSystemsAccount } = getProfileCapabilities(perfil)
+  if (!isMasterAdmin && !isSystemsAccount) return <Navigate to="/" replace />
   return children
 }
 
@@ -131,6 +139,7 @@ function App() {
           <Route path="/usuarios" element={<CapabilityRoute capability="canManageUsers"><UsuariosPage /></CapabilityRoute>} />
           <Route path="/plantillas" element={<CapabilityRoute capability="canManageTemplates"><PlantillasPage /></CapabilityRoute>} />
           <Route path="/plantillas/:id" element={<CapabilityRoute capability="canManageTemplates"><PlantillaDetallePage /></CapabilityRoute>} />
+          <Route path="/plantillas-area" element={<PlantillasAreaRoute><PlantillasAreaPage /></PlantillasAreaRoute>} />
           <Route path="/gerentes" element={<AreaManagerAssignmentRoute><GerentesPage /></AreaManagerAssignmentRoute>} />
           <Route path="/gerentes-operaciones" element={<GerentesOperacionesRoute><GerentesOperacionesPage /></GerentesOperacionesRoute>} />
           <Route path="/areas" element={<AreaManagerAssignmentRoute><AreasPage /></AreaManagerAssignmentRoute>} />
