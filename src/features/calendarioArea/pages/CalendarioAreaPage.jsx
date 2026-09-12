@@ -11,6 +11,7 @@ import { occurrencesToCalendarEvents } from '../adapters/calendarEvents'
 import {
   completeAreaOccurrence,
   getMonthlyAreaOccurrences,
+  getMonthlyAreaPerformance,
   rescheduleAreaOccurrence,
 } from '../services/calendarioAreaService'
 import './CalendarioAreaPage.css'
@@ -37,6 +38,54 @@ function errorMessage(error) {
   if (error.status === 400) return `Error de validación: ${error.message}`
   if (error.status === 403) return 'Acceso denegado para esta acción.'
   return error.message
+}
+
+const PERFORMANCE_FIELDS = [
+  ['area', 'Área'],
+  ['responsibility_id', 'Responsabilidad'],
+  ['month', 'Mes'],
+  ['version', 'Versión'],
+  ['state', 'Estado'],
+  ['weights', 'Pesos'],
+  ['percentage', 'Porcentaje'],
+  ['counts', 'Conteos'],
+  ['closed_at', 'Cerrado el'],
+  ['reason', 'Motivo'],
+]
+
+function performanceValue(value) {
+  return typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value)
+}
+
+function MonthlyPerformancePanel({ loading, performance, error, onRetry }) {
+  const notClosed = error?.status === 409
+    && (error.detail === 'monthly_performance_not_closed' || error.message === 'monthly_performance_not_closed')
+  const denied = error?.status === 403
+  const performances = Array.isArray(performance?.performances)
+    ? performance.performances.filter((snapshot) => snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot))
+    : []
+
+  return (
+    <section className="monthly-performance" aria-labelledby="monthly-performance-title">
+      <h2 id="monthly-performance-title">Rendimiento mensual</h2>
+      {loading ? <p role="status">Cargando rendimiento mensual...</p>
+        : notClosed ? <p role="status">El rendimiento mensual aún no está cerrado.</p>
+            : denied ? <p role="alert">Acceso denegado para consultar el rendimiento mensual.</p>
+              : error ? <div role="alert">{errorMessage(error)} <button type="button" onClick={onRetry}>Reintentar</button></div>
+              : performances.length === 0 ? <p>No hay rendimiento mensual disponible para este mes.</p>
+                : performances.map((snapshot, index) => {
+                  const fields = PERFORMANCE_FIELDS.filter(([name]) => snapshot[name] !== undefined)
+                  const headingId = `monthly-performance-${snapshot.responsibility_id ?? index}-${index}`
+
+                  return <section key={`${snapshot.responsibility_id ?? 'performance'}-${snapshot.version ?? index}-${index}`} aria-labelledby={headingId}>
+                    <h3 id={headingId}>Responsabilidad {snapshot.responsibility_id ?? 'sin identificar'}</h3>
+                    <dl className="monthly-performance-details">
+                      {fields.map(([name, label]) => <div key={name}><dt>{label}</dt><dd>{performanceValue(snapshot[name])}</dd></div>)}
+                    </dl>
+                  </section>
+                })}
+    </section>
+  )
 }
 
 function OccurrenceDialog({ occurrence, onClose, onComplete, onReschedule }) {
@@ -118,6 +167,9 @@ export default function CalendarioAreaPage() {
   const [occurrences, setOccurrences] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [performance, setPerformance] = useState(null)
+  const [performanceLoading, setPerformanceLoading] = useState(true)
+  const [performanceError, setPerformanceError] = useState(null)
   const [selected, setSelected] = useState(null)
   const triggerRef = useRef(null)
 
@@ -139,6 +191,21 @@ export default function CalendarioAreaPage() {
 
   useEffect(() => { loadMonth() }, [month])
 
+  async function loadPerformance() {
+    setPerformanceLoading(true)
+    setPerformanceError(null)
+    try {
+      setPerformance(await getMonthlyAreaPerformance(month))
+    } catch (requestError) {
+      setPerformance(null)
+      setPerformanceError(requestError)
+    } finally {
+      setPerformanceLoading(false)
+    }
+  }
+
+  useEffect(() => { loadPerformance() }, [month])
+
   async function runCommand(command) {
     try {
       await command()
@@ -158,6 +225,7 @@ export default function CalendarioAreaPage() {
   return (
     <section className="calendario-area-page">
       <div className="page-header"><h1>Calendario del área</h1></div>
+      <MonthlyPerformancePanel loading={performanceLoading} performance={performance} error={performanceError} onRetry={loadPerformance} />
       {error && <div role="alert">{error} <button type="button" onClick={() => loadMonth()}>Reintentar</button></div>}
       {loading ? <p>Cargando calendario...</p> : <>
         {occurrences.length === 0 && <p>No hay tareas programadas para este mes.</p>}

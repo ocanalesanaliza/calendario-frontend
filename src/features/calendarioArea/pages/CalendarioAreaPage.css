@@ -11,6 +11,37 @@
   box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
 }
 
+.monthly-performance {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+
+.monthly-performance h2 {
+  margin-top: 0;
+}
+
+.monthly-performance-details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.5rem 1rem;
+}
+
+.monthly-performance-details > div {
+  display: contents;
+}
+
+.monthly-performance-details dt {
+  font-weight: 700;
+}
+
+.monthly-performance-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 /* Variables FullCalendar */
 .calendario-area-calendar .fc {
   --fc-border-color: #e8edf3;

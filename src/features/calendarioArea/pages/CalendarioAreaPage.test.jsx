@@ -2,9 +2,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CalendarioAreaPage from './CalendarioAreaPage'
 
-const { completeAreaOccurrence, getMonthlyAreaOccurrences, rescheduleAreaOccurrence } = vi.hoisted(() => ({ completeAreaOccurrence: vi.fn(), getMonthlyAreaOccurrences: vi.fn(), rescheduleAreaOccurrence: vi.fn() }))
+const { completeAreaOccurrence, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, rescheduleAreaOccurrence } = vi.hoisted(() => ({ completeAreaOccurrence: vi.fn(), getMonthlyAreaOccurrences: vi.fn(), getMonthlyAreaPerformance: vi.fn(), rescheduleAreaOccurrence: vi.fn() }))
 
-vi.mock('../services/calendarioAreaService', () => ({ completeAreaOccurrence, getMonthlyAreaOccurrences, rescheduleAreaOccurrence }))
+vi.mock('../services/calendarioAreaService', () => ({ completeAreaOccurrence, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, rescheduleAreaOccurrence }))
 vi.mock('@fullcalendar/react', () => ({
   default: ({ events, datesSet, eventClick }) => (
     <div data-testid="full-calendar" data-read-only={String(events.every((event) => event.editable === false))}>
@@ -19,6 +19,8 @@ describe('CalendarioAreaPage', () => {
 
   beforeEach(() => {
     getMonthlyAreaOccurrences.mockReset()
+    getMonthlyAreaPerformance.mockReset()
+    getMonthlyAreaPerformance.mockResolvedValue({ month: '2026-09', performances: [] })
     completeAreaOccurrence.mockReset()
     rescheduleAreaOccurrence.mockReset()
   })
@@ -121,5 +123,56 @@ describe('CalendarioAreaPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente mes' }))
     await waitFor(() => expect(getMonthlyAreaOccurrences).toHaveBeenLastCalledWith('2026-11'))
+  })
+
+  it('renders every persisted performance snapshot from the response envelope', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+    getMonthlyAreaPerformance.mockResolvedValue({
+      month: '2026-09',
+      performances: [
+        { area: { id: 8, name: 'Operaciones' }, responsibility_id: 3, month: '2026-09', version: 2, state: 'closed', weights: { total: 100, completed: 80 }, percentage: 80, counts: { total: 5, completed: 4 }, closed_at: '2026-09-30T18:00:00Z', reason: 'Cierre mensual' },
+        { area: { id: 8, name: 'Operaciones' }, responsibility_id: 9, month: '2026-09', version: 1, state: 'closed', weights: { total: 40, completed: 40 }, percentage: 100, counts: { total: 2, completed: 2 }, closed_at: '2026-09-30T18:00:00Z', reason: 'Cierre adicional' },
+      ],
+    })
+
+    render(<CalendarioAreaPage />)
+
+    expect(await screen.findByText('Rendimiento mensual')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Responsabilidad 3' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Responsabilidad 9' })).toBeInTheDocument()
+    expect(screen.getAllByText('{"id":8,"name":"Operaciones"}')).toHaveLength(2)
+    expect(screen.getByText('Cierre mensual')).toBeInTheDocument()
+    expect(screen.getByText('Cierre adicional')).toBeInTheDocument()
+    expect(screen.getAllByText('Pesos')).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente mes' }))
+    await waitFor(() => expect(getMonthlyAreaPerformance).toHaveBeenLastCalledWith('2026-11'))
+  })
+
+  it('shows an empty performance state', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+    render(<CalendarioAreaPage />)
+    expect(await screen.findByText('No hay rendimiento mensual disponible para este mes.')).toBeInTheDocument()
+  })
+
+  it('handles denied and not-closed performance responses without actions', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+    getMonthlyAreaPerformance.mockRejectedValueOnce(Object.assign(new Error('No autorizado'), { status: 403 }))
+      .mockRejectedValueOnce(Object.assign(new Error('monthly_performance_not_closed'), { status: 409, detail: 'monthly_performance_not_closed' }))
+    const { rerender } = render(<CalendarioAreaPage />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Acceso denegado para consultar el rendimiento mensual.')
+    expect(screen.queryByRole('button', { name: 'Reintentar' })).not.toBeInTheDocument()
+    rerender(<CalendarioAreaPage key="not-closed" />)
+    expect(await screen.findByText('El rendimiento mensual aún no está cerrado.')).toBeInTheDocument()
+  })
+
+  it('retries recoverable performance errors and omits absent optional fields', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+    getMonthlyAreaPerformance.mockRejectedValueOnce(new Error('Servicio no disponible.')).mockResolvedValueOnce({ month: '2026-09', performances: [] })
+    render(<CalendarioAreaPage />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Servicio no disponible.')
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
+    await waitFor(() => expect(screen.getByText('No hay rendimiento mensual disponible para este mes.')).toBeInTheDocument())
+    expect(screen.queryByText('Motivo')).not.toBeInTheDocument()
+    expect(screen.queryByText('Pesos')).not.toBeInTheDocument()
   })
 })
