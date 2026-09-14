@@ -39,6 +39,15 @@ describe('calendar event adapter', () => {
     })
   })
 
+  it('exposes the resolved occurrence ID when the payload only provides id', () => {
+    const occurrence = { id: 12, task: 'Revisión', effective_date: '2026-09-01', all_day: false }
+
+    expect(occurrenceToCalendarEvent(occurrence)).toMatchObject({
+      id: '12',
+      extendedProps: { occurrence_id: 12 },
+    })
+  })
+
   it('adapts every occurrence without mutating the input', () => {
     const occurrences = [{ id: 1, task: { nombre: 'Revisión' }, effective_date: '2026-09-01', scheduled_date: '2026-09-01', weight: 10, all_day: false }]
 

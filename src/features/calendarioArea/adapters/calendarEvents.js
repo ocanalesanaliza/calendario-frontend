@@ -13,7 +13,7 @@ export function occurrenceToCalendarEvent(occurrence) {
     allDay: occurrence.all_day,
     editable: false,
     extendedProps: {
-      occurrence_id: occurrence.occurrence_id,
+      occurrence_id: occurrenceId,
       status: occurrence.status,
       template: occurrence.template,
       template_version: occurrence.template_version,
