@@ -1,17 +1,19 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CalendarioAreaPage from './CalendarioAreaPage'
 
 const { completeAreaOccurrence, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, rescheduleAreaOccurrence } = vi.hoisted(() => ({ completeAreaOccurrence: vi.fn(), getMonthlyAreaOccurrences: vi.fn(), getMonthlyAreaPerformance: vi.fn(), rescheduleAreaOccurrence: vi.fn() }))
+let datesSetHandler
 
 vi.mock('../services/calendarioAreaService', () => ({ completeAreaOccurrence, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, rescheduleAreaOccurrence }))
 vi.mock('@fullcalendar/react', () => ({
-  default: ({ events, datesSet, eventClick }) => (
-    <div data-testid="full-calendar" data-read-only={String(events.every((event) => event.editable === false))}>
+  default: ({ events, datesSet, eventClick }) => {
+    datesSetHandler = datesSet
+    return <div data-testid="full-calendar" data-read-only={String(events.every((event) => event.editable === false))}>
       {events.map((event) => <button type="button" key={event.id} onClick={(click) => eventClick({ event: { ...event, extendedProps: event.extendedProps }, jsEvent: click.nativeEvent })}>{event.title}</button>)}
       <button type="button" onClick={() => datesSet({ view: { currentStart: new Date(2026, 10, 1) } })}>Siguiente mes</button>
     </div>
-  ),
+  },
 }))
 
 describe('CalendarioAreaPage', () => {
@@ -52,10 +54,20 @@ describe('CalendarioAreaPage', () => {
     expect(event).toHaveFocus()
   })
 
-  it('does not expose commands for a non-pending occurrence', async () => {
-    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [{ ...occurrence, status: 'vencida', coverage_snapshot: undefined, template: undefined, template_version: undefined }] })
+  it('labels and enables commands only for the pending public status', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [occurrence] })
     render(<CalendarioAreaPage />)
     fireEvent.click(await screen.findByRole('button', { name: 'Auditoría' }))
+    expect(screen.getByText('Pendiente')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Completar' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reprogramar' })).toBeInTheDocument()
+  })
+
+  it('does not expose commands for a non-pending occurrence', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [{ ...occurrence, status: 'scheduled', coverage_snapshot: undefined, template: undefined, template_version: undefined }] })
+    render(<CalendarioAreaPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Auditoría' }))
+    expect(screen.getByText('scheduled')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Completar' })).not.toBeInTheDocument()
     expect(screen.queryByText('Jornada')).not.toBeInTheDocument()
   })
@@ -76,18 +88,27 @@ describe('CalendarioAreaPage', () => {
 
   it('submits the normalized reschedule body and shows command errors', async () => {
     getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [occurrence] })
-    rescheduleAreaOccurrence.mockRejectedValueOnce(Object.assign(new Error('Fecha inválida'), { status: 400 }))
+    rescheduleAreaOccurrence.mockRejectedValueOnce(Object.assign(new Error('Servicio no disponible'), { status: 500 }))
+      .mockRejectedValueOnce(Object.assign(new Error('Fecha inválida'), { status: 400 }))
       .mockRejectedValueOnce(Object.assign(new Error('No autorizado'), { status: 403 }))
+      .mockResolvedValueOnce({})
     render(<CalendarioAreaPage />)
     fireEvent.click(await screen.findByRole('button', { name: 'Auditoría' }))
     fireEvent.click(screen.getByRole('button', { name: 'Reprogramar' }))
     fireEvent.change(screen.getByLabelText('Nueva fecha'), { target: { value: '2026-09-05' } })
     fireEvent.change(screen.getByLabelText('Motivo'), { target: { value: 'Cobertura' } })
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar reprogramación' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Servicio no disponible')
+    const key = rescheduleAreaOccurrence.mock.calls[0][2]
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar reprogramación' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Error de validación: Fecha inválida')
-    expect(rescheduleAreaOccurrence).toHaveBeenCalledWith(4, { target_date: '2026-09-05', reason: 'Cobertura' })
+    expect(rescheduleAreaOccurrence).toHaveBeenCalledWith(4, { target_date: '2026-09-05', reason: 'Cobertura' }, key)
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar reprogramación' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Acceso denegado')
+    expect(rescheduleAreaOccurrence.mock.calls[2][2]).not.toBe(key)
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar reprogramación' }))
+    await waitFor(() => expect(rescheduleAreaOccurrence).toHaveBeenCalledTimes(4))
+    expect(rescheduleAreaOccurrence.mock.calls[3][2]).not.toBe(rescheduleAreaOccurrence.mock.calls[2][2])
   })
 
   it('reloads without retrying a conflicting command', async () => {
@@ -174,5 +195,42 @@ describe('CalendarioAreaPage', () => {
     await waitFor(() => expect(screen.getByText('No hay rendimiento mensual disponible para este mes.')).toBeInTheDocument())
     expect(screen.queryByText('Motivo')).not.toBeInTheDocument()
     expect(screen.queryByText('Pesos')).not.toBeInTheDocument()
+  })
+
+  it('keeps only the latest monthly occurrence response after navigation', async () => {
+    let resolveNovember
+    let resolveDecember
+    getMonthlyAreaOccurrences.mockResolvedValueOnce({ occurrences: [] })
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveNovember = resolve }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveDecember = resolve }))
+    render(<CalendarioAreaPage />)
+    await screen.findByTestId('full-calendar')
+    act(() => datesSetHandler({ view: { currentStart: new Date(2026, 10, 1) } }))
+    await waitFor(() => expect(getMonthlyAreaOccurrences).toHaveBeenCalledTimes(2))
+    act(() => datesSetHandler({ view: { currentStart: new Date(2026, 11, 1) } }))
+    await waitFor(() => expect(getMonthlyAreaOccurrences).toHaveBeenCalledTimes(3))
+    resolveDecember({ occurrences: [{ ...occurrence, task: 'Diciembre' }] })
+    expect(await screen.findByText('Diciembre')).toBeInTheDocument()
+    resolveNovember({ occurrences: [{ ...occurrence, task: 'Noviembre' }] })
+    await waitFor(() => expect(screen.queryByText('Noviembre')).not.toBeInTheDocument())
+  })
+
+  it('keeps only the latest monthly performance response after navigation', async () => {
+    let resolveNovember
+    let resolveDecember
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+    getMonthlyAreaPerformance.mockResolvedValueOnce({ performances: [] })
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveNovember = resolve }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveDecember = resolve }))
+    render(<CalendarioAreaPage />)
+    await screen.findByTestId('full-calendar')
+    act(() => datesSetHandler({ view: { currentStart: new Date(2026, 10, 1) } }))
+    await waitFor(() => expect(getMonthlyAreaPerformance).toHaveBeenCalledTimes(2))
+    act(() => datesSetHandler({ view: { currentStart: new Date(2026, 11, 1) } }))
+    await waitFor(() => expect(getMonthlyAreaPerformance).toHaveBeenCalledTimes(3))
+    resolveDecember({ performances: [{ responsibility_id: 11, month: '2026-12' }] })
+    expect(await screen.findByRole('heading', { name: 'Responsabilidad 11' })).toBeInTheDocument()
+    resolveNovember({ performances: [{ responsibility_id: 9, month: '2026-11' }] })
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Responsabilidad 9' })).not.toBeInTheDocument())
   })
 })

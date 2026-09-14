@@ -1,4 +1,4 @@
-import { getCalendarArea, postCalendarArea } from './calendarAreaApi'
+import { commandCalendarArea, getCalendarArea, postCalendarArea } from './calendarAreaApi'
 import { normalizeMonthlyAreaOccurrencesResponse } from './monthlyAreaOccurrence'
 
 export async function getMonthlyAreaOccurrences(month) {
@@ -10,12 +10,12 @@ export function getMonthlyAreaPerformance(month) {
   return getCalendarArea(`/api/calendar/my-area/monthly-performance/?month=${encodeURIComponent(month)}`, 'No se pudo cargar el rendimiento mensual del área.')
 }
 
-export function completeAreaOccurrence(occurrenceId) {
-  return postCalendarArea(`/api/calendar/my-area/occurrences/${occurrenceId}/complete/`, undefined, 'No se pudo completar la tarea del área.')
+export function completeAreaOccurrence(occurrenceId, idempotencyKey) {
+  return commandCalendarArea(`/api/calendar/my-area/occurrences/${occurrenceId}/complete/`, undefined, 'No se pudo completar la tarea del área.', idempotencyKey)
 }
 
-export function rescheduleAreaOccurrence(occurrenceId, body) {
-  return postCalendarArea(`/api/calendar/my-area/occurrences/${occurrenceId}/reschedule/`, body, 'No se pudo reprogramar la tarea del área.')
+export function rescheduleAreaOccurrence(occurrenceId, body, idempotencyKey) {
+  return commandCalendarArea(`/api/calendar/my-area/occurrences/${occurrenceId}/reschedule/`, body, 'No se pudo reprogramar la tarea del área.', idempotencyKey)
 }
 
 export function closeMonthlyAreaPerformance(body) {

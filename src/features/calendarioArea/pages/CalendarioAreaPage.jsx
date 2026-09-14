@@ -14,6 +14,7 @@ import {
   getMonthlyAreaPerformance,
   rescheduleAreaOccurrence,
 } from '../services/calendarioAreaService'
+import { createIdempotencyKey } from '../../calendarArea/services/calendarAreaApi'
 import './CalendarioAreaPage.css'
 
 const STATUS_LABELS = {
@@ -95,6 +96,7 @@ function OccurrenceDialog({ occurrence, onClose, onComplete, onReschedule }) {
   const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const commandKeyRef = useRef(null)
   const titleId = 'occurrence-dialog-title'
   const descriptionId = 'occurrence-dialog-description'
   const pending = occurrence.status === 'pendiente'
@@ -113,13 +115,21 @@ function OccurrenceDialog({ occurrence, onClose, onComplete, onReschedule }) {
     if (submitting) return
     setSubmitting(true)
     setError('')
+    commandKeyRef.current ??= createIdempotencyKey()
     try {
-      if (mode === 'complete') await onComplete(occurrence.occurrence_id)
-      else await onReschedule(occurrence.occurrence_id, { target_date: targetDate, reason })
+      if (mode === 'complete') await onComplete(occurrence.occurrence_id, commandKeyRef.current)
+      else await onReschedule(occurrence.occurrence_id, { target_date: targetDate, reason }, commandKeyRef.current)
+      commandKeyRef.current = null
     } catch (requestError) {
+      if ([400, 403, 409].includes(requestError.status)) commandKeyRef.current = null
       setError(errorMessage(requestError))
       setSubmitting(false)
     }
+  }
+
+  function selectMode(nextMode) {
+    commandKeyRef.current = createIdempotencyKey()
+    setMode(nextMode)
   }
 
   const coverage = occurrence.coverage_snapshot
@@ -141,8 +151,8 @@ function OccurrenceDialog({ occurrence, onClose, onComplete, onReschedule }) {
         </dl>
         {error && <p role="alert">{error}</p>}
         {pending && !mode && <div className="occurrence-actions">
-          <button type="button" onClick={() => setMode('complete')}>Completar</button>
-          <button type="button" onClick={() => setMode('reschedule')}>Reprogramar</button>
+          <button type="button" onClick={() => selectMode('complete')}>Completar</button>
+          <button type="button" onClick={() => selectMode('reschedule')}>Reprogramar</button>
         </div>}
         {pending && mode === 'complete' && <form onSubmit={submit}>
           <p>¿Confirmas que deseas completar esta ocurrencia?</p>
@@ -172,35 +182,45 @@ export default function CalendarioAreaPage() {
   const [performanceError, setPerformanceError] = useState(null)
   const [selected, setSelected] = useState(null)
   const triggerRef = useRef(null)
+  const currentMonthRef = useRef(month)
+  const occurrenceRequestRef = useRef(0)
+  const performanceRequestRef = useRef(0)
+  currentMonthRef.current = month
 
   useEffect(() => {
     if (!selected) triggerRef.current?.focus?.()
   }, [selected])
 
-  async function loadMonth(keepError = false) {
+  async function loadMonth(keepError = false, requestedMonth = month) {
+    const request = ++occurrenceRequestRef.current
     setLoading(true)
     if (!keepError) setError('')
     try {
-      setOccurrences((await getMonthlyAreaOccurrences(month)).occurrences)
+      const response = await getMonthlyAreaOccurrences(requestedMonth)
+      if (request === occurrenceRequestRef.current && requestedMonth === currentMonthRef.current) setOccurrences(response.occurrences)
     } catch (requestError) {
-      setError(errorMessage(requestError))
+      if (request === occurrenceRequestRef.current && requestedMonth === currentMonthRef.current) setError(errorMessage(requestError))
     } finally {
-      setLoading(false)
+      if (request === occurrenceRequestRef.current && requestedMonth === currentMonthRef.current) setLoading(false)
     }
   }
 
   useEffect(() => { loadMonth() }, [month])
 
-  async function loadPerformance() {
+  async function loadPerformance(requestedMonth = month) {
+    const request = ++performanceRequestRef.current
     setPerformanceLoading(true)
     setPerformanceError(null)
     try {
-      setPerformance(await getMonthlyAreaPerformance(month))
+      const response = await getMonthlyAreaPerformance(requestedMonth)
+      if (request === performanceRequestRef.current && requestedMonth === currentMonthRef.current) setPerformance(response)
     } catch (requestError) {
-      setPerformance(null)
-      setPerformanceError(requestError)
+      if (request === performanceRequestRef.current && requestedMonth === currentMonthRef.current) {
+        setPerformance(null)
+        setPerformanceError(requestError)
+      }
     } finally {
-      setPerformanceLoading(false)
+      if (request === performanceRequestRef.current && requestedMonth === currentMonthRef.current) setPerformanceLoading(false)
     }
   }
 
@@ -216,7 +236,7 @@ export default function CalendarioAreaPage() {
         setError('El estado de la ocurrencia cambió. Se recargó el mes.')
         setSelected(null)
         await loadMonth(true)
-        return
+        throw requestError
       }
       throw requestError
     }
@@ -225,13 +245,13 @@ export default function CalendarioAreaPage() {
   return (
     <section className="calendario-area-page">
       <div className="page-header"><h1>Calendario del área</h1></div>
-      <MonthlyPerformancePanel loading={performanceLoading} performance={performance} error={performanceError} onRetry={loadPerformance} />
+      <MonthlyPerformancePanel loading={performanceLoading} performance={performance} error={performanceError} onRetry={() => loadPerformance()} />
       {error && <div role="alert">{error} <button type="button" onClick={() => loadMonth()}>Reintentar</button></div>}
       {loading ? <p>Cargando calendario...</p> : <>
         {occurrences.length === 0 && <p>No hay tareas programadas para este mes.</p>}
         <div className="calendario-area-calendar"><FullCalendar plugins={[dayGridPlugin, interactionPlugin, timeGridPlugin, listPlugin, multiMonthPlugin]} headerToolbar={{ start: 'prev,today,next', center: 'title', end: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek,multiMonthYear' }} views={{ listWeek: { buttonText: 'Lista semanal' }, multiMonthYear: { buttonText: 'Año' } }} initialView="dayGridMonth" locale="es" buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día', list: 'Lista', year: 'Año' }} events={occurrencesToCalendarEvents(occurrences)} eventClick={(info) => { triggerRef.current = info.el ?? info.jsEvent?.target; setSelected({ ...info.event.extendedProps, occurrence_id: info.event.extendedProps.occurrence_id, task: info.event.extendedProps.task }) }} datesSet={({ view }) => setMonth(monthFromDate(view.currentStart))} height="auto" /></div>
       </>}
-      {selected && <OccurrenceDialog occurrence={selected} onClose={() => setSelected(null)} onComplete={(id) => runCommand(() => completeAreaOccurrence(id))} onReschedule={(id, body) => runCommand(() => rescheduleAreaOccurrence(id, body))} />}
+      {selected && <OccurrenceDialog occurrence={selected} onClose={() => setSelected(null)} onComplete={(id, key) => runCommand(() => completeAreaOccurrence(id, key))} onReschedule={(id, body, key) => runCommand(() => rescheduleAreaOccurrence(id, body, key))} />}
     </section>
   )
 }
