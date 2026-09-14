@@ -37,7 +37,7 @@ describe('CalendarioAreaPage', () => {
     expect(screen.getByTestId('full-calendar')).toHaveAttribute('data-read-only', 'true')
   })
 
-  it('opens an accessible detail dialog with optional metadata and restores focus on Escape', async () => {
+  it('opens an accessible detail dialog with optional metadata', async () => {
     getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [occurrence] })
     render(<CalendarioAreaPage />)
     const event = await screen.findByRole('button', { name: 'Auditoría' })
@@ -50,6 +50,35 @@ describe('CalendarioAreaPage', () => {
     expect(dialog).toHaveTextContent('Plantilla')
     expect(dialog).toHaveTextContent('Versión')
     expect(screen.getByRole('button', { name: 'Cerrar detalle de la ocurrencia' })).toHaveFocus()
+  })
+
+  it('traps Tab from the last dialog control to the first', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [occurrence] })
+    render(<CalendarioAreaPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Auditoría' }))
+    const closeButton = screen.getByRole('button', { name: 'Cerrar detalle de la ocurrencia' })
+    const lastButton = screen.getByRole('button', { name: 'Reprogramar' })
+    lastButton.focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(closeButton).toHaveFocus()
+  })
+
+  it('traps Shift+Tab from the first dialog control to the last', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [occurrence] })
+    render(<CalendarioAreaPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Auditoría' }))
+    const closeButton = screen.getByRole('button', { name: 'Cerrar detalle de la ocurrencia' })
+    const lastButton = screen.getByRole('button', { name: 'Reprogramar' })
+    closeButton.focus()
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+    expect(lastButton).toHaveFocus()
+  })
+
+  it('closes on Escape and restores focus to the calendar occurrence', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [occurrence] })
+    render(<CalendarioAreaPage />)
+    const event = await screen.findByRole('button', { name: 'Auditoría' })
+    fireEvent.click(event)
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(event).toHaveFocus()
   })

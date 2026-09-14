@@ -54,6 +54,19 @@ const PERFORMANCE_FIELDS = [
   ['reason', 'Motivo'],
 ]
 
+const FOCUSABLE_SELECTOR = 'a[href], area[href], input:not([type="hidden"]), select, textarea, button, iframe, object, embed, [contenteditable="true"], [tabindex]:not([tabindex="-1"])'
+
+function getFocusableElements(container) {
+  return [...container.querySelectorAll(FOCUSABLE_SELECTOR)].filter((element) => {
+    const style = window.getComputedStyle(element)
+    return !element.disabled
+      && !element.closest('[hidden], [aria-hidden="true"]')
+      && style.display !== 'none'
+      && style.visibility !== 'hidden'
+      && element.tabIndex >= 0
+  })
+}
+
 function performanceValue(value) {
   return typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value)
 }
@@ -90,6 +103,7 @@ function MonthlyPerformancePanel({ loading, performance, error, onRetry }) {
 }
 
 function OccurrenceDialog({ occurrence, onClose, onComplete, onReschedule }) {
+  const dialogRef = useRef(null)
   const closeButton = useRef(null)
   const [mode, setMode] = useState(null)
   const [targetDate, setTargetDate] = useState(occurrence.effective_date ?? '')
@@ -104,7 +118,23 @@ function OccurrenceDialog({ occurrence, onClose, onComplete, onReschedule }) {
   useEffect(() => {
     closeButton.current?.focus()
     function handleKeyDown(event) {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') {
+        onClose()
+        return
+      }
+      if (event.key !== 'Tab') return
+
+      const focusableElements = getFocusableElements(dialogRef.current)
+      if (focusableElements.length === 0) return
+
+      const first = focusableElements[0]
+      const last = focusableElements.at(-1)
+      const activeElement = document.activeElement
+      if (!dialogRef.current.contains(activeElement) || (event.shiftKey ? activeElement === first : activeElement === last)) {
+        event.preventDefault()
+        const focusTarget = event.shiftKey ? last : first
+        focusTarget.focus()
+      }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
@@ -136,7 +166,7 @@ function OccurrenceDialog({ occurrence, onClose, onComplete, onReschedule }) {
 
   return (
     <div className="calendar-modal-overlay" onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
-      <section className="calendar-modal" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId}>
+      <section ref={dialogRef} className="calendar-modal" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId}>
         <button ref={closeButton} type="button" className="calendar-modal-close" onClick={onClose} aria-label="Cerrar detalle de la ocurrencia">×</button>
         <h2 id={titleId}>{occurrenceTitle(occurrence)}</h2>
         <p id={descriptionId}>Detalle de la ocurrencia programada.</p>
