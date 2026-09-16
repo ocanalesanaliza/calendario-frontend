@@ -1,0 +1,13 @@
+services:
+  frontend:
+    build:
+      context: ../calendario-frontend
+      dockerfile: Dockerfile.test
+      args:
+        VITE_API_URL: "https://apptareas-test-api.laboratoriosanalizahn.com"
+    image: desarrollotuvet/apptareas-test:0.0.2
+
+    container_name: calendario_frontend
+    ports:
+      - "5173:80"
+    restart: unless-stopped
