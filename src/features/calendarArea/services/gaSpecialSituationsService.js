@@ -6,8 +6,11 @@ export function getGASpecialSituations() {
   return getCalendarArea(basePath, 'No se pudieron cargar las situaciones especiales.')
 }
 
-export function getCatalog(date) {
-  const query = date ? `?date=${encodeURIComponent(date)}` : ''
+export function getCatalog(date, endDate) {
+  const params = new URLSearchParams()
+  if (date) params.set('date', date)
+  if (endDate) params.set('end_date', endDate)
+  const query = params.size ? `?${params}` : ''
   return getCalendarArea(`${basePath}catalog/${query}`, 'No se pudo cargar el catálogo de situaciones especiales.')
 }
 
