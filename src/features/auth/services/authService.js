@@ -22,16 +22,39 @@ export async function getCurrentProfile() {
   return normalizeCurrentProfile(data)
 }
 
-export async function login(email, password) {
+export async function login(email, password, remember = false) {
   const res = await fetch(`${BASE_URL}/api/auth/login/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    credentials: 'include',
+    body: JSON.stringify({ email, password, remember_email: remember }),
   })
 
   const data = await res.json()
   if (!res.ok) throw new Error(data.detail || 'Error al iniciar sesión')
   return data
+}
+
+export async function getRememberedEmail({ signal } = {}) {
+  const res = await fetch(`${BASE_URL}/api/auth/remembered-email/`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+    signal,
+  })
+
+  if (!res.ok) throw new Error('No se pudo recuperar el correo guardado.')
+  const data = await res.json()
+  return typeof data?.email === 'string' ? data.email : ''
+}
+
+export async function forgetRememberedEmail() {
+  const res = await fetch(`${BASE_URL}/api/auth/remembered-email/`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+
+  if (!res.ok) throw new Error('No se pudo olvidar el correo guardado. Inténtalo de nuevo.')
 }
 
 export async function forgotPassword(email) {

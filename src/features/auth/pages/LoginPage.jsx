@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { login, decodeToken } from '../services/authService'
+import { login, decodeToken, getRememberedEmail, forgetRememberedEmail } from '../services/authService'
 import { useAuth } from '../context/AuthContext'
 import './LoginPage.css'
 
@@ -11,15 +11,52 @@ function LoginPage() {
   const [remember, setRemember] = useState(true)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [forgettingEmail, setForgettingEmail] = useState(false)
+  const hasInteracted = useRef(false)
   const navigate = useNavigate()
   const { setAuthData } = useAuth()
 
+  useEffect(() => {
+    const controller = new AbortController()
+
+    getRememberedEmail({ signal: controller.signal })
+      .then((savedEmail) => {
+        if (!controller.signal.aborted && !hasInteracted.current && savedEmail) {
+          setEmail(savedEmail)
+        }
+      })
+      .catch(() => {
+        // Remembering an email is optional; a failed lookup must not prevent login.
+      })
+
+    return () => controller.abort()
+  }, [])
+
+  const handleRememberChange = async (e) => {
+    const checked = e.target.checked
+    hasInteracted.current = true
+    setRemember(checked)
+    if (checked) return
+
+    setError('')
+    setForgettingEmail(true)
+    try {
+      await forgetRememberedEmail()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setForgettingEmail(false)
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (loading || forgettingEmail) return
+    hasInteracted.current = true
     setError('')
     setLoading(true)
     try {
-      const data = await login(email, password)
+      const data = await login(email, password, remember)
       setAuthData(data.access, data.refresh, remember)
       const claims = decodeToken(data.access)
       if (claims.perfil?.debe_cambiar_password) {
@@ -64,7 +101,10 @@ function LoginPage() {
                 type="email"
                 placeholder="usuario@correo.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  hasInteracted.current = true
+                  setEmail(e.target.value)
+                }}
                 required
                 autoComplete="email"
               />
@@ -110,7 +150,8 @@ function LoginPage() {
               <input
                 type="checkbox"
                 checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
+                onChange={handleRememberChange}
+                disabled={loading || forgettingEmail}
               />
               <span>Recordarme</span>
             </label>
@@ -119,7 +160,7 @@ function LoginPage() {
 
           {error && <p className="login-error">{error}</p>}
 
-          <button type="submit" className="login-btn" disabled={loading}>
+          <button type="submit" className="login-btn" disabled={loading || forgettingEmail}>
             {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </button>
         </form>
