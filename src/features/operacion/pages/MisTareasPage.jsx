@@ -172,10 +172,6 @@ export default function MisTareasPage() {
       setRevisionGuardiaTask(tarea)
       return
     }
-    if (tarea.tarea?.id_tarea === 18) {
-      setDepositTask(tarea)
-      return
-    }
     setRegistrando(tarea.id_sucursal_tarea)
     setRegError('')
   }
@@ -218,30 +214,33 @@ export default function MisTareasPage() {
 
   return (
     <div className="mis-tareas-page">
-      <div className="page-header">
-        <div>
+      <div className="page-header mis-tareas-header">
+        <div className="mis-tareas-heading">
           <h1>Mis tareas</h1>
           {data?.meta && (
-            <p>
+            <p className="mis-tareas-context">
               {data.meta.fecha_consultada} &mdash; {data.meta.hora_servidor}
-              &nbsp;({data.meta.jornada_servidor === 'tarde' ? 'Tarde' : 'Mañana'})
+              <span className="jornada-context">Jornada de {data.meta.jornada_servidor === 'tarde' ? 'tarde' : 'mañana'}</span>
             </p>
           )}
         </div>
-        <input
-          type="date"
-          className="fecha-picker"
-          value={fecha || data?.meta?.fecha_consultada || ''}
-          onChange={(e) => { setFecha(e.target.value); reiniciarVista() }}
-          max={data?.meta?.fecha_servidor || undefined}
-          disabled={busy}
-        />
+        <label className="fecha-control">
+          <span>Fecha</span>
+          <input
+            type="date"
+            className="fecha-picker"
+            value={fecha || data?.meta?.fecha_consultada || ''}
+            onChange={(e) => { setFecha(e.target.value); reiniciarVista() }}
+            max={data?.meta?.fecha_servidor || undefined}
+            disabled={busy}
+          />
+        </label>
       </div>
 
       {resumen && (
         <div className="stats-row">
           <StatCard label="Total"       value={resumen.total} />
-          <StatCard label="Disponibles" value={resumen.disponibles} color="green" />
+          <StatCard label="Disponibles" value={resumen.disponibles} color="green" emphasis />
           <StatCard label="Registradas" value={resumen.registradas} color="blue" />
           <StatCard label="Cerradas"    value={resumen.cerradas}    color="red" />
           {resumen.bloqueadas > 0 && (
@@ -294,11 +293,12 @@ export default function MisTareasPage() {
         </div>
       )}
 
-      <div className="jornada-tabs">
+      <div className="jornada-tabs" role="group" aria-label="Jornada de tareas">
         <button
           className={`jornada-tab${jornada === 'manana' ? ' active' : ''}`}
           onClick={() => { setJornada('manana'); reiniciarVista() }}
           disabled={busy}
+          aria-pressed={jornada === 'manana'}
         >
           Mañana
           {resumen?.manana && <span className="tab-count">{resumen.manana.total}</span>}
@@ -307,6 +307,7 @@ export default function MisTareasPage() {
           className={`jornada-tab${jornada === 'tarde' ? ' active' : ''}`}
           onClick={() => { setJornada('tarde'); reiniciarVista() }}
           disabled={busy}
+          aria-pressed={jornada === 'tarde'}
         >
           Tarde
           {resumen?.tarde && <span className="tab-count">{resumen.tarde.total}</span>}
@@ -426,12 +427,10 @@ export default function MisTareasPage() {
   )
 }
 
-function StatCard({ label, value, color }) {
-  const bg   = { green: '#dcfce7', blue: '#dbeafe', red: '#fee2e2', gray: '#f1f5f9' }
-  const text = { green: '#166534', blue: '#1d4ed8', red: '#991b1b', gray: '#475569' }
+function StatCard({ label, value, color, emphasis = false }) {
   return (
-    <div className="stat-card" style={{ background: bg[color] ?? '#fff' }}>
-      <span className="stat-value" style={{ color: text[color] ?? '#1e293b' }}>{value}</span>
+    <div className={['stat-card', color && `stat-card--${color}`, emphasis && 'stat-card--emphasis'].filter(Boolean).join(' ')}>
+      <span className="stat-value">{value}</span>
       <span className="stat-label">{label}</span>
     </div>
   )

@@ -98,8 +98,15 @@ describe('Layout Mis tareas navigation', () => {
     })
   })
 
-  it('shows Depósitos pendientes only for an area manager', () => {
-    useAuth.mockReturnValue({ perfil: { type: 'gerente_area' }, logout: vi.fn() })
+  it('hides the restricted navigation entries for an area manager', () => {
+    useAuth.mockReturnValue({
+      perfil: {
+        type: 'gerente_area',
+        can_access_my_tasks: true,
+        capabilities: { manage_branches: true },
+      },
+      logout: vi.fn(),
+    })
 
     render(
       <MemoryRouter>
@@ -109,9 +116,35 @@ describe('Layout Mis tareas navigation', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByTitle('Depósitos pendientes')).toBeInTheDocument()
+    expect(screen.queryByTitle('Mis tareas')).not.toBeInTheDocument()
+    expect(screen.queryByTitle('Depósitos pendientes')).not.toBeInTheDocument()
+    expect(screen.queryByTitle('Conteo de inventario')).not.toBeInTheDocument()
+    expect(screen.queryByTitle('Tareas')).not.toBeInTheDocument()
     expect(screen.getByTitle('Calendario del área')).toBeInTheDocument()
     expect(screen.getByTitle('Mi almuerzo')).toBeInTheDocument()
+  })
+
+  it('keeps the navigation entries available to a non-area-manager profile with the same capabilities', () => {
+    useAuth.mockReturnValue({
+      perfil: {
+        type: 'gerente_sucursal',
+        can_access_my_tasks: true,
+        capabilities: { manage_branches: true },
+      },
+      logout: vi.fn(),
+    })
+
+    render(
+      <MemoryRouter>
+        <Routes>
+          <Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByTitle('Mis tareas')).toBeInTheDocument()
+    expect(screen.getByTitle('Conteo de inventario')).toBeInTheDocument()
+    expect(screen.getByTitle('Tareas')).toBeInTheDocument()
   })
 
   it.each([

@@ -34,6 +34,7 @@ function Layout() {
     canAccessAreaAbsences,
     isSystemsAccount,
   } = getProfileCapabilities(perfil)
+  const hideRestrictedNavigation = esGerenteArea
 
   const [notifOpen, setNotifOpen]     = useState(false)
   const [notificaciones, setNotificaciones] = useState([])
@@ -134,7 +135,7 @@ function Layout() {
         {
           to: '/mis-tareas',
           label: 'Mis tareas',
-          visible: puedeAccederMisTareas,
+          visible: !hideRestrictedNavigation && puedeAccederMisTareas,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 11l3 3L22 4" />
@@ -145,7 +146,7 @@ function Layout() {
         {
           to: '/depositospendientes',
           label: 'Depósitos pendientes',
-          visible: esGerenteArea,
+          visible: !hideRestrictedNavigation && esGerenteArea,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="5" width="18" height="14" rx="2" />
@@ -213,7 +214,7 @@ function Layout() {
         {
           to: '/tareas',
           label: 'Tareas',
-          visible: canManageBranches,
+          visible: !hideRestrictedNavigation && canManageBranches,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 11l3 3L22 4" />
@@ -224,7 +225,7 @@ function Layout() {
         {
           to: '/inventario-demo',
           label: 'Conteo de inventario',
-          visible: canManageBranches,
+          visible: !hideRestrictedNavigation && canManageBranches,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 7l9-4 9 4-9 4-9-4z" />

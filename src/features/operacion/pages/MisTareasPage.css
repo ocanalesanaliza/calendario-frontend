@@ -1,13 +1,18 @@
 .mis-tareas-page {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
-.page-header {
+.mis-tareas-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
 }
 
 .page-header h1 {
@@ -19,8 +24,27 @@
 
 .page-header p { font-size: 0.85rem; color: #64748b; }
 
+.mis-tareas-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.jornada-context { font-weight: 600; color: #475569; }
+
+.fecha-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
 .fecha-picker {
-  padding: 0.5rem 0.75rem;
+  padding: 0.45rem 0.65rem;
   border: 1.5px solid #e2e8f0;
   border-radius: 8px;
   font-size: 0.9rem;
@@ -34,59 +58,77 @@
 
 /* ── Stats ── */
 .stats-row {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.6rem;
 }
 
 .stat-card {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 0.85rem 1.25rem;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.7rem 0.8rem;
   border-radius: 10px;
-  min-width: 88px;
-  border: 1px solid rgba(0,0,0,0.06);
+  border: 1px solid #e2e8f0;
+  background: #fff;
 }
 
 .stat-value {
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   font-weight: 700;
   line-height: 1;
+  color: #1e293b;
 }
 
 .stat-label {
   font-size: 0.75rem;
   color: #64748b;
-  margin-top: 0.2rem;
+  font-weight: 600;
 }
+
+.stat-card--green { background: #f0fdf4; border-color: #bbf7d0; }
+.stat-card--green .stat-value { color: #166534; }
+.stat-card--blue { background: #eff6ff; border-color: #bfdbfe; }
+.stat-card--blue .stat-value { color: #1d4ed8; }
+.stat-card--red { background: #fef2f2; border-color: #fecaca; }
+.stat-card--red .stat-value { color: #991b1b; }
+.stat-card--gray { background: #f8fafc; }
+.stat-card--gray .stat-value { color: #475569; }
+.stat-card--emphasis { box-shadow: 0 0 0 2px rgba(22, 101, 52, 0.1); }
 
 /* ── Jornada tabs ── */
 .jornada-tabs {
   display: flex;
-  gap: 0;
-  border-bottom: 2px solid #e2e8f0;
+  align-self: flex-start;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background: #f1f5f9;
+  border-radius: 10px;
 }
 
 .jornada-tab {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.4rem;
-  padding: 0.55rem 1.2rem;
-  background: none;
+  min-width: 130px;
+  padding: 0.5rem 0.85rem;
+  background: transparent;
   border: none;
   font-size: 0.9rem;
   font-weight: 500;
   color: #64748b;
   cursor: pointer;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
-  transition: color 0.15s, border-color 0.15s;
+  border-radius: 7px;
+  transition: color 0.15s, background-color 0.15s, box-shadow 0.15s;
 }
 
-.jornada-tab:hover { color: #1e293b; }
-.jornada-tab.active { color: #6366f1; border-color: #6366f1; font-weight: 600; }
+.jornada-tab:hover { color: #1e293b; background: #fff; }
+.jornada-tab.active { color: #4338ca; background: #fff; font-weight: 700; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12); }
 .jornada-tab:disabled { opacity: 0.6; cursor: not-allowed; }
+.jornada-tab:focus-visible, .fecha-picker:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
 
 /* ── Selección múltiple ── */
 .seleccion-bar {
@@ -118,13 +160,15 @@
 }
 
 .tab-count {
-  background: #e0e7ff;
-  color: #6366f1;
+  background: #e2e8f0;
+  color: #475569;
   font-size: 0.72rem;
   font-weight: 700;
   padding: 0.1rem 0.45rem;
   border-radius: 999px;
 }
+
+.jornada-tab.active .tab-count { background: #e0e7ff; color: #4338ca; }
 
 /* ── States ── */
 .loading-state, .empty-state {
@@ -139,6 +183,15 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .mis-tareas-header { align-items: flex-start; flex-direction: column; }
+  .fecha-control { width: 100%; justify-content: space-between; }
+  .fecha-picker { flex: 1; max-width: 180px; }
+  .stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .jornada-tabs { align-self: stretch; }
+  .jornada-tab { flex: 1; min-width: 0; }
 }
 
 .tarea-card {

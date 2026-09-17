@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MisTareasPage from './MisTareasPage'
@@ -17,22 +17,33 @@ const taskResponse = { meta: { fecha_consultada: '2026-09-05', hora_servidor: '1
 describe('MisTareasPage deposit demonstrations', () => {
   beforeEach(() => { perfil = { type: 'gerente_sucursal', can_access_my_tasks: true, sucursal: { nombre: 'Sucursal Norte' } }; getMisTareas.mockReset().mockResolvedValue(taskResponse); getTrabajosCampo.mockReset().mockResolvedValue({ results: [] }); registrarTarea.mockReset(); registrarTareasLote.mockReset(); aceptarTrabajoCampo.mockReset(); rechazarTrabajoCampo.mockReset(); getRevisionGuardia.mockReset(); guardarRevisionGuardia.mockReset(); revokeMyTasksAccess.mockReset() })
 
-  it('opens the GS deposit demo, validates cash sales, and shows local feedback without registering', async () => {
+  it('uses the standard confirmation flow for the branch deposit task', async () => {
+    registrarTarea.mockResolvedValue({})
+
     render(<MemoryRouter><MisTareasPage /></MemoryRouter>)
     const checkbox = await screen.findByRole('checkbox', { name: /Seleccionar Envio de deposito/i })
     fireEvent.click(checkbox)
     fireEvent.click(screen.getByRole('button', { name: /Registrar 1 tarea/i }))
-    expect(await screen.findByRole('dialog', { name: 'Registrar depósito' })).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Ventas totales'), { target: { value: '100' } })
-    fireEvent.change(screen.getByLabelText('Ventas en efectivo'), { target: { value: '101' } })
-    expect(screen.getByRole('alert')).toHaveTextContent('no pueden superar')
-    fireEvent.change(screen.getByLabelText('Ventas en efectivo'), { target: { value: '80' } })
-    fireEvent.change(screen.getByLabelText('Efectivo depositado'), { target: { value: '80' } })
-    fireEvent.change(screen.getByLabelText('Referencia'), { target: { value: 'REF-01' } })
-    fireEvent.change(screen.getByLabelText('Fecha real de depósito'), { target: { value: '2026-09-05' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Enviar para revisión' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('El depósito se envió para revisión a su gerente de área.')
-    expect(registrarTarea).not.toHaveBeenCalled()
+    expect(await screen.findByRole('button', { name: 'Confirmar' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Registrar depósito' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
+
+    await waitFor(() => expect(registrarTarea).toHaveBeenCalledWith({
+      id_tarea: 18,
+      fecha: '2026-09-05',
+      notas: undefined,
+    }))
+  })
+
+  it('renders the compact task overview with an explicit active jornada', async () => {
+    render(<MemoryRouter><MisTareasPage /></MemoryRouter>)
+
+    expect(await screen.findByText('Disponibles')).toBeInTheDocument()
+    expect(screen.getByText('Jornada de mañana')).toBeInTheDocument()
+    expect(screen.getByLabelText('Fecha')).toHaveValue('2026-09-05')
+    expect(screen.getByRole('button', { name: 'Mañana1' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Tarde0' })).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('does not load or render Mis tareas when the capability is absent', async () => {
