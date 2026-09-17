@@ -2,15 +2,16 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CalendarioAreaPage from './CalendarioAreaPage'
 
-const { completeAreaOccurrence, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, rescheduleAreaOccurrence } = vi.hoisted(() => ({ completeAreaOccurrence: vi.fn(), getMonthlyAreaOccurrences: vi.fn(), getMonthlyAreaPerformance: vi.fn(), rescheduleAreaOccurrence: vi.fn() }))
+const { completeAreaOccurrence, getMonthlyAreaAbsences, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, rescheduleAreaOccurrence } = vi.hoisted(() => ({ completeAreaOccurrence: vi.fn(), getMonthlyAreaAbsences: vi.fn(), getMonthlyAreaOccurrences: vi.fn(), getMonthlyAreaPerformance: vi.fn(), rescheduleAreaOccurrence: vi.fn() }))
 let datesSetHandler
 
-vi.mock('../services/calendarioAreaService', () => ({ completeAreaOccurrence, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, rescheduleAreaOccurrence }))
+vi.mock('../services/calendarioAreaService', () => ({ completeAreaOccurrence, getMonthlyAreaAbsences, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, rescheduleAreaOccurrence }))
 vi.mock('@fullcalendar/react', () => ({
   default: ({ events, datesSet, eventClick }) => {
     datesSetHandler = datesSet
     return <div data-testid="full-calendar" data-read-only={String(events.every((event) => event.editable === false))}>
       {events.map((event) => <button type="button" key={event.id} onClick={(click) => eventClick({ event: { ...event, extendedProps: event.extendedProps }, jsEvent: click.nativeEvent })}>{event.title}</button>)}
+      <button type="button" onClick={() => datesSet({ view: { currentStart: new Date(2026, 9, 1) } })}>Mes anterior</button>
       <button type="button" onClick={() => datesSet({ view: { currentStart: new Date(2026, 10, 1) } })}>Siguiente mes</button>
     </div>
   },
@@ -21,6 +22,8 @@ describe('CalendarioAreaPage', () => {
 
   beforeEach(() => {
     getMonthlyAreaOccurrences.mockReset()
+    getMonthlyAreaAbsences.mockReset()
+    getMonthlyAreaAbsences.mockResolvedValue({ month: '2026-09', absences: [] })
     getMonthlyAreaPerformance.mockReset()
     getMonthlyAreaPerformance.mockResolvedValue({ month: '2026-09', performances: [] })
     completeAreaOccurrence.mockReset()
@@ -33,8 +36,89 @@ describe('CalendarioAreaPage', () => {
     render(<CalendarioAreaPage />)
 
     expect(screen.getByText('Cargando calendario...')).toBeInTheDocument()
+    expect(screen.getByTestId('full-calendar')).toBeInTheDocument()
     expect(await screen.findByText('Auditoría')).toBeInTheDocument()
     expect(screen.getByTestId('full-calendar')).toHaveAttribute('data-read-only', 'true')
+  })
+
+  it('keeps the calendar mounted with old task and absence events while previous and next month loads complete', async () => {
+    let resolveOctoberOccurrences
+    let resolveNovemberOccurrences
+    let resolveOctoberAbsences
+    let resolveNovemberAbsences
+    getMonthlyAreaOccurrences.mockResolvedValueOnce({ occurrences: [occurrence] })
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveNovemberOccurrences = resolve }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveOctoberOccurrences = resolve }))
+    getMonthlyAreaAbsences.mockResolvedValueOnce({ absences: [{ id: 10, source: 'vacation', type: 'approved', date: '2026-09-03', slot: 'morning' }] })
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveNovemberAbsences = resolve }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveOctoberAbsences = resolve }))
+
+    render(<CalendarioAreaPage />)
+
+    expect(await screen.findByText('Auditoría')).toBeInTheDocument()
+    expect(await screen.findByText('Vacaciones · Mañana')).toBeInTheDocument()
+    const calendar = screen.getByTestId('full-calendar')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente mes' }))
+    expect(screen.getByText('Cargando calendario...')).toBeInTheDocument()
+    expect(screen.getByTestId('full-calendar')).toBe(calendar)
+    expect(screen.getByText('Auditoría')).toBeInTheDocument()
+    expect(screen.getByText('Vacaciones · Mañana')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(getMonthlyAreaOccurrences).toHaveBeenLastCalledWith('2026-11')
+      expect(getMonthlyAreaAbsences).toHaveBeenLastCalledWith('2026-11')
+      expect(getMonthlyAreaPerformance).toHaveBeenLastCalledWith('2026-11')
+    })
+    act(() => {
+      resolveNovemberOccurrences({ occurrences: [{ ...occurrence, task: 'Noviembre' }] })
+      resolveNovemberAbsences({ absences: [{ id: 11, source: 'vacation', type: 'approved', date: '2026-11-03', slot: 'full_day' }] })
+    })
+    expect(await screen.findByText('Noviembre')).toBeInTheDocument()
+    expect(await screen.findByText('Vacaciones · Jornada completa')).toBeInTheDocument()
+    expect(screen.getByTestId('full-calendar')).toBe(calendar)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mes anterior' }))
+    expect(screen.getByText('Cargando calendario...')).toBeInTheDocument()
+    expect(screen.getByTestId('full-calendar')).toBe(calendar)
+    expect(screen.getByText('Noviembre')).toBeInTheDocument()
+    expect(screen.getByText('Vacaciones · Jornada completa')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(getMonthlyAreaOccurrences).toHaveBeenLastCalledWith('2026-10')
+      expect(getMonthlyAreaAbsences).toHaveBeenLastCalledWith('2026-10')
+      expect(getMonthlyAreaPerformance).toHaveBeenLastCalledWith('2026-10')
+    })
+    act(() => {
+      resolveOctoberOccurrences({ occurrences: [{ ...occurrence, task: 'Octubre' }] })
+      resolveOctoberAbsences({ absences: [{ id: 12, source: 'special_situation', type: 'capacitacion', date: '2026-10-03', slot: 'afternoon' }] })
+    })
+    expect(await screen.findByText('Octubre')).toBeInTheDocument()
+    expect(await screen.findByText('Situación especial activa · Capacitación · Tarde')).toBeInTheDocument()
+    expect(screen.getByTestId('full-calendar')).toBe(calendar)
+  })
+
+  it('shows vacation and special-situation absences without opening the occurrence dialog', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [occurrence] })
+    getMonthlyAreaAbsences.mockResolvedValue({
+      month: '2026-09',
+      absences: [
+        { id: 10, source: 'vacation', type: 'approved', date: '2026-09-03', slot: 'morning' },
+        { id: 11, source: 'special_situation', type: 'capacitacion', date: '2026-09-03', slot: 'afternoon' },
+      ],
+    })
+    render(<CalendarioAreaPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Vacaciones · Mañana' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Situación especial activa · Capacitación · Tarde' })).toBeInTheDocument()
+  })
+
+  it('keeps task events visible when absence loading fails', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [occurrence] })
+    getMonthlyAreaAbsences.mockRejectedValue(new Error('Ausencias no disponibles.'))
+    render(<CalendarioAreaPage />)
+
+    expect(await screen.findByText('Auditoría')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('No se pudieron cargar las ausencias del área: Ausencias no disponibles.')
   })
 
   it('opens an accessible detail dialog with optional metadata', async () => {
@@ -242,6 +326,25 @@ describe('CalendarioAreaPage', () => {
     expect(await screen.findByText('Diciembre')).toBeInTheDocument()
     resolveNovember({ occurrences: [{ ...occurrence, task: 'Noviembre' }] })
     await waitFor(() => expect(screen.queryByText('Noviembre')).not.toBeInTheDocument())
+  })
+
+  it('refetches absences for the visible month and ignores stale navigation responses', async () => {
+    let resolveNovember
+    let resolveDecember
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+    getMonthlyAreaAbsences.mockResolvedValueOnce({ absences: [] })
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveNovember = resolve }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveDecember = resolve }))
+    render(<CalendarioAreaPage />)
+    await screen.findByTestId('full-calendar')
+    act(() => datesSetHandler({ view: { currentStart: new Date(2026, 10, 1) } }))
+    await waitFor(() => expect(getMonthlyAreaAbsences).toHaveBeenLastCalledWith('2026-11'))
+    act(() => datesSetHandler({ view: { currentStart: new Date(2026, 11, 1) } }))
+    await waitFor(() => expect(getMonthlyAreaAbsences).toHaveBeenLastCalledWith('2026-12'))
+    resolveDecember({ absences: [{ id: 12, source: 'vacation', type: 'approved', date: '2026-12-15', slot: 'full_day' }] })
+    expect(await screen.findByText('Vacaciones · Jornada completa')).toBeInTheDocument()
+    resolveNovember({ absences: [{ id: 13, source: 'special_situation', type: 'capacitacion', date: '2026-11-15', slot: 'afternoon' }] })
+    await waitFor(() => expect(screen.queryByText('Situación especial activa · Capacitación · Tarde')).not.toBeInTheDocument())
   })
 
   it('keeps only the latest monthly performance response after navigation', async () => {

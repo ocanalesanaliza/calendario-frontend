@@ -6,6 +6,10 @@ export async function getMonthlyAreaOccurrences(month) {
   return normalizeMonthlyAreaOccurrencesResponse(response)
 }
 
+export function getMonthlyAreaAbsences(month) {
+  return getCalendarArea(`/api/calendar/my-area/monthly-absences/?month=${encodeURIComponent(month)}`, 'No se pudieron cargar las ausencias del área.')
+}
+
 export function getMonthlyAreaPerformance(month) {
   return getCalendarArea(`/api/calendar/my-area/monthly-performance/?month=${encodeURIComponent(month)}`, 'No se pudo cargar el rendimiento mensual del área.')
 }

@@ -1,5 +1,6 @@
 export {
   completeAreaOccurrence,
+  getMonthlyAreaAbsences,
   getMonthlyAreaOccurrences,
   getMonthlyAreaPerformance,
   rescheduleAreaOccurrence,

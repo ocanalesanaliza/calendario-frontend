@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   completeAreaOccurrence,
+  getMonthlyAreaAbsences,
   getMonthlyAreaOccurrences,
   getMonthlyAreaPerformance,
   rescheduleAreaOccurrence,
@@ -13,19 +14,21 @@ vi.mock('../../../services/apiClient', () => ({ apiRequest }))
 describe('calendarioAreaService', () => {
   beforeEach(() => apiRequest.mockReset())
 
-  it('uses the WU8 monthly, completion, reschedule, and performance clients', async () => {
+  it('uses the WU8 monthly, absence, completion, reschedule, and performance clients', async () => {
     const payload = { month: '2026-09', timezone: 'America/Tegucigalpa', occurrences: [] }
     apiRequest.mockResolvedValue({ ok: true, status: 200, json: vi.fn().mockResolvedValue(payload) })
 
     await expect(getMonthlyAreaOccurrences('2026-09')).resolves.toEqual(payload)
+    await getMonthlyAreaAbsences('2026-09')
     await getMonthlyAreaPerformance('2026-09')
     await completeAreaOccurrence(14)
     await rescheduleAreaOccurrence(14, { target_date: '2026-09-15' })
 
     expect(apiRequest).toHaveBeenNthCalledWith(1, '/api/calendar/my-area/monthly-occurrences/?month=2026-09')
-    expect(apiRequest).toHaveBeenNthCalledWith(2, '/api/calendar/my-area/monthly-performance/?month=2026-09')
-    expect(apiRequest).toHaveBeenNthCalledWith(3, '/api/calendar/my-area/occurrences/14/complete/', { method: 'POST' })
-    expect(apiRequest).toHaveBeenNthCalledWith(4, '/api/calendar/my-area/occurrences/14/reschedule/', {
+    expect(apiRequest).toHaveBeenNthCalledWith(2, '/api/calendar/my-area/monthly-absences/?month=2026-09')
+    expect(apiRequest).toHaveBeenNthCalledWith(3, '/api/calendar/my-area/monthly-performance/?month=2026-09')
+    expect(apiRequest).toHaveBeenNthCalledWith(4, '/api/calendar/my-area/occurrences/14/complete/', { method: 'POST' })
+    expect(apiRequest).toHaveBeenNthCalledWith(5, '/api/calendar/my-area/occurrences/14/reschedule/', {
       method: 'POST', body: JSON.stringify({ target_date: '2026-09-15' }),
     })
   })
