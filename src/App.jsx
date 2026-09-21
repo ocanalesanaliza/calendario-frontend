@@ -15,6 +15,7 @@ import GerentesPage from "./features/gerentes/pages/GerentesPage";
 import GerentesOperacionesPage from "./features/gerentes_operaciones/pages/GerentesOperacionesPage";
 import AreasPage from "./features/areas/pages/AreasPage";
 import MisTareasPage from "./features/operacion/pages/MisTareasPage";
+import MisTareasV2Page from "./features/operacion/pages/MisTareasV2Page";
 import DepositosPendientesPage from "./features/operacion/pages/DepositosPendientesPage";
 import SolicitudesPendientesPage from "./features/trabajosCampo/pages/SolicitudesPendientesPage";
 import AlmuerzosPage from "./features/almuerzos/pages/AlmuerzosPage";
@@ -153,6 +154,7 @@ function App() {
           <Route path="/gerentes-operaciones" element={<GerentesOperacionesRoute><GerentesOperacionesPage /></GerentesOperacionesRoute>} />
           <Route path="/areas" element={<AreaManagerAssignmentRoute><AreasPage /></AreaManagerAssignmentRoute>} />
           <Route path="/mis-tareas" element={<MisTareasRoute><MisTareasPage /></MisTareasRoute>} />
+          <Route path="/mis-tareas-v2" element={<MisTareasRoute><MisTareasV2Page /></MisTareasRoute>} />
           <Route path="/depositospendientes" element={<DepositosPendientesRoute><DepositosPendientesPage /></DepositosPendientesRoute>} />
           <Route path="/calendario-area" element={<CalendarioAreaRoute><CalendarioAreaPage /></CalendarioAreaRoute>} />
           <Route path="/ausencias-area" element={<AusenciasAreaRoute><AusenciasAreaPage /></AusenciasAreaRoute>} />

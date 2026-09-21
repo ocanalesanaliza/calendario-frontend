@@ -21,6 +21,17 @@ function renderMisTareasRoute() {
   )
 }
 
+function renderMisTareasV2Route() {
+  render(
+    <MemoryRouter initialEntries={['/mis-tareas-v2']}>
+      <Routes>
+        <Route path="/" element={<p>Inicio</p>} />
+        <Route path="/mis-tareas-v2" element={<MisTareasRoute><p>Mis tareas V2 autorizadas</p></MisTareasRoute>} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
 describe('MisTareasRoute', () => {
   beforeEach(() => useAuth.mockReset())
 
@@ -246,6 +257,25 @@ describe('AdminMaestroRoute', () => {
     )
     expect(await screen.findByText('Inicio')).toBeInTheDocument()
     expect(screen.queryByText('Analítica de guardias')).not.toBeInTheDocument()
+  })
+})
+
+describe('MisTareasV2Route', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  it('uses the same capability gate as MisTareasRoute', async () => {
+    useAuth.mockReturnValue({ perfil: { es_cuenta_sistemas: true, can_access_my_tasks: false } })
+    renderMisTareasV2Route()
+
+    expect(await screen.findByText('Inicio')).toBeInTheDocument()
+    expect(screen.queryByText('Mis tareas V2 autorizadas')).not.toBeInTheDocument()
+  })
+
+  it('allows a branch manager when the capability is granted', () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_sucursal', can_access_my_tasks: true } })
+    renderMisTareasV2Route()
+
+    expect(screen.getByText('Mis tareas V2 autorizadas')).toBeInTheDocument()
   })
 })
 
