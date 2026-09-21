@@ -83,6 +83,20 @@ const inclusiveRange = (startDate, endDate) => {
   for (let date = startDate; date <= endDate; date = nextDate(date)) dates.push(date)
   return dates
 }
+const isSunday = (date) => {
+  const match = String(date ?? '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return false
+  const [, year, month, day] = match
+  return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day))).getUTCDay() === 0
+}
+const requestedDays = (startDate, endDate = startDate) => inclusiveRange(startDate, endDate).filter((date) => !isSunday(date)).length
+const requestedDaysLabel = (days) => `${days} ${days === 1 ? 'día solicitado' : 'días solicitados'}`
+const vacationRangeSummary = (startDate, endDate) => {
+  const days = requestedDays(startDate, endDate || startDate)
+  if (!endDate) return `${localizedDate(startDate)} · ${requestedDaysLabel(days)}`
+  if (startDate === endDate) return `El ${localizedDate(startDate)} · ${requestedDaysLabel(days)}`
+  return `${localizedDateRange(startDate, endDate)} · ${requestedDaysLabel(days)}`
+}
 const specialSituationRangeError = (startDate, endDate) => {
   if (!startDate || !endDate) return ''
   if (endDate < startDate) return 'La fecha de fin no puede ser anterior a la fecha de inicio.'
@@ -143,9 +157,7 @@ function VacationForm({ onClose, onConflict, onSubmit }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const isRange = Boolean(range.endDate)
-  const summary = range.startDate
-    ? isRange ? `Del ${range.startDate} al ${range.endDate}` : range.startDate
-    : 'Selecciona una fecha para ver el resumen.'
+  const summary = range.startDate ? vacationRangeSummary(range.startDate, range.endDate) : 'Selecciona una fecha para ver el resumen.'
 
   function update(index, field, value) {
     setSegments((current) => current.map((segment, i) => i === index ? { ...segment, [field]: value } : segment))

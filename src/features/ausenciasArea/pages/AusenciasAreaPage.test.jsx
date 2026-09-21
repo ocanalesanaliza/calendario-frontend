@@ -56,15 +56,37 @@ describe('AusenciasAreaPage', () => {
     setup()
     await screen.findByText('Mis solicitudes')
     fireEvent.click(screen.getByRole('button', { name: 'Nueva solicitud' }))
-    fireEvent.change(screen.getByLabelText('Fecha de inicio'), { target: { value: '2026-10-01' } })
-    fireEvent.change(screen.getByLabelText('Fecha de fin (opcional)'), { target: { value: '2026-10-03' } })
-    expect(screen.getByText('Del 2026-10-01 al 2026-10-03')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Fecha de inicio'), { target: { value: '2026-09-21' } })
+    fireEvent.change(screen.getByLabelText('Fecha de fin (opcional)'), { target: { value: '2026-09-24' } })
+    expect(screen.getByText('Del 21 al 24 de septiembre de 2026 · 4 días solicitados')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Solicitar vacaciones' }))
     await waitFor(() => expect(createGAVacationRequest).toHaveBeenCalledWith({ segments: [
-      { date: '2026-10-01', slot: 'full_day' },
-      { date: '2026-10-02', slot: 'full_day' },
-      { date: '2026-10-03', slot: 'full_day' },
+      { date: '2026-09-21', slot: 'full_day' },
+      { date: '2026-09-22', slot: 'full_day' },
+      { date: '2026-09-23', slot: 'full_day' },
+      { date: '2026-09-24', slot: 'full_day' },
     ] }, 'command-key'))
+  })
+
+  it('excludes Sundays from the standard range requested-day count', async () => {
+    setup()
+    await screen.findByText('Mis solicitudes')
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva solicitud' }))
+    fireEvent.change(screen.getByLabelText('Fecha de inicio'), { target: { value: '2026-09-19' } })
+    fireEvent.change(screen.getByLabelText('Fecha de fin (opcional)'), { target: { value: '2026-09-21' } })
+
+    expect(screen.getByText('Del 19 al 21 de septiembre de 2026 · 2 días solicitados')).toBeInTheDocument()
+  })
+
+  it('formats start-only and same-day standard selections with a singular requested-day count', async () => {
+    setup()
+    await screen.findByText('Mis solicitudes')
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva solicitud' }))
+    fireEvent.change(screen.getByLabelText('Fecha de inicio'), { target: { value: '2026-09-21' } })
+    expect(screen.getByText('21 de septiembre de 2026 · 1 día solicitado')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Fecha de fin (opcional)'), { target: { value: '2026-09-21' } })
+    expect(screen.getByText('El 21 de septiembre de 2026 · 1 día solicitado')).toBeInTheDocument()
   })
 
   it('shows a client validation error for an end date before the start date', async () => {
