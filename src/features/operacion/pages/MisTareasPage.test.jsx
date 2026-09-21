@@ -138,7 +138,7 @@ describe('MisTareasPage deposit demonstrations', () => {
     const v2Checkbox = await screen.findByRole('checkbox', { name: /Seleccionar Envio de deposito/i })
     const v2Card = v2Checkbox.closest('.tarea-card')
     expect(v2Card).toHaveClass('tarea-card--selection-emphasis')
-    expect(within(v2Card).getByText('Seleccionable')).toHaveAttribute('aria-hidden', 'true')
+    expect(within(v2Card).queryByText('Seleccionable')).not.toBeInTheDocument()
 
     fireEvent.click(v2Card)
 

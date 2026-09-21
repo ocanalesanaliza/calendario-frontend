@@ -388,9 +388,9 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
           </div>
         )}
 
-        {selectionUxVariant && t.disponible_para_registro && !esRevisionGuardia(t) && (
+        {selectionUxVariant && isSelected && t.disponible_para_registro && !esRevisionGuardia(t) && (
           <span className="tarea-selection-cue" aria-hidden="true">
-            {isSelected ? 'Seleccionada' : 'Seleccionable'}
+            Seleccionada
           </span>
         )}
 
