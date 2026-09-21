@@ -21,6 +21,7 @@ export default function PlantillaDetallePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [modal, setModal] = useState(null)
+  const [buscarTarea, setBuscarTarea] = useState('')
 
   useEffect(() => { loadData() }, [id])
 
@@ -83,6 +84,10 @@ export default function PlantillaDetallePage() {
 
   const tareasActivas = plantilla.tareas?.filter((t) => t.activa) ?? []
   const tareasInactivas = plantilla.tareas?.filter((t) => !t.activa) ?? []
+  const nombreBuscado = buscarTarea.trim().toLocaleLowerCase()
+  const tareasFiltradas = [...tareasActivas, ...tareasInactivas].filter((pt) =>
+    (pt.tarea?.nombre ?? '').toLocaleLowerCase().includes(nombreBuscado)
+  )
 
   return (
     <div className="detalle-page">
@@ -149,8 +154,22 @@ export default function PlantillaDetallePage() {
         )}
       </div>
 
+      <div className="form-group">
+        <label htmlFor="buscar-tarea-plantilla">Buscar tarea por nombre</label>
+        <input
+          id="buscar-tarea-plantilla"
+          className="tareas-search-input"
+          type="search"
+          placeholder="Buscar por nombre..."
+          value={buscarTarea}
+          onChange={(e) => setBuscarTarea(e.target.value)}
+        />
+      </div>
+
       {plantilla.tareas?.length === 0 ? (
         <div className="empty-state">Esta plantilla no tiene tareas aún.</div>
+      ) : tareasFiltradas.length === 0 ? (
+        <div className="empty-state" role="status">No se encontraron tareas con ese nombre.</div>
       ) : (
         <div className="table-card">
           <table className="tareas-table">
@@ -166,7 +185,7 @@ export default function PlantillaDetallePage() {
               </tr>
             </thead>
             <tbody>
-              {[...tareasActivas, ...tareasInactivas].map((pt) => (
+              {tareasFiltradas.map((pt) => (
                 <tr key={pt.id_plantilla_tarea} className={!pt.activa ? 'row-inactive' : ''}>
                   <td className="td-nombre">{pt.tarea?.nombre ?? '—'}</td>
                   <td>
