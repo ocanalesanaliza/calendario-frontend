@@ -154,7 +154,9 @@ describe('AreasPage', () => {
     apiRequest
       .mockResolvedValueOnce(response({ results: [{ id: 3, nombre: 'Ventas', codigo: 'VEN', country_id: 3, activa: true }] }))
       .mockResolvedValueOnce(response({ id: 3, nombre: 'Ventas', codigo: 'VEN', country_id: 3 }))
-      .mockResolvedValueOnce(response({ results: [] }))
+      .mockResolvedValueOnce(response({ results: [{ id: 1, name: 'Acme' }] }))
+      .mockResolvedValueOnce(response({ results: [{ id: 2, name: 'Norte' }] }))
+      .mockResolvedValueOnce(response({ results: [{ id: 3, name: 'México' }] }))
       .mockResolvedValueOnce(response({ id: 3, nombre: 'Comercial', codigo: 'VEN', country_id: 3 }))
       .mockResolvedValueOnce(response({ results: [{ id: 3, nombre: 'Comercial', codigo: 'VEN', country_id: 3, activa: true }] }))
 
@@ -162,15 +164,19 @@ describe('AreasPage', () => {
     await screen.findByText('Ventas')
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
     await screen.findByRole('dialog', { name: 'Editar área' })
+    expect(await screen.findByRole('option', { name: 'México' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Compañía')).toHaveValue('1')
+    expect(screen.getByLabelText('Región')).toHaveValue('2')
+    expect(screen.getByLabelText('País')).toHaveValue('3')
     fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Comercial' } })
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
 
-    await waitFor(() => expect(apiRequest).toHaveBeenNthCalledWith(4, '/api/calendar/areas/3/', {
+    await waitFor(() => expect(apiRequest).toHaveBeenNthCalledWith(6, '/api/calendar/areas/3/', {
       method: 'PATCH',
       body: JSON.stringify({ nombre: 'Comercial' }),
     }))
     expect(await screen.findByText('Comercial')).toBeInTheDocument()
-    expect(apiRequest).toHaveBeenCalledTimes(5)
+    expect(apiRequest).toHaveBeenCalledTimes(7)
   })
 
   it('unlinks a country with a null PATCH value', async () => {
@@ -186,12 +192,7 @@ describe('AreasPage', () => {
     render(<AreasPage />)
     await screen.findByText('Ventas')
     fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
-    await screen.findByRole('option', { name: 'Acme' })
-    fireEvent.change(screen.getByLabelText('Compañía'), { target: { value: '1' } })
-    expect(await screen.findByRole('option', { name: 'Norte' })).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Región'), { target: { value: '2' } })
     expect(await screen.findByRole('option', { name: 'México' })).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('País'), { target: { value: '3' } })
     fireEvent.change(screen.getByLabelText('País'), { target: { value: '' } })
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
 
@@ -199,6 +200,28 @@ describe('AreasPage', () => {
       method: 'PATCH',
       body: JSON.stringify({ country_id: null }),
     }))
+  })
+
+  it('ignores a stale hierarchy hydration error after changing company', async () => {
+    let rejectHydration
+    apiRequest.mockImplementation((path) => {
+      if (path === '/api/calendar/areas/') return Promise.resolve(response({ results: [{ id: 3, nombre: 'Ventas', codigo: 'VEN', country_id: 3, activa: true }] }))
+      if (path === '/api/calendar/areas/3/') return Promise.resolve(response({ id: 3, nombre: 'Ventas', codigo: 'VEN', country_id: 3 }))
+      if (path === '/api/calendar/companies/') return Promise.resolve(response({ results: [{ id: 1, name: 'Acme' }, { id: 2, name: 'Globex' }] }))
+      if (path === '/api/calendar/regions/?company_id=1') return new Promise((_, reject) => { rejectHydration = reject })
+      if (path === '/api/calendar/regions/?company_id=2') return Promise.resolve(response({ results: [] }))
+      throw new Error(`Unexpected request: ${path}`)
+    })
+
+    render(<AreasPage />)
+    await screen.findByText('Ventas')
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    await screen.findByRole('option', { name: 'Acme' })
+    fireEvent.change(screen.getByLabelText('Compañía'), { target: { value: '2' } })
+    rejectHydration(new Error('Stale request'))
+
+    await waitFor(() => expect(screen.getByLabelText('Compañía')).toHaveValue('2'))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('does not load organization data for a master admin', async () => {

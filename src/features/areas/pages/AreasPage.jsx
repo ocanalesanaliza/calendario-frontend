@@ -90,6 +90,10 @@ function FormModal({ area, isSystemsAccount, onClose, onSubmit }) {
   const [countryId, setCountryId] = useState('')
   const [countryTouched, setCountryTouched] = useState(false)
   const [catalogError, setCatalogError] = useState('')
+  const [hydratingCountry, setHydratingCountry] = useState(Boolean(isSystemsAccount && area?.country_id))
+  const hydrationRequestRef = useRef(0)
+  const skipRegionLoadRef = useRef('')
+  const skipCountryLoadRef = useRef('')
 
   useEffect(() => {
     if (!isSystemsAccount) return undefined
@@ -107,7 +111,61 @@ function FormModal({ area, isSystemsAccount, onClose, onSubmit }) {
   }, [isSystemsAccount])
 
   useEffect(() => {
+    const requestId = ++hydrationRequestRef.current
+    if (!isSystemsAccount || !area?.country_id || !companies.length) {
+      setHydratingCountry(false)
+      return undefined
+    }
+
+    let active = true
+    setHydratingCountry(true)
+
+    async function hydrateCountryHierarchy() {
+      try {
+        for (const company of companies) {
+          const companyRegions = itemsFrom(await getRegions(company.id))
+          if (!active || requestId !== hydrationRequestRef.current) return
+
+          for (const region of companyRegions) {
+            const regionCountries = itemsFrom(await getCountries(region.id))
+            if (!active || requestId !== hydrationRequestRef.current) return
+
+            if (regionCountries.some((country) => Number(country.id) === Number(area.country_id))) {
+              skipRegionLoadRef.current = String(company.id)
+              skipCountryLoadRef.current = String(region.id)
+              setCompanyId(String(company.id))
+              setRegions(companyRegions)
+              setRegionId(String(region.id))
+              setCountries(regionCountries)
+              setCountryId(String(area.country_id))
+              setHydratingCountry(false)
+              return
+            }
+          }
+        }
+
+        if (active && requestId === hydrationRequestRef.current) {
+          setCatalogError('No se pudo cargar la jerarquía organizacional.')
+          setHydratingCountry(false)
+        }
+      } catch (error) {
+        if (active && requestId === hydrationRequestRef.current) {
+          setCatalogError(apiMessage(error, 'No se pudo cargar la jerarquía organizacional.'))
+          setHydratingCountry(false)
+        }
+      }
+    }
+
+    void hydrateCountryHierarchy()
+    return () => { active = false }
+  }, [area?.country_id, companies, isSystemsAccount])
+
+  useEffect(() => {
     if (!isSystemsAccount || !companyId) return undefined
+    if (skipRegionLoadRef.current === companyId) {
+      skipRegionLoadRef.current = ''
+      return undefined
+    }
 
     let active = true
     getRegions(companyId)
@@ -123,6 +181,10 @@ function FormModal({ area, isSystemsAccount, onClose, onSubmit }) {
 
   useEffect(() => {
     if (!isSystemsAccount || !regionId) return undefined
+    if (skipCountryLoadRef.current === regionId) {
+      skipCountryLoadRef.current = ''
+      return undefined
+    }
 
     let active = true
     getCountries(regionId)
@@ -190,6 +252,10 @@ function FormModal({ area, isSystemsAccount, onClose, onSubmit }) {
             <label>
               Compañía
               <select value={companyId} onChange={(event) => {
+                hydrationRequestRef.current += 1
+                skipRegionLoadRef.current = ''
+                skipCountryLoadRef.current = ''
+                setHydratingCountry(false)
                 setCompanyId(event.target.value)
                 setRegionId('')
                 setRegions([])
@@ -203,6 +269,9 @@ function FormModal({ area, isSystemsAccount, onClose, onSubmit }) {
             <label>
               Región
               <select value={regionId} disabled={!companyId} onChange={(event) => {
+                hydrationRequestRef.current += 1
+                skipCountryLoadRef.current = ''
+                setHydratingCountry(false)
                 setRegionId(event.target.value)
                 setCountryId('')
                 setCountries([])
@@ -213,11 +282,13 @@ function FormModal({ area, isSystemsAccount, onClose, onSubmit }) {
             </label>
             <label>
               País
-              <select value={countryId} disabled={!regionId} onChange={(event) => {
+              <select value={countryId} disabled={!regionId || hydratingCountry} onChange={(event) => {
+                hydrationRequestRef.current += 1
+                setHydratingCountry(false)
                 setCountryId(event.target.value)
                 setCountryTouched(true)
               }}>
-                <option value="">Sin país</option>
+                <option value="">{hydratingCountry ? 'Cargando jerarquía...' : 'Sin país'}</option>
                 {countries.map((country) => <option key={country.id} value={country.id}>{country.name}</option>)}
               </select>
             </label>
