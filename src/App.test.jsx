@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AdminMaestroRoute, AlmuerzosRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GerentesOperacionesRoute, MisTareasRoute, PlantillasAreaRoute, RendimientoRoute } from './App'
+import { AdminMaestroRoute, AlmuerzosRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GerentesOperacionesRoute, MisTareasRoute, OrganizacionRoute, PlantillasAreaRoute, RendimientoRoute } from './App'
 
 const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
 
@@ -257,6 +257,40 @@ describe('AdminMaestroRoute', () => {
     )
     expect(await screen.findByText('Inicio')).toBeInTheDocument()
     expect(screen.queryByText('Analítica de guardias')).not.toBeInTheDocument()
+  })
+})
+
+describe('OrganizacionRoute', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  function renderOrganizacionRoute() {
+    render(
+      <MemoryRouter initialEntries={['/organizacion']}>
+        <Routes>
+          <Route path="/" element={<p>Inicio</p>} />
+          <Route path="/organizacion" element={<OrganizacionRoute><p>Organización autorizada</p></OrganizacionRoute>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+  }
+
+  it('allows an active enabled Systems account', () => {
+    useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true } })
+    renderOrganizacionRoute()
+
+    expect(screen.getByText('Organización autorizada')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['an operations manager', { type: 'gerente_operaciones', activo: true, habilitado: true }],
+    ['a non-Systems master admin', { es_admin_maestro: true, activo: true, habilitado: true }],
+    ['a disabled Systems account', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: false }],
+  ])('redirects %s to home', async (_, perfil) => {
+    useAuth.mockReturnValue({ perfil })
+    renderOrganizacionRoute()
+
+    expect(await screen.findByText('Inicio')).toBeInTheDocument()
+    expect(screen.queryByText('Organización autorizada')).not.toBeInTheDocument()
   })
 })
 

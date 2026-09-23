@@ -25,6 +25,7 @@ function Layout() {
     canAccessMyTasks: puedeAccederMisTareas,
     canManageAreaManagers,
     canManageOperationsManagers,
+    canManageOrganization,
     canManageBranches,
     canManageTemplates,
     canManageUsers,
@@ -252,6 +253,19 @@ function Layout() {
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" />
+            </svg>
+          ),
+        },
+        {
+          to: '/organizacion',
+          label: 'Organización',
+          visible: canManageOrganization,
+          icon: (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="8.5" y="14" width="7" height="7" rx="1" />
+              <path d="M6.5 10v2h11v-2M12 12v2" />
             </svg>
           ),
         },

@@ -27,6 +27,7 @@ describe('getProfileCapabilities', () => {
     expect(capabilities.canAccessOperationalDashboard).toBe(true)
     expect(capabilities.canAccessPerformanceReports).toBe(true)
     expect(capabilities.canAccessMyTasks).toBe(false)
+    expect(capabilities.canManageOrganization).toBe(true)
   })
 
   it('keeps an active operations manager limited to area-manager assignments', () => {
@@ -44,5 +45,16 @@ describe('getProfileCapabilities', () => {
     expect(capabilities.canManageUsers).toBe(false)
     expect(capabilities.canAccessOperationalDashboard).toBe(false)
     expect(capabilities.canAccessMyTasks).toBe(false)
+  })
+
+  it('denies organization management to active non-Systems profiles', () => {
+    const capabilities = getProfileCapabilities({
+      type: 'gerente_operaciones',
+      es_admin_maestro: true,
+      activo: true,
+      habilitado: true,
+    })
+
+    expect(capabilities.canManageOrganization).toBe(false)
   })
 })

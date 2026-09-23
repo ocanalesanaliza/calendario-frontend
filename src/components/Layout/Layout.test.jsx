@@ -50,6 +50,7 @@ describe('Layout Mis tareas navigation', () => {
     expect(screen.getByTitle('Áreas')).toBeInTheDocument()
     expect(screen.getByTitle('Gerentes de área')).toBeInTheDocument()
     expect(screen.getByTitle('Gerentes de operaciones')).toBeInTheDocument()
+    expect(screen.getByTitle('Organización')).toHaveAttribute('href', '/organizacion')
   })
 
   it('shows the six capability-controlled modules to a Systems master admin with granted capabilities', () => {
@@ -96,6 +97,7 @@ describe('Layout Mis tareas navigation', () => {
     capabilityModuleLabels.forEach((label) => {
       expect(screen.queryByTitle(label)).not.toBeInTheDocument()
     })
+    expect(screen.queryByTitle('Organización')).not.toBeInTheDocument()
   })
 
   it('hides the restricted navigation entries for an area manager', () => {
@@ -160,5 +162,15 @@ describe('Layout Mis tareas navigation', () => {
     useAuth.mockReturnValue({ perfil: { es_admin_maestro: true }, logout: vi.fn() })
     render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
     expect(screen.getByTitle('Revisiones de guardia')).toHaveAttribute('href', '/analitica/revisiones-guardia')
+  })
+
+  it.each([
+    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }],
+    ['Administrador Maestro', { es_admin_maestro: true, activo: true, habilitado: true }],
+  ])('hides Organización from a non-Systems %s', (_nombre, perfil) => {
+    useAuth.mockReturnValue({ perfil, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+
+    expect(screen.queryByTitle('Organización')).not.toBeInTheDocument()
   })
 })
