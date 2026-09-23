@@ -7,6 +7,7 @@ import {
   getCountries,
   getRegions,
 } from '../services/organizacionService'
+import './OrganizacionPage.css'
 
 const items = (data) => Array.isArray(data) ? data : data?.results || []
 const entityId = (entity) => entity.id ?? entity.id_company ?? entity.id_region ?? entity.id_country
@@ -20,7 +21,7 @@ function errorMessage(error, entity, parent) {
 }
 
 function HierarchySection({ title, children }) {
-  return <section className="table-card"><div className="table-card-header"><h2>{title}</h2></div>{children}</section>
+  return <section className="organizacion-card"><div className="organizacion-card-header"><h2>{title}</h2></div>{children}</section>
 }
 
 export default function OrganizacionPage() {
@@ -150,21 +151,21 @@ export default function OrganizacionPage() {
   }
 
   return <div className="organizacion-page">
-    <div className="page-header"><div><h1>Organización</h1><p>Administra la jerarquía de compañías, regiones y países.</p></div></div>
-    {notice && <p role="status">{notice}</p>}
-    {formError && <p role="alert">{formError}</p>}
+    <div className="organizacion-page-header"><div><h1>Organización</h1><p>Administra la jerarquía de compañías, regiones y países.</p></div></div>
+    {notice && <p className="organizacion-notice" role="status">{notice}</p>}
+    {formError && <p className="organizacion-form-error" role="alert">{formError}</p>}
     <div className="organizacion-hierarchy">
       <HierarchySection title="Compañías">
-        {companiesLoading ? <p role="status">Cargando compañías...</p> : companiesError ? <div role="alert"><p>{companiesError}</p><button type="button" className="btn-secondary" onClick={loadCompanies}>Reintentar</button></div> : <label>Compañía<select value={companyId} onChange={(event) => selectCompany(event.target.value)}><option value="">Seleccionar compañía</option>{companies.map((company) => <option key={entityId(company)} value={entityId(company)}>{entityName(company)}</option>)}</select></label>}
-        <form onSubmit={submitCompany}><label>Nueva compañía<input value={companyName} onChange={(event) => setCompanyName(event.target.value)} disabled={saving === 'company'} required /></label><button disabled={saving === 'company'}>{saving === 'company' ? 'Creando...' : 'Crear compañía'}</button></form>
+        {companiesLoading ? <p className="organizacion-state" role="status">Cargando compañías...</p> : companiesError ? <div className="organizacion-error-state" role="alert"><p>{companiesError}</p><button type="button" className="organizacion-button organizacion-button-secondary" onClick={loadCompanies}>Reintentar</button></div> : <label className="organizacion-field">Compañía<select value={companyId} onChange={(event) => selectCompany(event.target.value)}><option value="">Seleccionar compañía</option>{companies.map((company) => <option key={entityId(company)} value={entityId(company)}>{entityName(company)}</option>)}</select></label>}
+        <form className="organizacion-form" onSubmit={submitCompany}><label className="organizacion-field">Nueva compañía<input value={companyName} onChange={(event) => setCompanyName(event.target.value)} disabled={saving === 'company'} required /></label><button className="organizacion-button" disabled={saving === 'company'}>{saving === 'company' ? 'Creando...' : 'Crear compañía'}</button></form>
       </HierarchySection>
       <HierarchySection title="Regiones">
-        {!companyId ? <p>Selecciona una compañía para cargar sus regiones.</p> : regionsLoading ? <p role="status">Cargando regiones...</p> : regionsError ? <div role="alert"><p>{regionsError}</p><button type="button" className="btn-secondary" onClick={() => loadRegions(companyId)}>Reintentar</button></div> : <label>Región<select value={regionId} onChange={(event) => selectRegion(event.target.value)}><option value="">Seleccionar región</option>{regions.map((region) => <option key={entityId(region)} value={entityId(region)}>{entityName(region)}</option>)}</select></label>}
-        <form onSubmit={submitRegion}><label>Nueva región<input value={regionName} onChange={(event) => setRegionName(event.target.value)} disabled={!companyId || saving === 'region'} required /></label><button disabled={!companyId || saving === 'region'}>{saving === 'region' ? 'Creando...' : 'Crear región'}</button></form>
+        {!companyId ? <p className="organizacion-state">Selecciona una compañía para cargar sus regiones.</p> : regionsLoading ? <p className="organizacion-state" role="status">Cargando regiones...</p> : regionsError ? <div className="organizacion-error-state" role="alert"><p>{regionsError}</p><button type="button" className="organizacion-button organizacion-button-secondary" onClick={() => loadRegions(companyId)}>Reintentar</button></div> : <label className="organizacion-field">Región<select value={regionId} onChange={(event) => selectRegion(event.target.value)}><option value="">Seleccionar región</option>{regions.map((region) => <option key={entityId(region)} value={entityId(region)}>{entityName(region)}</option>)}</select></label>}
+        <form className="organizacion-form" onSubmit={submitRegion}><label className="organizacion-field">Nueva región<input value={regionName} onChange={(event) => setRegionName(event.target.value)} disabled={!companyId || saving === 'region'} required /></label><button className="organizacion-button" disabled={!companyId || saving === 'region'}>{saving === 'region' ? 'Creando...' : 'Crear región'}</button></form>
       </HierarchySection>
       <HierarchySection title="Países">
-        {!regionId ? <p>Selecciona una región para cargar sus países.</p> : countriesLoading ? <p role="status">Cargando países...</p> : countriesError ? <div role="alert"><p>{countriesError}</p><button type="button" className="btn-secondary" onClick={() => loadCountries(regionId)}>Reintentar</button></div> : <ul>{countries.length ? countries.map((country) => <li key={entityId(country)}>{entityName(country)}</li>) : <li>No hay países registrados para esta región.</li>}</ul>}
-        <form onSubmit={submitCountry}><label>Nuevo país<input value={countryName} onChange={(event) => setCountryName(event.target.value)} disabled={!regionId || saving === 'country'} required /></label><button disabled={!regionId || saving === 'country'}>{saving === 'country' ? 'Creando...' : 'Crear país'}</button></form>
+        {!regionId ? <p className="organizacion-state">Selecciona una región para cargar sus países.</p> : countriesLoading ? <p className="organizacion-state" role="status">Cargando países...</p> : countriesError ? <div className="organizacion-error-state" role="alert"><p>{countriesError}</p><button type="button" className="organizacion-button organizacion-button-secondary" onClick={() => loadCountries(regionId)}>Reintentar</button></div> : <ul className="organizacion-country-list">{countries.length ? countries.map((country) => <li key={entityId(country)}>{entityName(country)}</li>) : <li>No hay países registrados para esta región.</li>}</ul>}
+        <form className="organizacion-form" onSubmit={submitCountry}><label className="organizacion-field">Nuevo país<input value={countryName} onChange={(event) => setCountryName(event.target.value)} disabled={!regionId || saving === 'country'} required /></label><button className="organizacion-button" disabled={!regionId || saving === 'country'}>{saving === 'country' ? 'Creando...' : 'Crear país'}</button></form>
       </HierarchySection>
     </div>
   </div>
