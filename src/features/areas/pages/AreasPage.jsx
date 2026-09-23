@@ -6,6 +6,7 @@ import AreaManagerAssignmentModal from '../../asignaciones/components/AreaManage
 import AreaTemplateAssignmentModal from '../components/AreaTemplateAssignmentModal'
 import { assignAreaToManager, getEligibleAreaManagers, reassignAreaToManager } from '../../asignaciones/services/areaManagerAssignmentService'
 import { getProfileCapabilities } from '../../auth/profilePolicies'
+import { getCompanies, getCountries, getRegions } from '../../organizacion/services/organizacionService'
 import './AreasPage.css'
 
 const fields = ['nombre', 'codigo']
@@ -73,10 +74,67 @@ function Modal({ title, onClose, children }) {
   )
 }
 
-function FormModal({ area, onClose, onSubmit }) {
+function itemsFrom(data) {
+  return Array.isArray(data) ? data : data?.results || []
+}
+
+function FormModal({ area, isSystemsAccount, onClose, onSubmit }) {
   const [form, setForm] = useState({ nombre: area?.nombre || '', codigo: area?.codigo || '' })
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
+  const [companies, setCompanies] = useState([])
+  const [regions, setRegions] = useState([])
+  const [countries, setCountries] = useState([])
+  const [companyId, setCompanyId] = useState('')
+  const [regionId, setRegionId] = useState('')
+  const [countryId, setCountryId] = useState('')
+  const [countryTouched, setCountryTouched] = useState(false)
+  const [catalogError, setCatalogError] = useState('')
+
+  useEffect(() => {
+    if (!isSystemsAccount) return undefined
+
+    let active = true
+    getCompanies()
+      .then((data) => {
+        if (active) setCompanies(itemsFrom(data))
+      })
+      .catch((error) => {
+        if (active) setCatalogError(apiMessage(error, 'No se pudieron cargar las compañías.'))
+      })
+
+    return () => { active = false }
+  }, [isSystemsAccount])
+
+  useEffect(() => {
+    if (!isSystemsAccount || !companyId) return undefined
+
+    let active = true
+    getRegions(companyId)
+      .then((data) => {
+        if (active) setRegions(itemsFrom(data))
+      })
+      .catch((error) => {
+        if (active) setCatalogError(apiMessage(error, 'No se pudieron cargar las regiones.'))
+      })
+
+    return () => { active = false }
+  }, [companyId, isSystemsAccount])
+
+  useEffect(() => {
+    if (!isSystemsAccount || !regionId) return undefined
+
+    let active = true
+    getCountries(regionId)
+      .then((data) => {
+        if (active) setCountries(itemsFrom(data))
+      })
+      .catch((error) => {
+        if (active) setCatalogError(apiMessage(error, 'No se pudieron cargar los países.'))
+      })
+
+    return () => { active = false }
+  }, [isSystemsAccount, regionId])
 
   function fieldError(field) {
     return Array.isArray(errors[field]) ? errors[field].join(' ') : errors[field]
@@ -91,7 +149,10 @@ function FormModal({ area, onClose, onSubmit }) {
       const body = Object.fromEntries(
         Object.entries(form).filter(([key, value]) => !area || value !== (area[key] || '')),
       )
-      await onSubmit(body)
+      await onSubmit({
+        ...body,
+        ...(isSystemsAccount && countryTouched ? { country_id: countryId ? Number(countryId) : null } : {}),
+      })
     } catch (error) {
       setErrors(typeof error.fields === 'object' ? error.fields : {
         detail: apiMessage(error, 'No se pudo guardar el área.'),
@@ -122,6 +183,47 @@ function FormModal({ area, onClose, onSubmit }) {
             </div>
           )
         })}
+
+        {isSystemsAccount && (
+          <fieldset className="area-form-group">
+            <legend>País (opcional)</legend>
+            <label>
+              Compañía
+              <select value={companyId} onChange={(event) => {
+                setCompanyId(event.target.value)
+                setRegionId('')
+                setRegions([])
+                setCountryId('')
+                setCountries([])
+              }}>
+                <option value="">Seleccionar compañía</option>
+                {companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
+              </select>
+            </label>
+            <label>
+              Región
+              <select value={regionId} disabled={!companyId} onChange={(event) => {
+                setRegionId(event.target.value)
+                setCountryId('')
+                setCountries([])
+              }}>
+                <option value="">Seleccionar región</option>
+                {regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}
+              </select>
+            </label>
+            <label>
+              País
+              <select value={countryId} disabled={!regionId} onChange={(event) => {
+                setCountryId(event.target.value)
+                setCountryTouched(true)
+              }}>
+                <option value="">Sin país</option>
+                {countries.map((country) => <option key={country.id} value={country.id}>{country.name}</option>)}
+              </select>
+            </label>
+            {catalogError && <span role="alert">{catalogError}</span>}
+          </fieldset>
+        )}
 
         {errors.detail && (
           <p role="alert">
@@ -313,11 +415,12 @@ export default function AreasPage() {
       )}
 
       {modal?.type === 'create' && (
-        <FormModal onClose={close} onSubmit={(body) => mutation(() => createArea(body))} />
+        <FormModal isSystemsAccount={isSystemsAccount} onClose={close} onSubmit={(body) => mutation(() => createArea(body))} />
       )}
       {modal?.type === 'edit' && (
         <FormModal
           area={modal.area}
+          isSystemsAccount={isSystemsAccount}
           onClose={close}
           onSubmit={(body) => mutation(() => updateArea(modal.area.id, body))}
         />

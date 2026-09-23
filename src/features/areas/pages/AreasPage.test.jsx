@@ -103,6 +103,7 @@ describe('AreasPage', () => {
   it('creates an area and reloads the list', async () => {
     apiRequest
       .mockResolvedValueOnce(response({ results: [] }))
+      .mockResolvedValueOnce(response({ results: [] }))
       .mockResolvedValueOnce(response({ id: 4, nombre: 'Ventas', codigo: 'VEN' }))
       .mockResolvedValueOnce(response({ results: [{ id: 4, nombre: 'Ventas', codigo: 'VEN', activa: true }] }))
 
@@ -113,20 +114,49 @@ describe('AreasPage', () => {
     fireEvent.change(screen.getByLabelText('Codigo'), { target: { value: 'VEN' } })
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
 
-    await waitFor(() => expect(apiRequest).toHaveBeenNthCalledWith(2, '/api/calendar/areas/', {
+    await waitFor(() => expect(apiRequest).toHaveBeenNthCalledWith(3, '/api/calendar/areas/', {
       method: 'POST',
       body: JSON.stringify({ nombre: 'Ventas', codigo: 'VEN' }),
     }))
     expect(await screen.findByText('Ventas')).toBeInTheDocument()
-    expect(apiRequest).toHaveBeenCalledTimes(3)
+    expect(apiRequest).toHaveBeenCalledTimes(4)
+  })
+
+  it('creates an area with the selected country from the organization cascade', async () => {
+    apiRequest
+      .mockResolvedValueOnce(response({ results: [] }))
+      .mockResolvedValueOnce(response({ results: [{ id: 1, name: 'Acme' }] }))
+      .mockResolvedValueOnce(response({ results: [{ id: 2, name: 'Norte' }] }))
+      .mockResolvedValueOnce(response({ results: [{ id: 3, name: 'México' }] }))
+      .mockResolvedValueOnce(response({ id: 4, nombre: 'Ventas', codigo: 'VEN', country_id: 3 }))
+      .mockResolvedValueOnce(response({ results: [{ id: 4, nombre: 'Ventas', codigo: 'VEN', country_id: 3, activa: true }] }))
+
+    render(<AreasPage />)
+    await screen.findByText('No hay áreas registradas.')
+    fireEvent.click(screen.getByRole('button', { name: /Nueva área/ }))
+    await screen.findByRole('option', { name: 'Acme' })
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Ventas' } })
+    fireEvent.change(screen.getByLabelText('Codigo'), { target: { value: 'VEN' } })
+    fireEvent.change(screen.getByLabelText('Compañía'), { target: { value: '1' } })
+    expect(await screen.findByRole('option', { name: 'Norte' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Región'), { target: { value: '2' } })
+    expect(await screen.findByRole('option', { name: 'México' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('País'), { target: { value: '3' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    await waitFor(() => expect(apiRequest).toHaveBeenNthCalledWith(5, '/api/calendar/areas/', {
+      method: 'POST',
+      body: JSON.stringify({ nombre: 'Ventas', codigo: 'VEN', country_id: 3 }),
+    }))
   })
 
   it('edits an area and reloads the list', async () => {
     apiRequest
-      .mockResolvedValueOnce(response({ results: [{ id: 3, nombre: 'Ventas', codigo: 'VEN', activa: true }] }))
-      .mockResolvedValueOnce(response({ id: 3, nombre: 'Ventas', codigo: 'VEN' }))
-      .mockResolvedValueOnce(response({ id: 3, nombre: 'Comercial', codigo: 'VEN' }))
-      .mockResolvedValueOnce(response({ results: [{ id: 3, nombre: 'Comercial', codigo: 'VEN', activa: true }] }))
+      .mockResolvedValueOnce(response({ results: [{ id: 3, nombre: 'Ventas', codigo: 'VEN', country_id: 3, activa: true }] }))
+      .mockResolvedValueOnce(response({ id: 3, nombre: 'Ventas', codigo: 'VEN', country_id: 3 }))
+      .mockResolvedValueOnce(response({ results: [] }))
+      .mockResolvedValueOnce(response({ id: 3, nombre: 'Comercial', codigo: 'VEN', country_id: 3 }))
+      .mockResolvedValueOnce(response({ results: [{ id: 3, nombre: 'Comercial', codigo: 'VEN', country_id: 3, activa: true }] }))
 
     render(<AreasPage />)
     await screen.findByText('Ventas')
@@ -135,12 +165,63 @@ describe('AreasPage', () => {
     fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Comercial' } })
     fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
 
-    await waitFor(() => expect(apiRequest).toHaveBeenNthCalledWith(3, '/api/calendar/areas/3/', {
+    await waitFor(() => expect(apiRequest).toHaveBeenNthCalledWith(4, '/api/calendar/areas/3/', {
       method: 'PATCH',
       body: JSON.stringify({ nombre: 'Comercial' }),
     }))
     expect(await screen.findByText('Comercial')).toBeInTheDocument()
-    expect(apiRequest).toHaveBeenCalledTimes(4)
+    expect(apiRequest).toHaveBeenCalledTimes(5)
+  })
+
+  it('unlinks a country with a null PATCH value', async () => {
+    apiRequest
+      .mockResolvedValueOnce(response({ results: [{ id: 3, nombre: 'Ventas', codigo: 'VEN', country_id: 3, activa: true }] }))
+      .mockResolvedValueOnce(response({ id: 3, nombre: 'Ventas', codigo: 'VEN', country_id: 3 }))
+      .mockResolvedValueOnce(response({ results: [{ id: 1, name: 'Acme' }] }))
+      .mockResolvedValueOnce(response({ results: [{ id: 2, name: 'Norte' }] }))
+      .mockResolvedValueOnce(response({ results: [{ id: 3, name: 'México' }] }))
+      .mockResolvedValueOnce(response({ id: 3, nombre: 'Ventas', codigo: 'VEN', country_id: null }))
+      .mockResolvedValueOnce(response({ results: [{ id: 3, nombre: 'Ventas', codigo: 'VEN', country_id: null, activa: true }] }))
+
+    render(<AreasPage />)
+    await screen.findByText('Ventas')
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    await screen.findByRole('option', { name: 'Acme' })
+    fireEvent.change(screen.getByLabelText('Compañía'), { target: { value: '1' } })
+    expect(await screen.findByRole('option', { name: 'Norte' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Región'), { target: { value: '2' } })
+    expect(await screen.findByRole('option', { name: 'México' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('País'), { target: { value: '3' } })
+    fireEvent.change(screen.getByLabelText('País'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    await waitFor(() => expect(apiRequest).toHaveBeenNthCalledWith(6, '/api/calendar/areas/3/', {
+      method: 'PATCH',
+      body: JSON.stringify({ country_id: null }),
+    }))
+  })
+
+  it('does not load organization data for a master admin', async () => {
+    useAuth.mockReturnValue({ perfil: { es_admin_maestro: true, activo: true, habilitado: true } })
+    apiRequest.mockResolvedValue(response({ results: [{ id: 3, nombre: 'Ventas', codigo: 'VEN', activa: true }] }))
+
+    render(<AreasPage />)
+    await screen.findByText('Ventas')
+
+    expect(screen.queryByRole('button', { name: /Nueva área/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Asignar plantilla de área a Ventas' })).toBeInTheDocument()
+    expect(apiRequest).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not expose organization data to an inactive Sistemas account', async () => {
+    useAuth.mockReturnValue({ perfil: { es_cuenta_sistemas: true, activo: false, habilitado: true } })
+    apiRequest.mockResolvedValue(response({ results: [{ id: 3, nombre: 'Ventas', codigo: 'VEN', activa: true }] }))
+
+    render(<AreasPage />)
+    await screen.findByText('Ventas')
+
+    expect(screen.queryByRole('button', { name: /Nueva área/ })).not.toBeInTheDocument()
+    expect(apiRequest).toHaveBeenCalledTimes(1)
   })
 
   it('explains deactivation conflict', async () => {
