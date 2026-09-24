@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { DataGrid } from '@mui/x-data-grid'
+import * as XLSX from 'xlsx'
 import { getSucursales } from '../../sucursales/services/sucursalesService'
 import { getGerentes } from '../../gerentes/services/gerentesService'
 import { getUsuarios } from '../../usuarios/services/usuariosService'
 import { getAnaliticaRevisionesGuardia } from '../services/revisionesGuardiaAnaliticaService'
 import { REVISION_GRID_COLUMNS, toRevisionGridRows } from '../revisionesGuardiaGrid'
+import { toRevisionExportSheetData } from '../revisionesGuardiaExport'
 import RevisionGuardiaDetalleModal from '../components/RevisionGuardiaDetalleModal'
 import './RevisionesGuardiaPage.css'
 
@@ -102,6 +104,14 @@ export default function RevisionesGuardiaPage() {
     setDetalleRevision(null)
   }
 
+  function exportarPaginaActual() {
+    const worksheet = XLSX.utils.aoa_to_sheet(toRevisionExportSheetData(filas))
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Revisiones')
+    const fecha = new Date().toISOString().slice(0, 10)
+    XLSX.writeFile(workbook, `revisiones-guardia-pagina-${paginationModel.page + 1}-${fecha}.xlsx`)
+  }
+
   const filas = toRevisionGridRows(results)
   const gridColumns = REVISION_GRID_COLUMNS.map((column) => column.field === 'accion'
     ? { ...column, renderCell: (params) => <button type="button" className="btn-secondary" onClick={() => abrirDetalle(params.row.id)}>Ver detalle</button> }
@@ -113,6 +123,10 @@ export default function RevisionesGuardiaPage() {
         <div>
           <h1>Revisiones de guardia</h1>
           <p>{count} revisión{count !== 1 ? 'es' : ''} encontrada{count !== 1 ? 's' : ''}</p>
+        </div>
+        <div className="revisiones-export-actions">
+          <span>Página actual: {paginationModel.page + 1}</span>
+          <button type="button" className="btn-secondary" onClick={exportarPaginaActual} disabled={filas.length === 0}>Exportar página actual</button>
         </div>
       </div>
 

@@ -1,4 +1,6 @@
 .revisiones-analitica-page { display: flex; flex-direction: column; gap: 1.25rem; }
+.revisiones-export-actions { align-items: center; display: flex; gap: .75rem; }
+.revisiones-export-actions span { color: #475569; font-size: .875rem; font-weight: 600; }
 .revisiones-filtros { align-items: end; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; display: grid; gap: .75rem; grid-template-columns: repeat(3, minmax(150px, 1fr)); padding: 1rem; }
 .revisiones-filtros label { color: #475569; display: flex; flex-direction: column; font-size: .78rem; font-weight: 600; gap: .3rem; }
 .revisiones-filtros input, .revisiones-filtros select { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 7px; color: #1e293b; font: inherit; padding: .5rem .65rem; }
@@ -11,4 +13,5 @@
 @media (max-width: 800px) {
   .revisiones-filtros { grid-template-columns: 1fr; }
   .revisiones-buscar { grid-column: auto; }
+  .revisiones-export-actions { align-items: flex-start; flex-direction: column; }
 }
