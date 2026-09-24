@@ -1,4 +1,4 @@
-.revisiones-analitica-page { display: flex; flex-direction: column; gap: 1.25rem; }
+.revisiones-analitica-page { display: flex; flex-direction: column; font-family: Roboto, Helvetica, Arial, sans-serif; gap: 1.25rem; }
 .revisiones-export-actions { align-items: center; display: flex; gap: .75rem; justify-content: flex-end; }
 .revisiones-export-actions span { color: #475569; font-size: .875rem; font-weight: 600; }
 .revisiones-export-button { align-items: center; background: #15803d; border: 1px solid #15803d; border-radius: 7px; color: #fff; cursor: pointer; display: inline-flex; font: inherit; font-weight: 700; gap: .5rem; justify-content: center; padding: .6rem .85rem; transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease; }
@@ -12,7 +12,7 @@
 .revisiones-buscar { grid-column: span 2; }
 .revisiones-filter-actions { display: flex; gap: .5rem; justify-content: flex-end; }
 .revisiones-grid-wrap { height: 610px; overflow: hidden; }
-.revisiones-grid-wrap .MuiDataGrid-root { border: 0; }
+.revisiones-grid-wrap .MuiDataGrid-root { border: 0; font-family: Roboto, Helvetica, Arial, sans-serif; }
 .revisiones-grid-wrap .MuiDataGrid-columnHeaders { background: #f8fafc; }
 .revisiones-grid-wrap .MuiDataGrid-columnHeaderTitle { color: #64748b; font-size: .72rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
 @media (max-width: 800px) {
