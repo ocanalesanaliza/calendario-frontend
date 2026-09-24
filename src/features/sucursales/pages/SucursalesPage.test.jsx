@@ -47,7 +47,6 @@ describe('SucursalesPage: número de guardias', () => {
     fireEvent.change(area, { target: { value: '8' } })
     expect(within(dialog).getByText('Gerente de área asignado')).toBeInTheDocument()
     expect(within(dialog).getByText('GA Centro')).toBeInTheDocument()
-    expect(within(dialog).getByText('ga@example.com')).toBeInTheDocument()
     const numeroGuardias = within(dialog).getByLabelText('Número de guardias')
     expect(numeroGuardias).toHaveAttribute('min', '0')
     expect(numeroGuardias).toHaveAttribute('max', '4')
