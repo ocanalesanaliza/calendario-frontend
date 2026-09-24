@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from 'react'
 import {
-  getSucursales, createSucursal, updateSucursal, desactivarSucursal,
+  getSucursales, createSucursal, getAreasElegibles, updateSucursal, desactivarSucursal,
   quitarGsSucursal,
   getHorarios, saveHorarios, updateHorario,
   getTareasSucursal,
@@ -40,20 +40,35 @@ export default function SucursalesPage() {
 
   async function handleCreate(form, idPlantilla, fechaPlantilla) {
     const resp = await createSucursal(form)
+    const idSucursal = resp?.sucursal?.id_sucursal ?? resp?.id_sucursal
     await loadData()
-    if (idPlantilla) {
-      const idSucursal = resp?.sucursal?.id_sucursal ?? resp?.id_sucursal
-      if (idSucursal) {
-        try {
-          const body = { id_sucursal: idSucursal }
-          if (fechaPlantilla) body.fecha_inicio = fechaPlantilla
-          await asignarSucursales(idPlantilla, body)
-        } catch {
-          // sucursal creada; asignación de plantilla falló silenciosamente
-        }
+    if (idPlantilla && idSucursal) {
+      const assignment = { idSucursal, idPlantilla, fechaPlantilla }
+      try {
+        await assignTemplate(assignment)
+      } catch (requestError) {
+        setModal({ type: 'template-assignment-failed', assignment, error: requestError.message })
+        return
       }
     }
     setModal(null)
+  }
+
+  async function assignTemplate({ idSucursal, idPlantilla, fechaPlantilla }) {
+    const body = { id_sucursal: idSucursal }
+    if (fechaPlantilla) body.fecha_inicio = fechaPlantilla
+    await asignarSucursales(idPlantilla, body)
+  }
+
+  async function retryTemplateAssignment() {
+    const { assignment } = modal
+    setModal({ type: 'template-assignment-failed', assignment, error: '', retrying: true })
+    try {
+      await assignTemplate(assignment)
+      setModal(null)
+    } catch (requestError) {
+      setModal({ type: 'template-assignment-failed', assignment, error: requestError.message })
+    }
   }
 
   async function handleEdit(id, form) {
@@ -239,6 +254,14 @@ export default function SucursalesPage() {
       {modal?.type === 'plantilla' && (
         <PlantillaModal sucursal={modal.sucursal} onClose={() => setModal(null)} />
       )}
+      {modal?.type === 'template-assignment-failed' && (
+        <TemplateAssignmentFailureModal
+          error={modal.error}
+          retrying={modal.retrying}
+          onRetry={retryTemplateAssignment}
+          onClose={() => setModal(null)}
+        />
+      )}
     </div>
   )
 }
@@ -264,29 +287,56 @@ function ModalWrapper({ title, onClose, children, wide, xl }) {
 }
 
 function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
+  const isCreating = !inicial
   const [gerentes, setGerentes] = useState([])
+  const [areas, setAreas] = useState([])
   const [plantillas, setPlantillas] = useState([])
   const [form, setForm] = useState({
     nombre:          inicial?.nombre ?? '',
     codigo:          inicial?.codigo ?? '',
     id_gerente_area: inicial?.gerente_area?.id_gerente_area ?? '',
+    calendar_area_id: '',
     numero_guardias: inicial?.numero_guardias ?? 0,
   })
   const [idPlantilla, setIdPlantilla]   = useState('')
   const [fechaPlantilla, setFechaPlantilla] = useState('')
   const [error, setError]   = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
   const [loading, setLoading] = useState(false)
+  const [loadingAreas, setLoadingAreas] = useState(isCreating)
+  const [areasError, setAreasError] = useState('')
 
   useEffect(() => {
-    if (esAdmin) getGerentes().then(setGerentes).catch(() => {})
+    let active = true
+    if (isCreating) {
+      getAreasElegibles()
+        .then((data) => { if (active) setAreas(data) })
+        .catch((requestError) => { if (active) setAreasError(requestError.message || 'No se pudieron cargar las áreas elegibles.') })
+        .finally(() => { if (active) setLoadingAreas(false) })
+    }
+    if (esAdmin && !isCreating) getGerentes().then(setGerentes).catch(() => {})
     if (conPlantilla) getPlantillas().then((p) => setPlantillas(p.filter((x) => x.activa))).catch(() => {})
-  }, [esAdmin, conPlantilla])
+    return () => { active = false }
+  }, [esAdmin, conPlantilla, isCreating])
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+  const set = (k) => (e) => {
+    setForm((f) => ({ ...f, [k]: e.target.value }))
+    setFieldErrors((errors) => ({ ...errors, [k]: undefined }))
+  }
+
+  const selectedArea = areas.find((area) => String(area.id) === form.calendar_area_id)
+  const areaError = Array.isArray(fieldErrors.calendar_area_id)
+    ? fieldErrors.calendar_area_id.join(' ')
+    : fieldErrors.calendar_area_id
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+    setFieldErrors({})
+    if (isCreating && !form.calendar_area_id) {
+      setFieldErrors({ calendar_area_id: 'Selecciona un área.' })
+      return
+    }
     const numeroGuardias = Number(form.numero_guardias)
     if (esAdmin && (!Number.isInteger(numeroGuardias) || numeroGuardias < 0 || numeroGuardias > 4)) {
       setError('El número de guardias debe ser un entero entre 0 y 4.')
@@ -295,11 +345,13 @@ function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
     setLoading(true)
     try {
       const body = { nombre: form.nombre, codigo: form.codigo }
-      if (esAdmin && form.id_gerente_area) body.id_gerente_area = Number(form.id_gerente_area)
+      if (isCreating) body.calendar_area_id = Number(form.calendar_area_id)
+      if (esAdmin && !isCreating && form.id_gerente_area) body.id_gerente_area = Number(form.id_gerente_area)
       if (esAdmin) body.numero_guardias = numeroGuardias
       await onSubmit(body, idPlantilla ? Number(idPlantilla) : null, fechaPlantilla || null)
     } catch (err) {
-      setError(err.message)
+      if (err.fields && typeof err.fields === 'object') setFieldErrors(err.fields)
+      else setError(err.message)
     } finally {
       setLoading(false)
     }
@@ -316,17 +368,52 @@ function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
           <label>Código</label>
           <input type="text" value={form.codigo} onChange={set('codigo')} required placeholder="ej. CENTRO-001" />
         </div>
+        {isCreating && (
+            <>
+              <div className="form-group">
+                <label htmlFor="calendar-area">Área <span className="label-required">*</span></label>
+                <select
+                  id="calendar-area"
+                  value={form.calendar_area_id}
+                  onChange={set('calendar_area_id')}
+                  required
+                  disabled={loadingAreas || areas.length === 0}
+                  aria-describedby={areaError ? 'calendar-area-error' : undefined}
+                >
+                  <option value="">{loadingAreas ? 'Cargando áreas...' : 'Seleccionar área'}</option>
+                  {areas.map((area) => (
+                    <option key={area.id} value={area.id}>{area.codigo} — {area.nombre}</option>
+                  ))}
+                </select>
+                {areaError && <span id="calendar-area-error" className="modal-error" role="alert">{areaError}</span>}
+                {areasError && <p className="modal-error" role="alert">{areasError}</p>}
+                {!loadingAreas && !areasError && areas.length === 0 && (
+                  <p className="modal-error" role="alert">No hay áreas elegibles disponibles para crear una sucursal.</p>
+                )}
+              </div>
+              {selectedArea?.gerente_area && (
+                <div className="form-group">
+                  <p className="form-section-label">Gerente de área asignado</p>
+                  <p>{selectedArea.gerente_area.nombre}</p>
+                </div>
+              )}
+            </>
+        )}
         {esAdmin && (
           <>
-            <div className="form-group">
-              <label>Gerente de área {!inicial && <span className="label-required">*</span>}</label>
-              <select value={form.id_gerente_area} onChange={set('id_gerente_area')} required={!inicial}>
-                <option value="">Seleccionar gerente</option>
-                {gerentes.filter((g) => g.activo).map((g) => (
-                  <option key={g.id_gerente_area} value={g.id_gerente_area}>{g.nombre}</option>
-                ))}
-              </select>
-            </div>
+            {!isCreating && (
+            <>
+              <div className="form-group">
+                <label>Gerente de área</label>
+                <select value={form.id_gerente_area} onChange={set('id_gerente_area')}>
+                  <option value="">Seleccionar gerente</option>
+                  {gerentes.filter((g) => g.activo).map((g) => (
+                    <option key={g.id_gerente_area} value={g.id_gerente_area}>{g.nombre}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+            )}
             <div className="form-group">
               <label htmlFor="numero-guardias">Número de guardias</label>
               <input
@@ -369,11 +456,28 @@ function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
         {error && <p className="modal-error">{error}</p>}
         <div className="modal-footer">
           <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button type="submit" className="btn-primary" disabled={loading}>
+          <button type="submit" className="btn-primary" disabled={loading || (isCreating && (loadingAreas || areas.length === 0 || !form.calendar_area_id))}>
             {loading ? 'Guardando...' : inicial ? 'Guardar cambios' : 'Crear sucursal'}
           </button>
         </div>
       </form>
+    </ModalWrapper>
+  )
+}
+
+function TemplateAssignmentFailureModal({ error, retrying, onRetry, onClose }) {
+  return (
+    <ModalWrapper title="No se pudo asignar la plantilla" onClose={onClose}>
+      <div className="modal-form">
+        <p role="alert">La sucursal fue creada, pero no se pudo asignar la plantilla.</p>
+        {error && <p className="modal-error">{error}</p>}
+        <div className="modal-footer">
+          <button type="button" className="btn-secondary" onClick={onClose} disabled={retrying}>Cerrar</button>
+          <button type="button" className="btn-primary" onClick={onRetry} disabled={retrying}>
+            {retrying ? 'Reintentando...' : 'Reintentar asignación'}
+          </button>
+        </div>
+      </div>
     </ModalWrapper>
   )
 }
