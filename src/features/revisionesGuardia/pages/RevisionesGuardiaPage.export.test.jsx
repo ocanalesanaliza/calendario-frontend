@@ -31,7 +31,7 @@ const revision = {
   sucursal: { nombre: 'Sucursal Centro', codigo: 'CENTRO-01' },
   gerente_area: { nombre: 'GA Centro' },
   usuario: { nombre: 'GS Ana' },
-  guardias: [{ identidad: '0801-2000-12345', telefono: '9999-0000', primer_nombre: 'María' }],
+  guardias: [{ numero_guardia: 1, identidad: '0801-2000-12345', telefono: '9999-0000', primer_nombre: 'María', primer_apellido: 'López', uniforme: { botas: false }, equipamiento: { porta_carnet: false } }],
   notas: 'Nota visible de la página.',
 }
 
@@ -55,25 +55,34 @@ describe('RevisionesGuardiaPage export', () => {
     render(<RevisionesGuardiaPage />)
 
     expect(await screen.findByText('No hay revisiones para los filtros aplicados.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Exportar página actual' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Exportar a excel' })).toBeDisabled()
   })
 
-  it('exports only loaded public rows with the required workbook and no further requests', async () => {
+  it('exports the loaded page into Revisiones then Guardias without further requests', async () => {
     render(<RevisionesGuardiaPage />)
     await screen.findByRole('grid')
     const requestsBeforeExport = [getSucursales, getGerentes, getUsuarios, getAnalitica].map((request) => request.mock.calls.length)
 
     expect(screen.getByText('Página actual: 1')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Exportar página actual' }))
+    const exportButton = screen.getByRole('button', { name: 'Exportar a excel' })
+    expect(exportButton).toBeInTheDocument()
+    expect(exportButton.querySelector('svg[aria-hidden="true"]')).toBeInTheDocument()
+    fireEvent.click(exportButton)
 
     const expectedSheetData = [
       ['Fecha', 'Sucursal', 'Código', 'Gerente de área', 'GS', 'Resultado', 'Cantidad de guardias', 'Nota'],
       ['2026-09-09', 'Sucursal Centro', 'CENTRO-01', 'GA Centro', 'GS Ana', 'Revisión realizada', 1, 'Nota visible de la página.'],
     ]
-    await waitFor(() => expect(aoaToSheet).toHaveBeenCalledWith(expectedSheetData))
+    await waitFor(() => expect(aoaToSheet).toHaveBeenNthCalledWith(1, expectedSheetData))
     expect(JSON.stringify(aoaToSheet.mock.calls[0][0])).not.toMatch(/identidad|tel[eé]fono|María|0801-2000-12345|9999-0000/i)
+    expect(aoaToSheet).toHaveBeenNthCalledWith(2, [
+      ['Fecha', 'Sucursal', 'Código', 'Gerente de sucursal', 'Resultado', 'Número de guardia', 'Nombre completo', 'Teléfono', 'Uniforme no portado', 'Equipamiento no portado', 'Nota'],
+      ['2026-09-09', 'Sucursal Centro', 'CENTRO-01', 'GS Ana', 'Revisión realizada', 1, 'María López', '9999-0000', 'Botas', 'Porta carnet', 'Nota visible de la página.'],
+    ])
+    expect(JSON.stringify(aoaToSheet.mock.calls[1][0])).not.toMatch(/identidad|0801-2000-12345/i)
     expect(bookNew).toHaveBeenCalledOnce()
-    expect(bookAppendSheet).toHaveBeenCalledWith({ workbook: true }, { worksheet: true }, 'Revisiones')
+    expect(bookAppendSheet).toHaveBeenNthCalledWith(1, { workbook: true }, { worksheet: true }, 'Revisiones')
+    expect(bookAppendSheet).toHaveBeenNthCalledWith(2, { workbook: true }, { worksheet: true }, 'Guardias')
     expect(writeFile).toHaveBeenCalledWith({ workbook: true }, 'revisiones-guardia-pagina-1-2026-09-24.xlsx')
     expect([getSucursales, getGerentes, getUsuarios, getAnalitica].map((request) => request.mock.calls.length)).toEqual(requestsBeforeExport)
   })

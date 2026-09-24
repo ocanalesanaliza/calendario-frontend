@@ -1,6 +1,11 @@
 .revisiones-analitica-page { display: flex; flex-direction: column; gap: 1.25rem; }
-.revisiones-export-actions { align-items: center; display: flex; gap: .75rem; }
+.revisiones-export-actions { align-items: center; display: flex; gap: .75rem; justify-content: flex-end; }
 .revisiones-export-actions span { color: #475569; font-size: .875rem; font-weight: 600; }
+.revisiones-export-button { align-items: center; background: #15803d; border: 1px solid #15803d; border-radius: 7px; color: #fff; cursor: pointer; display: inline-flex; font: inherit; font-weight: 700; gap: .5rem; justify-content: center; padding: .6rem .85rem; transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease; }
+.revisiones-export-button svg { flex: 0 0 auto; height: 1.1rem; width: 1.1rem; }
+.revisiones-export-button:hover:not(:disabled) { background: #166534; border-color: #166534; }
+.revisiones-export-button:focus-visible { box-shadow: 0 0 0 3px #bbf7d0; outline: 3px solid #14532d; outline-offset: 2px; }
+.revisiones-export-button:disabled { background: #94a3b8; border-color: #94a3b8; color: #f8fafc; cursor: not-allowed; }
 .revisiones-filtros { align-items: end; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; display: grid; gap: .75rem; grid-template-columns: repeat(3, minmax(150px, 1fr)); padding: 1rem; }
 .revisiones-filtros label { color: #475569; display: flex; flex-direction: column; font-size: .78rem; font-weight: 600; gap: .3rem; }
 .revisiones-filtros input, .revisiones-filtros select { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 7px; color: #1e293b; font: inherit; padding: .5rem .65rem; }
@@ -13,5 +18,6 @@
 @media (max-width: 800px) {
   .revisiones-filtros { grid-template-columns: 1fr; }
   .revisiones-buscar { grid-column: auto; }
-  .revisiones-export-actions { align-items: flex-start; flex-direction: column; }
+  .revisiones-export-actions { align-items: stretch; flex-direction: column; }
+  .revisiones-export-button { width: 100%; }
 }

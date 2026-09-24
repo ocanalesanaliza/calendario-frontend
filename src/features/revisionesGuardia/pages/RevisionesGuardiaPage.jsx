@@ -6,7 +6,7 @@ import { getGerentes } from '../../gerentes/services/gerentesService'
 import { getUsuarios } from '../../usuarios/services/usuariosService'
 import { getAnaliticaRevisionesGuardia } from '../services/revisionesGuardiaAnaliticaService'
 import { REVISION_GRID_COLUMNS, toRevisionGridRows } from '../revisionesGuardiaGrid'
-import { toRevisionExportSheetData } from '../revisionesGuardiaExport'
+import { toGuardiaExportSheetData, toRevisionExportSheetData } from '../revisionesGuardiaExport'
 import RevisionGuardiaDetalleModal from '../components/RevisionGuardiaDetalleModal'
 import './RevisionesGuardiaPage.css'
 
@@ -105,9 +105,11 @@ export default function RevisionesGuardiaPage() {
   }
 
   function exportarPaginaActual() {
-    const worksheet = XLSX.utils.aoa_to_sheet(toRevisionExportSheetData(filas))
+    const revisionesWorksheet = XLSX.utils.aoa_to_sheet(toRevisionExportSheetData(filas))
+    const guardiasWorksheet = XLSX.utils.aoa_to_sheet(toGuardiaExportSheetData(results))
     const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Revisiones')
+    XLSX.utils.book_append_sheet(workbook, revisionesWorksheet, 'Revisiones')
+    XLSX.utils.book_append_sheet(workbook, guardiasWorksheet, 'Guardias')
     const fecha = new Date().toISOString().slice(0, 10)
     XLSX.writeFile(workbook, `revisiones-guardia-pagina-${paginationModel.page + 1}-${fecha}.xlsx`)
   }
@@ -124,10 +126,6 @@ export default function RevisionesGuardiaPage() {
           <h1>Revisiones de guardia</h1>
           <p>{count} revisión{count !== 1 ? 'es' : ''} encontrada{count !== 1 ? 's' : ''}</p>
         </div>
-        <div className="revisiones-export-actions">
-          <span>Página actual: {paginationModel.page + 1}</span>
-          <button type="button" className="btn-secondary" onClick={exportarPaginaActual} disabled={filas.length === 0}>Exportar página actual</button>
-        </div>
       </div>
 
       <form className="revisiones-filtros" onSubmit={aplicarFiltros}>
@@ -143,6 +141,17 @@ export default function RevisionesGuardiaPage() {
           <button type="submit" className="btn-primary">Aplicar filtros</button>
         </div>
       </form>
+
+      <div className="revisiones-export-actions">
+        <span>Página actual: {paginationModel.page + 1}</span>
+        <button type="button" className="revisiones-export-button" onClick={exportarPaginaActual} disabled={filas.length === 0}>
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <path d="M14 2v6h6M8 13h8M8 17h5M12 10v7m0 0-3-3m3 3 3-3" />
+          </svg>
+          Exportar a excel
+        </button>
+      </div>
 
       {loading ? (
         <div className="loading-state">Cargando revisiones...</div>
