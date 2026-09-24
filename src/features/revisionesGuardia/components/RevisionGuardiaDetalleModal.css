@@ -5,6 +5,7 @@
 .revision-guardia-detalle-summary dt, .revision-guardia-detalle-guardia dt { color: #64748b; font-size: .75rem; font-weight: 700; text-transform: uppercase; }
 .revision-guardia-detalle-summary dd, .revision-guardia-detalle-guardia dd { color: #1e293b; margin: .2rem 0 0; overflow-wrap: anywhere; }
 .revision-guardia-detalle-notes { grid-column: 1 / -1; }
+.revision-guardia-detalle-missing ul { margin: .2rem 0 0; padding-left: 1.25rem; }
 .revision-guardia-detalle-modal h3 { color: #1e293b; font-size: 1rem; margin: 1rem 0 .75rem; }
 .revision-guardia-detalle-guardias { display: grid; gap: .75rem; }
 .revision-guardia-detalle-guardia { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: .75rem; }

@@ -34,7 +34,15 @@ const revision = {
   sucursal: { id_sucursal: 15, nombre: 'Sucursal Centro', codigo: 'CENTRO-01' },
   gerente_area: { id_gerente_area: 2, nombre: 'GA Centro' },
   usuario: { id_usuario: 12, nombre: 'GS Ana' },
-  guardias: [{ numero_guardia: 1, primer_nombre: 'María', primer_apellido: 'López', identidad: '0801-2000-12345', telefono: '9999-0000' }],
+  guardias: [{
+    numero_guardia: 1,
+    primer_nombre: 'María',
+    primer_apellido: 'López',
+    identidad: '0801-2000-12345',
+    telefono: '9999-0000',
+    uniforme: { botas: false, zapatillas: true, pantalon_jean: false },
+    equipamiento: { porta_carnet: false, revolver: true },
+  }],
   notas: 'La revisión fue completada y esta nota se muestra íntegramente en el detalle protegido.',
 }
 
@@ -133,7 +141,27 @@ describe('RevisionesGuardiaPage', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent('0801-2000-12345')
     expect(screen.getByRole('dialog')).toHaveTextContent('9999-0000')
     expect(screen.getByRole('dialog')).toHaveTextContent(revision.notas)
+    expect(screen.getByRole('dialog')).toHaveTextContent('Uniforme no portadoBotasPantalón jean')
+    expect(screen.getByRole('dialog')).toHaveTextContent('Equipamiento no portadoPorta carnet')
+    expect(screen.getByRole('dialog')).not.toHaveTextContent('Zapatillas')
+    expect(screen.getByRole('dialog')).not.toHaveTextContent('Revólver')
+    expect(screen.getByRole('dialog')).toHaveTextContent('Gerente de sucursalGS Ana')
+    expect(screen.getByRole('dialog')).not.toHaveTextContent('Código')
+    expect(screen.getByRole('dialog')).not.toHaveTextContent('Gerente de área')
     expect(getAnalitica).toHaveBeenCalledTimes(requestsBeforeOpen)
+  })
+
+  it('no trata campos ausentes como faltantes de uniforme o equipamiento', async () => {
+    getAnalitica.mockResolvedValueOnce({ count: 1, results: [{ ...revision, guardias: [{ numero_guardia: 1, uniforme: { botas: true }, equipamiento: {} }] }] })
+    render(<RevisionesGuardiaPage />)
+    await screen.findByRole('grid')
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalle' }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveTextContent('Uniforme no portadoSin faltantes de uniforme.')
+    expect(dialog).toHaveTextContent('Equipamiento no portadoSin faltantes de equipamiento.')
+    expect(dialog).not.toHaveTextContent('Camisa con logo')
+    expect(dialog).not.toHaveTextContent('Escopeta')
   })
 
   it('muestra guardias múltiples o ausencia de guardias con valores de presentación consistentes', async () => {

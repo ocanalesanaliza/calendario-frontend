@@ -3,6 +3,24 @@ import './RevisionGuardiaDetalleModal.css'
 
 const EMPTY_VALUE = '—'
 
+const UNIFORME_LABELS = {
+  botas: 'Botas',
+  zapatillas: 'Zapatillas',
+  tenis: 'Tenis',
+  camisa_con_logo: 'Camisa con logo',
+  pantalon_tela: 'Pantalón de tela',
+  pantalon_jean: 'Pantalón jean',
+  gorra: 'Gorra',
+}
+
+const EQUIPAMIENTO_LABELS = {
+  porta_carnet: 'Porta carnet',
+  revolver: 'Revólver',
+  escopeta: 'Escopeta',
+  tolete: 'Tolete',
+  libro_novedades: 'Libro de novedades',
+}
+
 function present(value) {
   return value || EMPTY_VALUE
 }
@@ -23,6 +41,12 @@ function fullName(guardia) {
 
 function getGuardias(revision) {
   return revision.guardias ?? revision.detalle?.guardias ?? (revision.guardia ? [revision.guardia] : [])
+}
+
+function getMissingItems(items, labels) {
+  return Object.entries(labels)
+    .filter(([key]) => items?.[key] === false)
+    .map(([, label]) => label)
 }
 
 export default function RevisionGuardiaDetalleModal({ revision, onClose }) {
@@ -60,8 +84,6 @@ export default function RevisionGuardiaDetalleModal({ revision, onClose }) {
   const guardias = getGuardias(revision)
   const resultado = revision.no_se_presento_guardia ? 'No se presentó guardia' : 'Revisión realizada'
   const sucursal = displayName(revision.sucursal) !== EMPTY_VALUE ? displayName(revision.sucursal) : revision.nombre_sucursal
-  const codigo = revision.sucursal?.codigo ?? revision.codigo_sucursal
-  const gerente = displayName(revision.gerente_area)
   const gs = displayName(revision.usuario) !== EMPTY_VALUE ? displayName(revision.usuario) : displayName(revision.gerente_sucursal)
 
   return (
@@ -77,9 +99,7 @@ export default function RevisionGuardiaDetalleModal({ revision, onClose }) {
 
         <dl className="revision-guardia-detalle-summary">
           <div><dt>Sucursal</dt><dd>{present(sucursal)}</dd></div>
-          <div><dt>Código</dt><dd>{present(codigo)}</dd></div>
-          <div><dt>Gerente de área</dt><dd>{present(gerente)}</dd></div>
-          <div><dt>GS</dt><dd>{present(gs)}</dd></div>
+          <div><dt>Gerente de sucursal</dt><dd>{present(gs)}</dd></div>
           <div><dt>Resultado</dt><dd>{resultado}</dd></div>
           <div><dt>Cantidad de guardias</dt><dd>{guardias.length}</dd></div>
           <div className="revision-guardia-detalle-notes"><dt>Notas</dt><dd>{present(revision.notas)}</dd></div>
@@ -91,14 +111,21 @@ export default function RevisionGuardiaDetalleModal({ revision, onClose }) {
             <p className="revision-guardia-detalle-empty">No hay guardias registrados.</p>
           ) : (
             <div className="revision-guardia-detalle-guardias">
-              {guardias.map((guardia, index) => (
-                <dl key={guardia.id_guardia ?? guardia.numero_guardia ?? index} className="revision-guardia-detalle-guardia">
-                  <div><dt>Número</dt><dd>{present(guardia.numero_guardia ?? index + 1)}</dd></div>
-                  <div><dt>Nombre completo</dt><dd>{fullName(guardia)}</dd></div>
-                  <div><dt>Identidad</dt><dd>{present(guardia.identidad)}</dd></div>
-                  <div><dt>Teléfono</dt><dd>{present(guardia.telefono)}</dd></div>
-                </dl>
-              ))}
+              {guardias.map((guardia, index) => {
+                const uniformeFaltante = getMissingItems(guardia.uniforme, UNIFORME_LABELS)
+                const equipamientoFaltante = getMissingItems(guardia.equipamiento, EQUIPAMIENTO_LABELS)
+
+                return (
+                  <dl key={guardia.id_guardia ?? guardia.numero_guardia ?? index} className="revision-guardia-detalle-guardia">
+                    <div><dt>Número</dt><dd>{present(guardia.numero_guardia ?? index + 1)}</dd></div>
+                    <div><dt>Nombre completo</dt><dd>{fullName(guardia)}</dd></div>
+                    <div><dt>Identidad</dt><dd>{present(guardia.identidad)}</dd></div>
+                    <div><dt>Teléfono</dt><dd>{present(guardia.telefono)}</dd></div>
+                    <div className="revision-guardia-detalle-missing"><dt>Uniforme no portado</dt><dd>{uniformeFaltante.length ? <ul>{uniformeFaltante.map((item) => <li key={item}>{item}</li>)}</ul> : 'Sin faltantes de uniforme.'}</dd></div>
+                    <div className="revision-guardia-detalle-missing"><dt>Equipamiento no portado</dt><dd>{equipamientoFaltante.length ? <ul>{equipamientoFaltante.map((item) => <li key={item}>{item}</li>)}</ul> : 'Sin faltantes de equipamiento.'}</dd></div>
+                  </dl>
+                )
+              })}
             </div>
           )}
         </section>
