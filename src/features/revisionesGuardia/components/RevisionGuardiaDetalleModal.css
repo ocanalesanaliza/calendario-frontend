@@ -1,0 +1,12 @@
+.revision-guardia-detalle-modal { max-height: min(90vh, 760px); max-width: 760px; overflow-y: auto; width: min(92vw, 760px); }
+.revision-guardia-detalle-summary, .revision-guardia-detalle-guardia { display: grid; gap: .75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
+.revision-guardia-detalle-summary { border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem; }
+.revision-guardia-detalle-summary > div, .revision-guardia-detalle-guardia > div { min-width: 0; }
+.revision-guardia-detalle-summary dt, .revision-guardia-detalle-guardia dt { color: #64748b; font-size: .75rem; font-weight: 700; text-transform: uppercase; }
+.revision-guardia-detalle-summary dd, .revision-guardia-detalle-guardia dd { color: #1e293b; margin: .2rem 0 0; overflow-wrap: anywhere; }
+.revision-guardia-detalle-notes { grid-column: 1 / -1; }
+.revision-guardia-detalle-modal h3 { color: #1e293b; font-size: 1rem; margin: 1rem 0 .75rem; }
+.revision-guardia-detalle-guardias { display: grid; gap: .75rem; }
+.revision-guardia-detalle-guardia { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: .75rem; }
+.revision-guardia-detalle-empty { color: #64748b; margin: 0; }
+@media (max-width: 600px) { .revision-guardia-detalle-summary, .revision-guardia-detalle-guardia { grid-template-columns: 1fr; } }

@@ -5,6 +5,7 @@ import { getGerentes } from '../../gerentes/services/gerentesService'
 import { getUsuarios } from '../../usuarios/services/usuariosService'
 import { getAnaliticaRevisionesGuardia } from '../services/revisionesGuardiaAnaliticaService'
 import { REVISION_GRID_COLUMNS, toRevisionGridRows } from '../revisionesGuardiaGrid'
+import RevisionGuardiaDetalleModal from '../components/RevisionGuardiaDetalleModal'
 import './RevisionesGuardiaPage.css'
 
 const FILTROS_VACIOS = {
@@ -17,10 +18,6 @@ const FILTROS_VACIOS = {
   buscar: '',
 }
 
-const GRID_COLUMNS = REVISION_GRID_COLUMNS.map((column) => column.field === 'accion'
-  ? { ...column, renderCell: () => <button type="button" className="btn-secondary" disabled>Ver detalle</button> }
-  : column)
-
 export default function RevisionesGuardiaPage() {
   const [draft, setDraft] = useState(FILTROS_VACIOS)
   const [filtros, setFiltros] = useState(FILTROS_VACIOS)
@@ -28,6 +25,7 @@ export default function RevisionesGuardiaPage() {
   const [revision, setRevision] = useState(0)
   const [catalogos, setCatalogos] = useState({ sucursales: [], gerentes: [], usuarios: [] })
   const [carga, setCarga] = useState({ clave: null, results: [], count: 0, error: '' })
+  const [detalleRevision, setDetalleRevision] = useState(null)
   const claveCarga = `${JSON.stringify(filtros)}:${paginationModel.page}:${paginationModel.pageSize}:${revision}`
   const loading = carga.clave !== claveCarga
   const results = loading ? [] : carga.results
@@ -94,7 +92,20 @@ export default function RevisionesGuardiaPage() {
     }))
   }
 
+  function abrirDetalle(id) {
+    const revisionSeleccionada = results[filas.findIndex((fila) => fila.id === id)]
+    if (!revisionSeleccionada) return
+    setDetalleRevision(revisionSeleccionada)
+  }
+
+  function cerrarDetalle() {
+    setDetalleRevision(null)
+  }
+
   const filas = toRevisionGridRows(results)
+  const gridColumns = REVISION_GRID_COLUMNS.map((column) => column.field === 'accion'
+    ? { ...column, renderCell: (params) => <button type="button" className="btn-secondary" onClick={() => abrirDetalle(params.row.id)}>Ver detalle</button> }
+    : column)
 
   return (
     <div className="revisiones-analitica-page">
@@ -128,7 +139,7 @@ export default function RevisionesGuardiaPage() {
       ) : (
         <div className="table-card revisiones-grid-wrap">
           <DataGrid
-            columns={GRID_COLUMNS}
+            columns={gridColumns}
             rows={filas}
             rowCount={count}
             loading={loading}
@@ -145,6 +156,7 @@ export default function RevisionesGuardiaPage() {
           />
         </div>
       )}
+      {detalleRevision && <RevisionGuardiaDetalleModal revision={detalleRevision} onClose={cerrarDetalle} />}
     </div>
   )
 }
