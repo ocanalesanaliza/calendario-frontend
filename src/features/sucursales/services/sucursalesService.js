@@ -9,6 +9,15 @@ function parseDetail(detail) {
   return ''
 }
 
+function requestError(data, fallback, status) {
+  const error = new Error(parseDetail(data?.detail) || fallback)
+  error.status = status
+  if (data?.detail && typeof data.detail === 'object' && !Array.isArray(data.detail)) {
+    error.fields = data.detail
+  }
+  return error
+}
+
 export async function getSucursales() {
   const res = await apiRequest('/api/sucursales/')
   const data = await res.json()
@@ -22,8 +31,15 @@ export async function createSucursal(body) {
     body: JSON.stringify(body),
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.detail || 'Error al crear sucursal')
+  if (!res.ok) throw requestError(data, 'Error al crear sucursal', res.status)
   return data
+}
+
+export async function getAreasElegibles() {
+  const res = await apiRequest('/api/sucursales/areas-elegibles/')
+  const data = await res.json()
+  if (!res.ok) throw requestError(data, 'Error al cargar áreas elegibles', res.status)
+  return data.results
 }
 
 export async function updateSucursal(id, body) {
