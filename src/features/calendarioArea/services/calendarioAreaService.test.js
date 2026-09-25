@@ -27,10 +27,28 @@ describe('calendarioAreaService', () => {
     expect(apiRequest).toHaveBeenNthCalledWith(1, '/api/calendar/my-area/monthly-occurrences/?month=2026-09')
     expect(apiRequest).toHaveBeenNthCalledWith(2, '/api/calendar/my-area/monthly-absences/?month=2026-09')
     expect(apiRequest).toHaveBeenNthCalledWith(3, '/api/calendar/my-area/monthly-performance/?month=2026-09')
-    expect(apiRequest).toHaveBeenNthCalledWith(4, '/api/calendar/my-area/occurrences/14/complete/', { method: 'POST' })
-    expect(apiRequest).toHaveBeenNthCalledWith(5, '/api/calendar/my-area/occurrences/14/reschedule/', {
-      method: 'POST', body: JSON.stringify({ target_date: '2026-09-15' }),
-    })
+    expect(apiRequest).toHaveBeenNthCalledWith(
+      4,
+      '/api/calendar/my-area/occurrences/14/complete/',
+      {
+        method: 'POST',
+        headers: {
+          'Idempotency-Key': expect.any(String),
+        },
+      },
+    )
+
+    expect(apiRequest).toHaveBeenNthCalledWith(
+      5,
+      '/api/calendar/my-area/occurrences/14/reschedule/',
+      {
+        method: 'POST',
+        headers: {
+          'Idempotency-Key': expect.any(String),
+        },
+        body: JSON.stringify({ target_date: '2026-09-15' }),
+      },
+    )
   })
 
   it.each([400, 403, 409])('preserves status, detail, and fields for a %i calendar API error', async (status) => {
