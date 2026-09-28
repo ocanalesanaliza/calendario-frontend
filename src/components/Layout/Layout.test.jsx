@@ -145,8 +145,33 @@ describe('Layout Mis tareas navigation', () => {
     )
 
     expect(screen.getByTitle('Mis tareas')).toBeInTheDocument()
+    expect(screen.getByTitle('Solicitudes pendientes')).toBeInTheDocument()
     expect(screen.getByTitle('Conteo de inventario')).toBeInTheDocument()
     expect(screen.getByTitle('Tareas')).toBeInTheDocument()
+  })
+
+  it('hides Mis tareas and Solicitudes pendientes for an operations manager while preserving Áreas', () => {
+    useAuth.mockReturnValue({
+      perfil: {
+        type: 'gerente_operaciones',
+        activo: true,
+        habilitado: true,
+        can_access_my_tasks: true,
+      },
+      logout: vi.fn(),
+    })
+
+    render(
+      <MemoryRouter>
+        <Routes>
+          <Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.queryByTitle('Mis tareas')).not.toBeInTheDocument()
+    expect(screen.queryByTitle('Solicitudes pendientes')).not.toBeInTheDocument()
+    expect(screen.getByTitle('Áreas')).toBeInTheDocument()
   })
 
   it.each([

@@ -136,7 +136,7 @@ function Layout() {
         {
           to: '/mis-tareas',
           label: 'Mis tareas',
-          visible: !hideRestrictedNavigation && puedeAccederMisTareas,
+          visible: !hideRestrictedNavigation && !esGerenteOperaciones && puedeAccederMisTareas,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 11l3 3L22 4" />
@@ -197,7 +197,7 @@ function Layout() {
         {
           to: '/solicitudes-pendientes',
           label: 'Solicitudes pendientes',
-          visible: esSucursal || esGerenteArea || esGerenteOperaciones,
+          visible: esSucursal || esGerenteArea,
           badge: notificacionesVisibles.length,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
