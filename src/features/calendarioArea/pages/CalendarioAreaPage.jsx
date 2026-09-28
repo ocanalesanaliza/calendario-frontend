@@ -168,10 +168,12 @@ function OccurrenceDialog({ occurrence, onClose, onComplete, onReschedule }) {
   return (
     <div className="calendar-modal-overlay" onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
       <section ref={dialogRef} className="calendar-modal" role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={descriptionId}>
-        <button ref={closeButton} type="button" className="calendar-modal-close" onClick={onClose} aria-label="Cerrar detalle de la ocurrencia">×</button>
-        <h2 id={titleId}>{occurrenceTitle(occurrence)}</h2>
-        <p id={descriptionId}>Detalle de la ocurrencia programada.</p>
-        <dl className="occurrence-details">
+        <header className="calendar-modal__header">
+          <h2 id={titleId} className="calendar-modal__title">{occurrenceTitle(occurrence)}</h2>
+          <button ref={closeButton} type="button" className="calendar-modal__close" onClick={onClose} aria-label="Cerrar detalle de la ocurrencia">×</button>
+        </header>
+        <p id={descriptionId} className="calendar-modal__description">Detalle de la ocurrencia programada.</p>
+        <dl className="calendar-modal__details">
           <dt>Fecha</dt><dd>{occurrence.effective_date}</dd>
           <dt>Estado</dt><dd>{STATUS_LABELS[occurrence.status] ?? occurrence.status}</dd>
           {coverage?.jornada && <><dt>Jornada</dt><dd>{coverage.jornada}</dd></>}
@@ -181,16 +183,16 @@ function OccurrenceDialog({ occurrence, onClose, onComplete, onReschedule }) {
           {occurrence.template_version?.number !== undefined && <><dt>Versión</dt><dd>{occurrence.template_version.number}</dd></>}
         </dl>
         {error && <p role="alert">{error}</p>}
-        {pending && !mode && <div className="occurrence-actions">
+        {pending && !mode && <div className="calendar-modal__actions">
           <button type="button" onClick={() => selectMode('complete')}>Completar</button>
           <button type="button" onClick={() => selectMode('reschedule')}>Reprogramar</button>
         </div>}
-        {pending && mode === 'complete' && <form onSubmit={submit}>
+        {pending && mode === 'complete' && <form className="calendar-modal__form" onSubmit={submit}>
           <p>¿Confirmas que deseas completar esta ocurrencia?</p>
           <button type="button" disabled={submitting} onClick={() => setMode(null)}>Cancelar</button>
           <button type="submit" disabled={submitting}>{submitting ? 'Completando...' : 'Confirmar completar'}</button>
         </form>}
-        {pending && mode === 'reschedule' && <form onSubmit={submit}>
+        {pending && mode === 'reschedule' && <form className="calendar-modal__form" onSubmit={submit}>
           <label htmlFor="occurrence-target-date">Nueva fecha</label>
           <input id="occurrence-target-date" type="date" required value={targetDate} disabled={submitting} onChange={(event) => setTargetDate(event.target.value)} />
           <label htmlFor="occurrence-reason">Motivo</label>
