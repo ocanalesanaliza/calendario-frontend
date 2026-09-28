@@ -84,7 +84,8 @@ function absenceCoversOccurrence(absence, occurrence) {
   if (absenceDate(absence) !== occurrence.effective_date) return false
 
   const shift = occurrenceShift(occurrence)
-  return shift !== undefined && normalizedShift(absence.slot ?? absence.jornada) === shift
+  const absenceShift = normalizedShift(absence.slot ?? absence.jornada)
+  return shift !== undefined && (absenceShift === 'full_day' || absenceShift === shift)
 }
 
 export function selectVisibleOccurrences(occurrences = [], absences = []) {

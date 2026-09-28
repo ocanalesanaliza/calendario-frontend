@@ -80,13 +80,20 @@ describe('calendar event adapter', () => {
   it.each([
     ['morning', { known: true, jornada: 'morning' }, { known: true, jornada: 'afternoon' }],
     ['afternoon', { known: true, jornada: 'afternoon' }, { known: true, jornada: 'morning' }],
-    ['full_day', { known: true, jornada: 'morning', aplica_ambas_jornadas: true }, { known: true, jornada: 'morning' }],
   ])('hides only known %s occurrences on the same effective date', (slot, coveredCoverage, visibleCoverage) => {
     const covered = { id: 1, effective_date: '2026-09-15', coverage_snapshot: coveredCoverage }
     const visible = { id: 2, effective_date: '2026-09-15', coverage_snapshot: visibleCoverage }
     const otherDate = { id: 3, effective_date: '2026-09-16', coverage_snapshot: coveredCoverage }
 
     expect(selectVisibleOccurrences([covered, visible, otherDate], [{ source: 'vacation', date: '2026-09-15', slot }])).toEqual([visible, otherDate])
+  })
+
+  it('hides every known coverage with a full-day absence', () => {
+    const morning = { id: 1, effective_date: '2026-09-15', coverage_snapshot: { known: true, jornada: 'morning' } }
+    const afternoon = { id: 2, effective_date: '2026-09-15', coverage_snapshot: { known: true, jornada: 'afternoon' } }
+    const fullDay = { id: 3, effective_date: '2026-09-15', coverage_snapshot: { known: true, jornada: 'morning', aplica_ambas_jornadas: true } }
+
+    expect(selectVisibleOccurrences([morning, afternoon, fullDay], [{ source: 'vacation', date: '2026-09-15', slot: 'full_day' }])).toEqual([])
   })
 
   it('keeps full-day tasks visible for partial absences and unknown or legacy coverage', () => {
