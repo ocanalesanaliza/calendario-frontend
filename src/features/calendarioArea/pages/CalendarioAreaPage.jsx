@@ -25,6 +25,7 @@ const STATUS_LABELS = {
   justificada: 'Justificada',
   diferida: 'Diferida',
 }
+const JORNADA_LABELS = { manana: 'Mañana', tarde: 'Tarde' }
 
 function monthFromDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
@@ -176,29 +177,34 @@ function OccurrenceDialog({ occurrence, onClose, onComplete, onReschedule }) {
         <dl className="calendar-modal__details">
           <dt>Fecha</dt><dd>{occurrence.effective_date}</dd>
           <dt>Estado</dt><dd>{STATUS_LABELS[occurrence.status] ?? occurrence.status}</dd>
-          {coverage?.jornada && <><dt>Jornada</dt><dd>{coverage.jornada}</dd></>}
+          {coverage?.jornada && <><dt>Jornada</dt><dd>{JORNADA_LABELS[coverage.jornada] ?? coverage.jornada}</dd></>}
           {coverage?.aplica_ambas_jornadas !== undefined && <><dt>Cobertura</dt><dd>{coverage.aplica_ambas_jornadas ? 'Ambas jornadas' : 'Una jornada'}</dd></>}
-          {occurrence.weight !== undefined && <><dt>Peso</dt><dd>{occurrence.weight}</dd></>}
-          {occurrence.template?.name && <><dt>Plantilla</dt><dd>{occurrence.template.name}</dd></>}
-          {occurrence.template_version?.number !== undefined && <><dt>Versión</dt><dd>{occurrence.template_version.number}</dd></>}
         </dl>
-        {error && <p role="alert">{error}</p>}
+        {error && <p className="calendar-modal__error" role="alert">{error}</p>}
         {pending && !mode && <div className="calendar-modal__actions">
-          <button type="button" onClick={() => selectMode('complete')}>Completar</button>
-          <button type="button" onClick={() => selectMode('reschedule')}>Reprogramar</button>
+          <button type="button" className="calendar-modal__button calendar-modal__button--primary" onClick={() => selectMode('complete')}>Completar</button>
+          <button type="button" className="calendar-modal__button calendar-modal__button--primary" onClick={() => selectMode('reschedule')}>Reprogramar</button>
         </div>}
         {pending && mode === 'complete' && <form className="calendar-modal__form" onSubmit={submit}>
-          <p>¿Confirmas que deseas completar esta ocurrencia?</p>
-          <button type="button" disabled={submitting} onClick={() => setMode(null)}>Cancelar</button>
-          <button type="submit" disabled={submitting}>{submitting ? 'Completando...' : 'Confirmar completar'}</button>
+          <p className="calendar-modal__confirmation">¿Confirmas que deseas completar esta ocurrencia?</p>
+          <div className="calendar-modal__footer">
+            <button type="button" className="calendar-modal__button calendar-modal__button--secondary" disabled={submitting} onClick={() => setMode(null)}>Cancelar</button>
+            <button type="submit" className="calendar-modal__button calendar-modal__button--primary" disabled={submitting}>{submitting ? 'Completando...' : 'Confirmar completar'}</button>
+          </div>
         </form>}
         {pending && mode === 'reschedule' && <form className="calendar-modal__form" onSubmit={submit}>
-          <label htmlFor="occurrence-target-date">Nueva fecha</label>
-          <input id="occurrence-target-date" type="date" required value={targetDate} disabled={submitting} onChange={(event) => setTargetDate(event.target.value)} />
-          <label htmlFor="occurrence-reason">Motivo</label>
-          <textarea id="occurrence-reason" required value={reason} disabled={submitting} onChange={(event) => setReason(event.target.value)} />
-          <button type="button" disabled={submitting} onClick={() => setMode(null)}>Cancelar</button>
-          <button type="submit" disabled={submitting}>{submitting ? 'Reprogramando...' : 'Confirmar reprogramación'}</button>
+          <div className="calendar-modal__field">
+            <label className="calendar-modal__label" htmlFor="occurrence-target-date">Nueva fecha</label>
+            <input className="calendar-modal__control" id="occurrence-target-date" type="date" required value={targetDate} disabled={submitting} onChange={(event) => setTargetDate(event.target.value)} />
+          </div>
+          <div className="calendar-modal__field">
+            <label className="calendar-modal__label" htmlFor="occurrence-reason">Motivo</label>
+            <textarea className="calendar-modal__control calendar-modal__control--textarea" id="occurrence-reason" required value={reason} disabled={submitting} onChange={(event) => setReason(event.target.value)} />
+          </div>
+          <div className="calendar-modal__footer">
+            <button type="button" className="calendar-modal__button calendar-modal__button--secondary" disabled={submitting} onClick={() => setMode(null)}>Cancelar</button>
+            <button type="submit" className="calendar-modal__button calendar-modal__button--primary" disabled={submitting}>{submitting ? 'Reprogramando...' : 'Confirmar reprogramación'}</button>
+          </div>
         </form>}
       </section>
     </div>

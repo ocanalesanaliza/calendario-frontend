@@ -299,6 +299,121 @@
   width: 100%;
 }
 
+.calendar-modal__actions,
+.calendar-modal__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.calendar-modal__actions .calendar-modal__button {
+  flex: 1 1 12rem;
+}
+
+.calendar-modal__form {
+  flex-direction: column;
+}
+
+.calendar-modal__confirmation {
+  margin: 0;
+  color: #334155;
+}
+
+.calendar-modal__field {
+  display: grid;
+  gap: 0.375rem;
+}
+
+.calendar-modal__label {
+  color: #334155;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.calendar-modal__control {
+  box-sizing: border-box;
+  min-height: 2.75rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0f172a;
+  font: inherit;
+}
+
+.calendar-modal__control--textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.calendar-modal__control:focus-visible {
+  outline: 3px solid rgba(99, 102, 241, 0.3);
+  outline-offset: 1px;
+  border-color: #6366f1;
+}
+
+.calendar-modal__control:disabled {
+  cursor: not-allowed;
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+
+.calendar-modal__error {
+  margin-top: 1rem;
+  margin-bottom: 0;
+  padding: 0.75rem;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.calendar-modal__footer {
+  justify-content: flex-end;
+  margin-top: 0.25rem;
+}
+
+.calendar-modal__button {
+  min-height: 2.75rem;
+  padding: 0.625rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.calendar-modal__button--primary {
+  background: #4f46e5;
+  color: #ffffff;
+}
+
+.calendar-modal__button--primary:hover:not(:disabled) {
+  background: #4338ca;
+}
+
+.calendar-modal__button--secondary {
+  border-color: #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+}
+
+.calendar-modal__button--secondary:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.calendar-modal__button:focus-visible {
+  outline: 3px solid rgba(99, 102, 241, 0.3);
+  outline-offset: 2px;
+}
+
+.calendar-modal__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 @media (max-width: 480px) {
   .calendar-modal-overlay {
     padding: 0.75rem;
@@ -319,5 +434,10 @@
   .calendar-modal > [role='alert'] {
     margin-right: 1rem;
     margin-left: 1rem;
+  }
+
+  .calendar-modal__actions .calendar-modal__button,
+  .calendar-modal__footer .calendar-modal__button {
+    flex-basis: 100%;
   }
 }
