@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { absenceToCalendarEvent, absencesToCalendarEvents, occurrenceToCalendarEvent, occurrencesToCalendarEvents } from './calendarEvents'
+import { absenceToCalendarEvent, absencesToCalendarEvents, occurrenceToCalendarEvent, occurrencesToCalendarEvents, selectVisibleOccurrences } from './calendarEvents'
 
 describe('calendar event adapter', () => {
   it('uses the effective ISO date as start and preserves the scheduled date', () => {
@@ -75,5 +75,37 @@ describe('calendar event adapter', () => {
       expect.objectContaining({ id: 'absence-special_situation-7', title: 'Situación especial activa · Capacitación · Tarde', start: '2026-09-15', classNames: ['calendar-absence--special_situation'], extendedProps: expect.objectContaining({ source: 'special_situation', slot: 'afternoon', type: 'capacitacion' }) }),
       expect.objectContaining({ id: 'absence-special_situation-8', start: '2026-09-15', extendedProps: expect.objectContaining({ source: 'special_situation', slot: 'afternoon' }) }),
     ]))
+  })
+
+  it.each([
+    ['morning', { known: true, jornada: 'morning' }, { known: true, jornada: 'afternoon' }],
+    ['afternoon', { known: true, jornada: 'afternoon' }, { known: true, jornada: 'morning' }],
+    ['full_day', { known: true, jornada: 'morning', aplica_ambas_jornadas: true }, { known: true, jornada: 'morning' }],
+  ])('hides only known %s occurrences on the same effective date', (slot, coveredCoverage, visibleCoverage) => {
+    const covered = { id: 1, effective_date: '2026-09-15', coverage_snapshot: coveredCoverage }
+    const visible = { id: 2, effective_date: '2026-09-15', coverage_snapshot: visibleCoverage }
+    const otherDate = { id: 3, effective_date: '2026-09-16', coverage_snapshot: coveredCoverage }
+
+    expect(selectVisibleOccurrences([covered, visible, otherDate], [{ source: 'vacation', date: '2026-09-15', slot }])).toEqual([visible, otherDate])
+  })
+
+  it('keeps full-day tasks visible for partial absences and unknown or legacy coverage', () => {
+    const occurrences = [
+      { id: 1, effective_date: '2026-09-15', coverage_snapshot: { known: true, jornada: 'morning', aplica_ambas_jornadas: true } },
+      { id: 2, effective_date: '2026-09-15', coverage_snapshot: { known: false, jornada: 'morning' } },
+      { id: 3, effective_date: '2026-09-15' },
+    ]
+
+    expect(selectVisibleOccurrences(occurrences, [{ source: 'vacation', date: '2026-09-15', slot: 'morning' }])).toEqual(occurrences)
+  })
+
+  it('hides occurrences when any active supported absence source covers their shift', () => {
+    const occurrence = { id: 1, effective_date: '2026-09-15', coverage_snapshot: { known: true, jornada: 'tarde' } }
+
+    expect(selectVisibleOccurrences([occurrence], [
+      { source: 'other', date: '2026-09-15', slot: 'afternoon' },
+      { source: 'vacation', date: '2026-09-14', slot: 'afternoon' },
+      { source: 'special_situation', date: '2026-09-15', slot: 'afternoon' },
+    ])).toEqual([])
   })
 })

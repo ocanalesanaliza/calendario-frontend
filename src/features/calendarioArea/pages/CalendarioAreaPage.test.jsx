@@ -113,12 +113,26 @@ describe('CalendarioAreaPage', () => {
   })
 
   it('keeps task events visible when absence loading fails', async () => {
-    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [occurrence] })
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [{ ...occurrence, coverage_snapshot: { known: true, jornada: 'morning' } }] })
     getMonthlyAreaAbsences.mockRejectedValue(new Error('Ausencias no disponibles.'))
     render(<CalendarioAreaPage />)
 
     expect(await screen.findByText('Auditoría')).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveTextContent('No se pudieron cargar las ausencias del área: Ausencias no disponibles.')
+  })
+
+  it('does not render potentially covered tasks before the monthly absences resolve', async () => {
+    let resolveAbsences
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [{ ...occurrence, coverage_snapshot: { known: true, jornada: 'morning' } }] })
+    getMonthlyAreaAbsences.mockImplementation(() => new Promise((resolve) => { resolveAbsences = resolve }))
+
+    render(<CalendarioAreaPage />)
+
+    await waitFor(() => expect(getMonthlyAreaOccurrences).toHaveBeenCalled())
+    expect(screen.queryByText('Auditoría')).not.toBeInTheDocument()
+    act(() => resolveAbsences({ absences: [{ id: 10, source: 'vacation', date: '2026-09-03', slot: 'morning' }] }))
+    expect(await screen.findByText('Vacaciones · Mañana')).toBeInTheDocument()
+    expect(screen.queryByText('Auditoría')).not.toBeInTheDocument()
   })
 
   it('opens an accessible detail dialog with optional metadata', async () => {
@@ -129,6 +143,7 @@ describe('CalendarioAreaPage', () => {
     const dialog = screen.getByRole('dialog', { name: 'Auditoría' })
     expect(dialog).toHaveAttribute('aria-modal', 'true')
     expect(dialog).toHaveTextContent('Jornada')
+    expect(dialog).toHaveTextContent('Mañana')
     expect(dialog).toHaveTextContent('Ambas jornadas')
     expect(dialog).not.toHaveTextContent('Peso')
     expect(dialog).not.toHaveTextContent('Plantilla')
@@ -143,7 +158,6 @@ describe('CalendarioAreaPage', () => {
     const closeButton = screen.getByRole('button', { name: 'Cerrar detalle de la ocurrencia' })
     const lastButton = screen.getByRole('button', { name: 'Reprogramar' })
     lastButton.focus()
-    expect(dialog).toHaveTextContent('Mañana')
     fireEvent.keyDown(document, { key: 'Tab' })
     expect(closeButton).toHaveFocus()
   })

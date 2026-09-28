@@ -60,6 +60,37 @@ export function absencesToCalendarEvents(absences = []) {
   return absences.map(absenceToCalendarEvent)
 }
 
+const SHIFT_ALIASES = {
+  morning: 'morning',
+  manana: 'morning',
+  afternoon: 'afternoon',
+  tarde: 'afternoon',
+  full_day: 'full_day',
+}
+
+function normalizedShift(shift) {
+  return SHIFT_ALIASES[shift]
+}
+
+function occurrenceShift(occurrence) {
+  const coverage = occurrence.coverage_snapshot
+  if (!coverage?.known) return undefined
+  if (coverage.aplica_ambas_jornadas) return 'full_day'
+  return normalizedShift(coverage.jornada)
+}
+
+function absenceCoversOccurrence(absence, occurrence) {
+  if (!['vacation', 'special_situation'].includes(absence.source) || absence.active === false) return false
+  if (absenceDate(absence) !== occurrence.effective_date) return false
+
+  const shift = occurrenceShift(occurrence)
+  return shift !== undefined && normalizedShift(absence.slot ?? absence.jornada) === shift
+}
+
+export function selectVisibleOccurrences(occurrences = [], absences = []) {
+  return occurrences.filter((occurrence) => !absences.some((absence) => absenceCoversOccurrence(absence, occurrence)))
+}
+
 export function occurrenceToCalendarEvent(occurrence) {
   const occurrenceId = occurrence.occurrence_id ?? occurrence.id
 
