@@ -227,8 +227,6 @@ export default function CalendarioAreaPage() {
   const monthRequestRef = useRef(0)
   const absenceRequestRef = useRef(0)
   const performanceRequestRef = useRef(0)
-  currentMonthRef.current = month
-
   useEffect(() => {
     if (!selected) triggerRef.current?.focus?.()
   }, [selected])
@@ -257,7 +255,7 @@ export default function CalendarioAreaPage() {
     if (absenceRequest === absenceRequestRef.current) setLoading(false)
   }
 
-  useEffect(() => { loadMonth() }, [month])
+  useEffect(() => { void Promise.resolve().then(loadMonth) }, [])
 
   const loadAbsences = useCallback(async (requestedMonth = month) => {
     const request = ++absenceRequestRef.current
@@ -290,7 +288,16 @@ export default function CalendarioAreaPage() {
     }
   }
 
-  useEffect(() => { loadPerformance() }, [month])
+  useEffect(() => { void Promise.resolve().then(loadPerformance) }, [])
+
+  function handleDatesSet({ view }) {
+    const requestedMonth = monthFromDate(view.currentStart)
+    if (requestedMonth === month) return
+    currentMonthRef.current = requestedMonth
+    setMonth(requestedMonth)
+    void loadMonth(false, requestedMonth)
+    void loadPerformance(requestedMonth)
+  }
 
   async function runCommand(command) {
     try {
@@ -317,7 +324,7 @@ export default function CalendarioAreaPage() {
       {loading && <p role="status">Cargando calendario...</p>}
       <>
         {!loading && occurrences.length === 0 && <p>No hay tareas programadas para este mes.</p>}
-        <div className="calendario-area-calendar"><FullCalendar plugins={[dayGridPlugin, interactionPlugin, timeGridPlugin, listPlugin, multiMonthPlugin]} headerToolbar={{ start: 'prev,today,next', center: 'title', end: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek,multiMonthYear' }} views={{ listWeek: { buttonText: 'Lista semanal' }, multiMonthYear: { buttonText: 'Año' } }} initialView="dayGridMonth" locale="es" buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día', list: 'Lista', year: 'Año' }} events={[...occurrencesToCalendarEvents(selectVisibleOccurrences(occurrences, absences)), ...absencesToCalendarEvents(absences)]} eventClick={(info) => { if (info.event.extendedProps.calendar_event_type === 'absence') return; triggerRef.current = info.el ?? info.jsEvent?.target; setSelected({ ...info.event.extendedProps, occurrence_id: info.event.extendedProps.occurrence_id, task: info.event.extendedProps.task }) }} datesSet={({ view }) => setMonth(monthFromDate(view.currentStart))} height="auto" /></div>
+        <div className="calendario-area-calendar"><FullCalendar plugins={[dayGridPlugin, interactionPlugin, timeGridPlugin, listPlugin, multiMonthPlugin]} headerToolbar={{ start: 'prev,today,next', center: 'title', end: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek,multiMonthYear' }} views={{ listWeek: { buttonText: 'Lista semanal' }, multiMonthYear: { buttonText: 'Año' } }} initialView="dayGridMonth" locale="es" buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día', list: 'Lista', year: 'Año' }} events={[...occurrencesToCalendarEvents(selectVisibleOccurrences(occurrences, absences)), ...absencesToCalendarEvents(absences)]} eventClick={(info) => { if (info.event.extendedProps.calendar_event_type === 'absence') return; triggerRef.current = info.el ?? info.jsEvent?.target; setSelected({ ...info.event.extendedProps, occurrence_id: info.event.extendedProps.occurrence_id, task: info.event.extendedProps.task }) }} datesSet={handleDatesSet} height="auto" /></div>
       </>
       {selected && <OccurrenceDialog occurrence={selected} onClose={() => setSelected(null)} onComplete={(id, key) => runCommand(() => completeAreaOccurrence(id, key))} onReschedule={(id, body, key) => runCommand(() => rescheduleAreaOccurrence(id, body, key))} />}
     </section>
