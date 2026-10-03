@@ -57,12 +57,13 @@ describe('situacionesService: contrato de la API', () => {
     expect(apiRequest).toHaveBeenCalledWith(url)
   })
 
-  it('registra una situación con id_usuario, fecha, código del tipo y notas', async () => {
+  it('registra una situación con id_usuario, fecha, código del tipo, notas y jornada', async () => {
     const payload = {
       id_usuario: 12,
       fecha: '2026-09-08',
       tipo: 'reunion_resultados',
       notas: 'Reunión mensual',
+      slot: 'morning',
     }
     const situacion = { id: 7, ...payload }
     respond(situacion, 201)

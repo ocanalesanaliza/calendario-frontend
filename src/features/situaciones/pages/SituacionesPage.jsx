@@ -14,6 +14,14 @@ function nombreTipoConPorcentaje(tipo) {
   return `${tipo.nombre} (${porcentajeTipo(tipo.codigo)}%)`
 }
 
+function nombreJornada(slot) {
+  return {
+    morning: 'Mañana',
+    afternoon: 'Tarde',
+    full_day: 'Jornada completa',
+  }[slot] ?? 'Jornada completa'
+}
+
 function formatFecha(iso) {
   if (!iso) return '—'
   const [y, m, d] = iso.split('-')
@@ -162,6 +170,7 @@ export default function SituacionesPage() {
               <tr>
                 <th>Usuario</th>
                 <th>Fecha</th>
+                <th>Jornada</th>
                 <th>Tipo</th>
                 <th>Notas</th>
                 <th>Creada por</th>
@@ -175,6 +184,7 @@ export default function SituacionesPage() {
                 <tr key={s.id_situacion_especial} className={!s.activa ? 'row-inactive' : ''}>
                   <td className="td-nombre">{s.usuario?.nombre ?? '—'}</td>
                   <td>{formatFecha(s.fecha)}</td>
+                  <td>{nombreJornada(s.slot ?? s.jornada)}</td>
                   <td>
                     <span className="badge badge-tipo">
                       {nombreTipoConPorcentaje(tipos.find((tipo) => tipo.codigo === s.tipo) ?? { codigo: s.tipo, nombre: s.tipo })}
@@ -312,6 +322,7 @@ function CrearModal({ tipos, loadingTipos, errorTipos, onRecargarTipos, puedeCre
     fecha_fin:    '',
     tipo:         '',
     notas:        '',
+    slot:         'full_day',
   })
   const [error, setError]     = useState('')
   const [loading, setLoading] = useState(false)
@@ -399,6 +410,7 @@ function CrearModal({ tipos, loadingTipos, errorTipos, onRecargarTipos, puedeCre
           fecha,
           tipo:  tipoSeleccionado,
           notas: form.notas.trim(),
+          slot: form.slot,
         })
         siguienteFecha = fechas[index + 1]
       }
@@ -529,6 +541,15 @@ function CrearModal({ tipos, loadingTipos, errorTipos, onRecargarTipos, puedeCre
           {puedeCrearTipo && (
             <button type="button" className="btn-secondary" disabled={loading || loadingTipos || !!errorTipos} onClick={() => { setMostrandoNuevoTipo(true); setError('') }}>Agregar tipo</button>
           )}
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="situacion-jornada">Jornada</label>
+          <select id="situacion-jornada" value={form.slot} onChange={set('slot')} disabled={loading}>
+            <option value="morning">Mañana</option>
+            <option value="afternoon">Tarde</option>
+            <option value="full_day">Jornada completa</option>
+          </select>
         </div>
 
         <div className="form-group">

@@ -27,7 +27,7 @@ function fechaReciente() {
   return fecha.toISOString().slice(0, 10)
 }
 
-function mockApi({ permisoTipos = { puede_crear: false }, errorCrearTipo } = {}) {
+function mockApi({ permisoTipos = { puede_crear: false }, errorCrearTipo, errorCrearSituacion } = {}) {
   let tipos = [...TIPOS]
   let situaciones = []
   apiRequest.mockImplementation(async (path, options = {}) => {
@@ -47,6 +47,7 @@ function mockApi({ permisoTipos = { puede_crear: false }, errorCrearTipo } = {})
       return response({ count: 1, results: [{ id_gerente_area: 2, nombre: 'GA Centro', activo: true }] })
     }
     if (path === BASE && method === 'POST') {
+      if (errorCrearSituacion) return response(errorCrearSituacion.body, errorCrearSituacion.status)
       const situacion = {
         id_situacion_especial: 7,
         ...JSON.parse(options.body),
@@ -89,20 +90,37 @@ beforeEach(() => {
 })
 
 describe('SituacionesPage: catálogo y registro', () => {
-  it('envía el código del primer tipo visible aunque el usuario no cambie el selector', async () => {
+  it('muestra el selector de jornada y envía jornada completa por defecto', async () => {
     mockApi()
     await abrirNuevaSituacion()
     expect(screen.getByLabelText('Tipo')).toHaveValue('permiso_autorizado')
     expect(screen.getByRole('option', { name: 'Permiso con autorización (100%)' })).toHaveProperty('selected', true)
+    expect(screen.getByLabelText('Jornada')).toHaveValue('full_day')
     const fecha = llenarSituacion()
 
     fireEvent.click(screen.getByRole('button', { name: 'Aplicar situación' }))
 
     await waitFor(() => expect(apiRequest).toHaveBeenCalledWith(BASE, {
       method: 'POST',
-      body: JSON.stringify({ id_usuario: 12, fecha, tipo: 'permiso_autorizado', notas: 'Reunión mensual' }),
+      body: JSON.stringify({ id_usuario: 12, fecha, tipo: 'permiso_autorizado', notas: 'Reunión mensual', slot: 'full_day' }),
     }))
     expect(await screen.findByRole('cell', { name: 'Permiso con autorización (100%)' })).toBeInTheDocument()
+  })
+
+  it.each([
+    ['Mañana', 'morning'],
+    ['Tarde', 'afternoon'],
+  ])('envía %s como %s', async (_label, slot) => {
+    mockApi()
+    await abrirNuevaSituacion()
+    const fecha = llenarSituacion()
+    fireEvent.change(screen.getByLabelText('Jornada'), { target: { value: slot } })
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar situación' }))
+
+    await waitFor(() => expect(apiRequest).toHaveBeenCalledWith(BASE, {
+      method: 'POST',
+      body: JSON.stringify({ id_usuario: 12, fecha, tipo: 'permiso_autorizado', notas: 'Reunión mensual', slot }),
+    }))
   })
 
   it.each(TIPOS.slice(1))('muestra $nombre y envía su código $codigo', async ({ codigo, nombre }) => {
@@ -118,7 +136,7 @@ describe('SituacionesPage: catálogo y registro', () => {
 
     await waitFor(() => expect(apiRequest).toHaveBeenCalledWith(BASE, {
       method: 'POST',
-      body: JSON.stringify({ id_usuario: 12, fecha, tipo: codigo, notas: 'Reunión mensual' }),
+      body: JSON.stringify({ id_usuario: 12, fecha, tipo: codigo, notas: 'Reunión mensual', slot: 'full_day' }),
     }))
     expect(await screen.findByRole('cell', { name: nombreConPorcentaje })).toBeInTheDocument()
   })
@@ -200,9 +218,94 @@ describe('SituacionesPage: creación de tipos', () => {
 
     await waitFor(() => expect(apiRequest).toHaveBeenCalledWith(BASE, {
       method: 'POST',
-      body: JSON.stringify({ id_usuario: 12, fecha, tipo: 'capacitacion', notas: 'Reunión mensual' }),
+      body: JSON.stringify({ id_usuario: 12, fecha, tipo: 'capacitacion', notas: 'Reunión mensual', slot: 'full_day' }),
     }))
     expect(await screen.findByRole('cell', { name: 'Capacitación (100%)' })).toBeInTheDocument()
+  })
+
+  it('muestra mañana y tarde activas de un mismo GS y fecha por separado', async () => {
+    const fecha = fechaReciente()
+    const situaciones = [
+      { id_situacion_especial: 7, id_usuario: 12, fecha, tipo: 'permiso_autorizado', notas: '', slot: 'morning', usuario: USUARIO, activa: true },
+      { id_situacion_especial: 8, id_usuario: 12, fecha, tipo: 'reunion_resultados', notas: '', slot: 'afternoon', usuario: USUARIO, activa: true },
+    ]
+    mockApi()
+    apiRequest.mockImplementation(async (path, options = {}) => {
+      if (path.startsWith(`${BASE}?`) && !options.method) return response({ count: situaciones.length, results: situaciones, total_pages: 1 })
+      if (path === `${BASE}tipos/`) return response({ count: TIPOS.length, results: TIPOS, puede_crear: false })
+      throw new Error(`Unexpected request: ${options.method ?? 'GET'} ${path}`)
+    })
+
+    render(<SituacionesPage />)
+
+    expect(await screen.findByRole('cell', { name: 'Mañana' })).toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: 'Tarde' })).toBeInTheDocument()
+    expect(screen.getAllByText('GS Ana')).toHaveLength(2)
+  })
+
+  it('muestra Jornada completa cuando una situación existente no incluye jornada', async () => {
+    const fecha = fechaReciente()
+    const situaciones = [{ id_situacion_especial: 7, id_usuario: 12, fecha, tipo: 'permiso_autorizado', notas: '', usuario: USUARIO, activa: true }]
+    mockApi()
+    apiRequest.mockImplementation(async (path, options = {}) => {
+      if (path.startsWith(`${BASE}?`) && !options.method) return response({ count: 1, results: situaciones, total_pages: 1 })
+      if (path === `${BASE}tipos/`) return response({ count: TIPOS.length, results: TIPOS, puede_crear: false })
+      throw new Error(`Unexpected request: ${options.method ?? 'GET'} ${path}`)
+    })
+
+    render(<SituacionesPage />)
+
+    expect(await screen.findByRole('cell', { name: 'Jornada completa' })).toBeInTheDocument()
+  })
+
+  it('muestra el detalle de conflicto 409 devuelto por el backend', async () => {
+    mockApi({ errorCrearSituacion: { status: 409, body: { detail: 'Ya existe una situación para la jornada de mañana.' } } })
+    await abrirNuevaSituacion()
+    llenarSituacion()
+    fireEvent.change(screen.getByLabelText('Jornada'), { target: { value: 'morning' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar situación' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ya existe una situación para la jornada de mañana.')
+  })
+
+  it('recarga el listado después de crear jornada completa para reflejar parciales inactivas', async () => {
+    const fecha = fechaReciente()
+    let situaciones = [{
+      id_situacion_especial: 7,
+      id_usuario: 12,
+      fecha,
+      tipo: 'permiso_autorizado',
+      notas: '',
+      slot: 'morning',
+      usuario: USUARIO,
+      activa: true,
+    }]
+    mockApi()
+    apiRequest.mockImplementation(async (path, options = {}) => {
+      const method = options.method ?? 'GET'
+      if (path === `${BASE}tipos/`) return response({ count: TIPOS.length, results: TIPOS, puede_crear: false })
+      if (path === `${BASE}usuarios/`) return response({ count: 1, results: [USUARIO] })
+      if (path === BASE && method === 'POST') {
+        situaciones = [
+          { ...situaciones[0], activa: false },
+          { id_situacion_especial: 8, ...JSON.parse(options.body), usuario: USUARIO, activa: true },
+        ]
+        return response(situaciones[1], 201)
+      }
+      if (path.startsWith(`${BASE}?`) && method === 'GET') return response({ count: situaciones.length, results: situaciones, total_pages: 1 })
+      throw new Error(`Unexpected request: ${method} ${path}`)
+    })
+
+    render(<SituacionesPage />)
+    await screen.findByRole('cell', { name: 'Mañana' })
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva situación' }))
+    await screen.findByRole('option', { name: USUARIO.nombre })
+    llenarSituacion(fecha)
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar situación' }))
+
+    await waitFor(() => expect(screen.getAllByText('Inactiva')).toHaveLength(1))
+    expect(screen.getByRole('cell', { name: 'Jornada completa' })).toBeInTheDocument()
+    expect(apiRequest.mock.calls.filter(([path, options]) => path.startsWith(`${BASE}?`) && !options?.method)).toHaveLength(2)
   })
 
   it.each([
