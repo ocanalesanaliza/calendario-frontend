@@ -481,4 +481,165 @@ describe('MisTareasPage deposit demonstrations', () => {
     expect(registrarTarea).not.toHaveBeenCalled()
     expect(registrarTareasLote).not.toHaveBeenCalled()
   })
+
+  it('ignores an older task-list response that resolves after the selected-date response', async () => {
+    let resolveInitialRequest
+    let resolveSelectedDateRequest
+    const initialRequest = new Promise((resolve) => { resolveInitialRequest = resolve })
+    const selectedDateRequest = new Promise((resolve) => { resolveSelectedDateRequest = resolve })
+    const initialResponse = {
+      ...taskResponse,
+      results: [{ ...taskResponse.results[0], tarea: { id_tarea: 1, nombre: 'Previous date task' } }],
+    }
+    const selectedDateResponse = {
+      ...taskResponse,
+      meta: { ...taskResponse.meta, fecha_consultada: '2026-09-06' },
+      results: [{ ...taskResponse.results[0], tarea: { id_tarea: 2, nombre: 'Selected date task' } }],
+    }
+    getMisTareas.mockImplementationOnce(() => initialRequest).mockImplementationOnce(() => selectedDateRequest)
+
+    render(<MemoryRouter><MisTareasPage /></MemoryRouter>)
+    await waitFor(() => expect(getMisTareas).toHaveBeenCalledTimes(1))
+
+    fireEvent.change(screen.getByLabelText('Fecha'), { target: { value: '2026-09-06' } })
+    await waitFor(() => expect(getMisTareas).toHaveBeenCalledTimes(2))
+
+    resolveSelectedDateRequest(selectedDateResponse)
+    expect(await screen.findByText('Selected date task')).toBeInTheDocument()
+
+    resolveInitialRequest(initialResponse)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(screen.queryByText('Previous date task')).not.toBeInTheDocument()
+  })
+
+  it('posts the selected response fecha when completing a task after changing the date', async () => {
+    const selectedDateResponse = {
+      ...taskResponse,
+      meta: { ...taskResponse.meta, fecha_consultada: '2026-09-06' },
+      results: [{ ...taskResponse.results[0], tarea: { id_tarea: 19, nombre: 'Selected date completion' } }],
+    }
+    getMisTareas.mockResolvedValueOnce(taskResponse).mockResolvedValueOnce(selectedDateResponse).mockResolvedValueOnce(selectedDateResponse)
+    registrarTarea.mockResolvedValue({})
+
+    render(<MemoryRouter><MisTareasPage /></MemoryRouter>)
+    await screen.findByText('Envio de deposito de Sucursal.')
+
+    fireEvent.change(screen.getByLabelText('Fecha'), { target: { value: '2026-09-06' } })
+    const checkbox = await screen.findByRole('checkbox', { name: /Seleccionar Selected date completion/i })
+    fireEvent.click(checkbox)
+    fireEvent.click(screen.getByRole('button', { name: /Registrar 1 tarea/i }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirmar' }))
+
+    await waitFor(() => expect(registrarTarea).toHaveBeenCalledWith({
+      id_tarea: 19,
+      fecha: '2026-09-06',
+      notas: undefined,
+    }))
+  })
+
+  it('does not let an accepted field-work action refresh its original date after switching dates', async () => {
+    let resolveAcceptance
+    const acceptance = new Promise((resolve) => { resolveAcceptance = resolve })
+    perfil = { type: 'gerente_area', can_access_my_tasks: true }
+    const selectedDateResponse = {
+      ...taskResponse,
+      meta: { ...taskResponse.meta, fecha_consultada: '2026-09-06' },
+      results: [{ ...taskResponse.results[0], tarea: { id_tarea: 2, nombre: 'Selected date task' } }],
+    }
+    getMisTareas.mockResolvedValueOnce(taskResponse).mockResolvedValueOnce(selectedDateResponse)
+    getTrabajosCampo
+      .mockResolvedValueOnce({ results: [{ id_trabajo_campo: 9, fecha: '2026-09-05', jornada: 'manana' }] })
+      .mockResolvedValueOnce({ results: [{ id_trabajo_campo: 10, fecha: '2026-09-06', jornada: 'manana' }] })
+    aceptarTrabajoCampo.mockReturnValueOnce(acceptance)
+
+    render(<MemoryRouter><MisTareasPage /></MemoryRouter>)
+    fireEvent.click(await screen.findByRole('button', { name: 'Aceptar' }))
+    fireEvent.change(screen.getByLabelText('Fecha'), { target: { value: '2026-09-06' } })
+
+    expect(await screen.findByText('Selected date task')).toBeInTheDocument()
+    resolveAcceptance({})
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(getMisTareas).toHaveBeenCalledTimes(2)
+    expect(getTrabajosCampo).toHaveBeenCalledTimes(2)
+    expect(screen.getByText('Selected date task')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['accept', aceptarTrabajoCampo, 'Aceptar'],
+    ['reject', rechazarTrabajoCampo, 'Rechazar'],
+  ])('does not warn after unmounting during a pending field-work %s action', async (_action, request, buttonName) => {
+    let resolveRequest
+    const pendingRequest = new Promise((resolve) => { resolveRequest = resolve })
+    perfil = { type: 'gerente_area', can_access_my_tasks: true }
+    getTrabajosCampo.mockResolvedValue({ results: [{ id_trabajo_campo: 9, fecha: '2026-09-05', jornada: 'manana' }] })
+    request.mockReturnValueOnce(pendingRequest)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const { unmount } = render(<MemoryRouter><MisTareasPage /></MemoryRouter>)
+    fireEvent.click(await screen.findByRole('button', { name: buttonName }))
+    unmount()
+    resolveRequest({})
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(consoleError).not.toHaveBeenCalled()
+    consoleError.mockRestore()
+  })
+
+  it('does not warn after unmounting during pending individual or batch registration', async () => {
+    let resolveIndividual
+    let resolveBatch
+    const individualRequest = new Promise((resolve) => { resolveIndividual = resolve })
+    const batchRequest = new Promise((resolve) => { resolveBatch = resolve })
+    registrarTarea.mockReturnValueOnce(individualRequest)
+    registrarTareasLote.mockReturnValueOnce(batchRequest)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const individualView = render(<MemoryRouter><MisTareasPage /></MemoryRouter>)
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Seleccionar Envio de deposito/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Registrar 1 tarea/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
+    individualView.unmount()
+    resolveIndividual({})
+
+    getMisTareas.mockResolvedValue({
+      ...taskResponse,
+      resumen: { ...taskResponse.resumen, total: 2, disponibles: 2, manana: { total: 2 } },
+      results: [
+        { ...taskResponse.results[0], tarea: { id_tarea: 18, nombre: 'First task' } },
+        { ...taskResponse.results[0], id_sucursal_tarea: 45, tarea: { id_tarea: 19, nombre: 'Second task' } },
+      ],
+    })
+    const batchView = render(<MemoryRouter><MisTareasPage /></MemoryRouter>)
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Seleccionar First task/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /Seleccionar Second task/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Registrar 2 tareas/i }))
+    batchView.unmount()
+    resolveBatch({ errores: [] })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(consoleError).not.toHaveBeenCalled()
+    consoleError.mockRestore()
+  })
+
+  it('does not render a prior-session task after identity changes while its request is in flight', async () => {
+    let resolvePriorSessionRequest
+    const priorSessionRequest = new Promise((resolve) => { resolvePriorSessionRequest = resolve })
+    getMisTareas.mockImplementationOnce(() => priorSessionRequest)
+    const renderPage = () => <MemoryRouter><MisTareasPage /></MemoryRouter>
+
+    const view = render(renderPage())
+    await waitFor(() => expect(getMisTareas).toHaveBeenCalledTimes(1))
+
+    perfil = { type: 'gerente_sucursal', can_access_my_tasks: true, sucursal: { nombre: 'Sucursal Sur' } }
+    view.rerender(renderPage())
+
+    resolvePriorSessionRequest({
+      ...taskResponse,
+      results: [{ ...taskResponse.results[0], tarea: { id_tarea: 3, nombre: 'Prior-session task' } }],
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(screen.queryByText('Prior-session task')).not.toBeInTheDocument()
+  })
 })

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { getMisTareas, registrarTarea, registrarTareasLote } from '../services/operacionService'
 import { getTrabajosCampo, aceptarTrabajoCampo, rechazarTrabajoCampo } from '../../trabajosCampo/services/trabajosCampoService'
@@ -90,19 +90,39 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
   const [depositTask, setDepositTask] = useState(null)
   const [revisionGuardiaTask, setRevisionGuardiaTask] = useState(null)
   const [availableFilterActive, setAvailableFilterActive] = useState(false)
+  const isMountedRef = useRef(true)
+  const perfilRef = useRef(null)
+  const fechaRef = useRef('')
+  const viewVersion = useRef(0)
+  const tareasRequestVersion = useRef(0)
+  const trabajosCampoRequestVersion = useRef(0)
 
   const { perfil, revokeMyTasksAccess } = useAuth()
   const navigate = useNavigate()
+  perfilRef.current = perfil
+  fechaRef.current = fecha
 
   const busy = savingId !== null || registrandoLote
   const esGerenteArea = perfil?.type === 'gerente_area'
   const puedeAccederMisTareas = perfil?.can_access_my_tasks === true
 
   useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      tareasRequestVersion.current += 1
+      trabajosCampoRequestVersion.current += 1
+    }
+  }, [])
+
+  useEffect(() => {
+    viewVersion.current += 1
+    tareasRequestVersion.current += 1
+    trabajosCampoRequestVersion.current += 1
     if (!puedeAccederMisTareas) return
     loadTareas()
     loadTrabajosCampo()
-  }, [fecha, puedeAccederMisTareas])
+  }, [fecha, perfil, puedeAccederMisTareas])
 
   function handleForbidden(error) {
     if (error?.status !== 403) return false
@@ -112,10 +132,18 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
   }
 
   async function loadTareas() {
+    const requestVersion = ++tareasRequestVersion.current
+    const requestPerfil = perfil
+    const isCurrentRequest = () => (
+      isMountedRef.current
+      && requestVersion === tareasRequestVersion.current
+      && perfilRef.current === requestPerfil
+    )
     setLoading(true)
     try {
       const params = fecha ? { fecha } : {}
       const res = await getMisTareas(params)
+      if (!isCurrentRequest()) return
       setData(res)
       if (availableFilterVariant && availableFilterActive) {
         const activeJornada = !fecha && res.meta?.jornada_servidor
@@ -127,32 +155,54 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
         setJornada(res.meta.jornada_servidor)
       }
     } catch (error) {
-      handleForbidden(error)
+      if (isCurrentRequest()) handleForbidden(error)
     } finally {
-      setLoading(false)
+      if (isCurrentRequest()) setLoading(false)
     }
   }
 
+  function getActionContext() {
+    const actionFecha = fecha
+    const actionPerfil = perfil
+    const actionViewVersion = viewVersion.current
+    return () => (
+      isMountedRef.current
+      && fechaRef.current === actionFecha
+      && perfilRef.current === actionPerfil
+      && viewVersion.current === actionViewVersion
+    )
+  }
+
   async function loadTrabajosCampo() {
+    const requestVersion = ++trabajosCampoRequestVersion.current
+    const requestPerfil = perfil
+    const isCurrentRequest = () => (
+      isMountedRef.current
+      && requestVersion === trabajosCampoRequestVersion.current
+      && perfilRef.current === requestPerfil
+    )
     try {
       const params = { estado: 'pendiente' }
       if (fecha) params.fecha = fecha
       const res = await getTrabajosCampo(params)
+      if (!isCurrentRequest()) return
       setTrabajosCampo(res.results ?? [])
     } catch (error) {
-      if (!handleForbidden(error)) setTrabajosCampo([])
+      if (isCurrentRequest() && !handleForbidden(error)) setTrabajosCampo([])
     }
   }
 
   async function handleAceptarCampo(id) {
+    const isCurrentAction = getActionContext()
     setCampoAction(id)
     try {
       await aceptarTrabajoCampo(id)
+      if (!isCurrentAction()) return
       await Promise.all([loadTareas(), loadTrabajosCampo()])
     } catch (err) {
-      if (!handleForbidden(err)) alert(err.message)
+      if (isCurrentAction() && !handleForbidden(err)) alert(err.message)
     } finally {
-      setCampoAction(null)
+      if (isCurrentAction()) setCampoAction(null)
     }
   }
 
@@ -173,18 +223,21 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
   }
 
   async function handleRechazarCampo(id) {
+    const isCurrentAction = getActionContext()
     setCampoAction(id)
     try {
       await rechazarTrabajoCampo(id)
+      if (!isCurrentAction()) return
       await loadTrabajosCampo()
     } catch (err) {
-      if (!handleForbidden(err)) alert(err.message)
+      if (isCurrentAction() && !handleForbidden(err)) alert(err.message)
     } finally {
-      setCampoAction(null)
+      if (isCurrentAction()) setCampoAction(null)
     }
   }
 
   async function handleRegistrar(tarea) {
+    const isCurrentAction = getActionContext()
     setSavingId(tarea.id_sucursal_tarea)
     setRegError('')
     try {
@@ -193,15 +246,18 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
         fecha:    data.meta?.fecha_consultada,
         notas:    notas || undefined,
       })
+      if (!isCurrentAction()) return
       setRegistrando(null)
       setNotas('')
       setSeleccionadas([])
       await loadTareas()
     } catch (err) {
-      if (handleForbidden(err)) return
-      setRegError(err.message)
+      if (isCurrentAction()) {
+        if (handleForbidden(err)) return
+        setRegError(err.message)
+      }
     } finally {
-      setSavingId(null)
+      if (isCurrentAction()) setSavingId(null)
     }
   }
 
@@ -241,6 +297,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
   }
 
   async function handleRegistrarSeleccionadas() {
+    const isCurrentAction = getActionContext()
     const tareas = tareasFiltradas.filter((t) => seleccionadas.includes(t.id_sucursal_tarea))
     setRegistrandoLote(true)
     setLoteError('')
@@ -250,6 +307,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
         fecha:     data.meta?.fecha_consultada,
         id_tareas: tareas.map((t) => t.tarea?.id_tarea),
       })
+      if (!isCurrentAction()) return
       if (res.errores?.length > 0) {
         const nombrePorId = new Map(
           tareas.map((t) => [t.tarea?.id_tarea, t.tarea?.nombre || `Tarea #${t.id_sucursal_tarea}`])
@@ -258,11 +316,17 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
         setLoteError(`No se pudieron registrar: ${nombres.join(', ')}`)
       }
     } catch (err) {
-      accessRevoked = handleForbidden(err)
-      if (!accessRevoked) setLoteError(err.message)
+      if (isCurrentAction()) {
+        accessRevoked = handleForbidden(err)
+        if (!accessRevoked) setLoteError(err.message)
+      }
     } finally {
+      if (!isCurrentAction()) return
       setSeleccionadas([])
-      if (!accessRevoked) await loadTareas()
+      if (!accessRevoked) {
+        await loadTareas()
+        if (!isCurrentAction()) return
+      }
       setRegistrandoLote(false)
     }
   }
@@ -604,8 +668,9 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
           fecha={data?.meta?.fecha_consultada}
           onClose={() => setRevisionGuardiaTask(null)}
           onSaved={async () => {
+            const isCurrentAction = getActionContext()
             await loadTareas()
-            setRevisionGuardiaTask(null)
+            if (isCurrentAction()) setRevisionGuardiaTask(null)
           }}
         />
       )}
