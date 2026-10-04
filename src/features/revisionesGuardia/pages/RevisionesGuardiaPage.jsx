@@ -20,6 +20,26 @@ const FILTROS_VACIOS = {
   buscar: '',
 }
 
+const WORKSHEET_LAYOUTS = {
+  Revisiones: [12, 28, 16, 28, 24, 24, 22, 42],
+  Guardias: [12, 28, 16, 28, 24, 18, 32, 16, 42, 42, 42],
+}
+
+function createGuardReviewWorksheet(sheetData, widths, page, generatedAt) {
+  const [headers, ...dataRows] = sheetData
+  const worksheet = XLSX.utils.aoa_to_sheet([
+    ['Revisiones de guardia'],
+    [`Página ${page}`, `Generado: ${generatedAt.toISOString()}`],
+    [],
+    headers,
+    ...dataRows,
+  ])
+  worksheet['!cols'] = widths.map((wch) => ({ wch }))
+  worksheet['!rows'] = [{}, {}, {}, { hpt: 32 }]
+  worksheet['!autofilter'] = { ref: `A4:${XLSX.utils.encode_col(headers.length - 1)}${4 + dataRows.length}` }
+  return worksheet
+}
+
 export default function RevisionesGuardiaPage() {
   const [draft, setDraft] = useState(FILTROS_VACIOS)
   const [filtros, setFiltros] = useState(FILTROS_VACIOS)
@@ -105,13 +125,21 @@ export default function RevisionesGuardiaPage() {
   }
 
   function exportarPaginaActual() {
-    const revisionesWorksheet = XLSX.utils.aoa_to_sheet(toRevisionExportSheetData(filas))
-    const guardiasWorksheet = XLSX.utils.aoa_to_sheet(toGuardiaExportSheetData(results))
+    const generatedAt = new Date()
+    const page = paginationModel.page + 1
+    const fecha = generatedAt.toISOString().slice(0, 10)
+    const revisionesWorksheet = createGuardReviewWorksheet(toRevisionExportSheetData(filas), WORKSHEET_LAYOUTS.Revisiones, page, generatedAt)
+    const guardiasWorksheet = createGuardReviewWorksheet(toGuardiaExportSheetData(results), WORKSHEET_LAYOUTS.Guardias, page, generatedAt)
     const workbook = XLSX.utils.book_new()
+    workbook.Props = {
+      Title: 'Revisiones de guardia',
+      Subject: `Página ${page} exportada el ${generatedAt.toISOString()}`,
+      Author: 'Calendario',
+      CreatedDate: generatedAt,
+    }
     XLSX.utils.book_append_sheet(workbook, revisionesWorksheet, 'Revisiones')
     XLSX.utils.book_append_sheet(workbook, guardiasWorksheet, 'Guardias')
-    const fecha = new Date().toISOString().slice(0, 10)
-    XLSX.writeFile(workbook, `revisiones-guardia-pagina-${paginationModel.page + 1}-${fecha}.xlsx`)
+    XLSX.writeFile(workbook, `revisiones-guardia-pagina-${page}-${fecha}.xlsx`)
   }
 
   const filas = toRevisionGridRows(results)

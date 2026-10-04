@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import RevisionesGuardiaPage from './RevisionesGuardiaPage'
 
-const { getSucursales, getGerentes, getUsuarios, getAnalitica, aoaToSheet, bookNew, bookAppendSheet, writeFile } = vi.hoisted(() => ({
+const { getSucursales, getGerentes, getUsuarios, getAnalitica, aoaToSheet, bookNew, bookAppendSheet, writeFile, encodeCol } = vi.hoisted(() => ({
   getSucursales: vi.fn(),
   getGerentes: vi.fn(),
   getUsuarios: vi.fn(),
@@ -11,13 +11,14 @@ const { getSucursales, getGerentes, getUsuarios, getAnalitica, aoaToSheet, bookN
   bookNew: vi.fn(),
   bookAppendSheet: vi.fn(),
   writeFile: vi.fn(),
+  encodeCol: vi.fn(),
 }))
 
 vi.mock('@mui/x-data-grid', () => ({
   DataGrid: ({ columns, rows }) => <div role="grid">{columns.map((column) => <span key={column.field}>{column.headerName}</span>)}{rows.map((row) => <div key={row.id}>{row.sucursal}</div>)}</div>,
 }))
 vi.mock('xlsx', () => ({
-  utils: { aoa_to_sheet: aoaToSheet, book_new: bookNew, book_append_sheet: bookAppendSheet },
+  utils: { aoa_to_sheet: aoaToSheet, book_new: bookNew, book_append_sheet: bookAppendSheet, encode_col: encodeCol },
   writeFile,
 }))
 vi.mock('../../sucursales/services/sucursalesService', () => ({ getSucursales }))
@@ -42,10 +43,11 @@ describe('RevisionesGuardiaPage export', () => {
     getGerentes.mockReset().mockResolvedValue([])
     getUsuarios.mockReset().mockResolvedValue([])
     getAnalitica.mockReset().mockResolvedValue({ count: 41, results: [revision] })
-    aoaToSheet.mockReset().mockReturnValue({ worksheet: true })
+    aoaToSheet.mockReset().mockImplementation((data) => ({ data }))
     bookNew.mockReset().mockReturnValue({ workbook: true })
     bookAppendSheet.mockReset()
     writeFile.mockReset()
+    encodeCol.mockReset().mockImplementation((index) => String.fromCharCode(65 + index))
   })
 
   afterEach(() => vi.restoreAllMocks())
@@ -73,17 +75,44 @@ describe('RevisionesGuardiaPage export', () => {
       ['Fecha', 'Sucursal', 'Código', 'Gerente de área', 'GS', 'Resultado', 'Cantidad de guardias', 'Nota'],
       ['2026-09-09', 'Sucursal Centro', 'CENTRO-01', 'GA Centro', 'GS Ana', 'Revisión realizada', 1, 'Nota visible de la página.'],
     ]
-    await waitFor(() => expect(aoaToSheet).toHaveBeenNthCalledWith(1, expectedSheetData))
+    await waitFor(() => expect(aoaToSheet).toHaveBeenCalledTimes(2))
+    expect(aoaToSheet).toHaveBeenNthCalledWith(1, [
+      ['Revisiones de guardia'],
+      ['Página 1', 'Generado: 2026-09-24T12:00:00.000Z'],
+      [],
+      ...expectedSheetData,
+    ])
     expect(JSON.stringify(aoaToSheet.mock.calls[0][0])).not.toMatch(/identidad|tel[eé]fono|María|0801-2000-12345|9999-0000/i)
     expect(aoaToSheet).toHaveBeenNthCalledWith(2, [
+      ['Revisiones de guardia'],
+      ['Página 1', 'Generado: 2026-09-24T12:00:00.000Z'],
+      [],
       ['Fecha', 'Sucursal', 'Código', 'Gerente de sucursal', 'Resultado', 'Número de guardia', 'Nombre completo', 'Teléfono', 'Uniforme no portado', 'Equipamiento no portado', 'Nota'],
       ['2026-09-09', 'Sucursal Centro', 'CENTRO-01', 'GS Ana', 'Revisión realizada', 1, 'María López', '9999-0000', 'Botas', 'Porta carnet', 'Nota visible de la página.'],
     ])
     expect(JSON.stringify(aoaToSheet.mock.calls[1][0])).not.toMatch(/identidad|0801-2000-12345/i)
+    expect(aoaToSheet.mock.results[0].value).toMatchObject({
+      '!cols': [{ wch: 12 }, { wch: 28 }, { wch: 16 }, { wch: 28 }, { wch: 24 }, { wch: 24 }, { wch: 22 }, { wch: 42 }],
+      '!rows': [{}, {}, {}, { hpt: 32 }],
+      '!autofilter': { ref: 'A4:H5' },
+    })
+    expect(aoaToSheet.mock.results[1].value).toMatchObject({
+      '!cols': [{ wch: 12 }, { wch: 28 }, { wch: 16 }, { wch: 28 }, { wch: 24 }, { wch: 18 }, { wch: 32 }, { wch: 16 }, { wch: 42 }, { wch: 42 }, { wch: 42 }],
+      '!rows': [{}, {}, {}, { hpt: 32 }],
+      '!autofilter': { ref: 'A4:K5' },
+    })
     expect(bookNew).toHaveBeenCalledOnce()
-    expect(bookAppendSheet).toHaveBeenNthCalledWith(1, { workbook: true }, { worksheet: true }, 'Revisiones')
-    expect(bookAppendSheet).toHaveBeenNthCalledWith(2, { workbook: true }, { worksheet: true }, 'Guardias')
-    expect(writeFile).toHaveBeenCalledWith({ workbook: true }, 'revisiones-guardia-pagina-1-2026-09-24.xlsx')
+    expect(bookNew.mock.results[0].value).toMatchObject({
+      Props: {
+        Title: 'Revisiones de guardia',
+        Subject: 'Página 1 exportada el 2026-09-24T12:00:00.000Z',
+        Author: 'Calendario',
+        CreatedDate: expect.any(Date),
+      },
+    })
+    expect(bookAppendSheet).toHaveBeenNthCalledWith(1, { workbook: true, Props: expect.any(Object) }, aoaToSheet.mock.results[0].value, 'Revisiones')
+    expect(bookAppendSheet).toHaveBeenNthCalledWith(2, { workbook: true, Props: expect.any(Object) }, aoaToSheet.mock.results[1].value, 'Guardias')
+    expect(writeFile).toHaveBeenCalledWith({ workbook: true, Props: expect.any(Object) }, 'revisiones-guardia-pagina-1-2026-09-24.xlsx')
     expect([getSucursales, getGerentes, getUsuarios, getAnalitica].map((request) => request.mock.calls.length)).toEqual(requestsBeforeExport)
   })
 })
