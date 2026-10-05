@@ -6,6 +6,7 @@ import { useAuth } from '../../auth/context/AuthContext'
 import { DepositDemoModal } from '../components/DepositDemoModal'
 import { RevisionGuardiaModal } from '../components/RevisionGuardiaModal'
 import './MisTareasPage.css'
+import './MisTareasV2Page.css'
 
 const ESTADO_BADGE = {
   disponible:    'badge-green',
@@ -61,6 +62,7 @@ function getTimeInMinutes(value) {
 
 function getTaskPriority(tarea, meta) {
   if (tarea.estado_ui === 'no_disponible' || tarea.estado_ui === 'bloqueada') return 'neutral'
+  if (tarea.estado_ui === 'registrada') return null
   if (!meta || meta.fecha_consultada !== meta.fecha_servidor) return null
 
   const serverTime = getTimeInMinutes(meta.hora_servidor)
@@ -498,22 +500,6 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
             disabled={busy}
           />
         </label>
-        <nav className="mis-tareas-view-switcher" aria-label="Versión de Mis tareas">
-          <Link
-            className={location.pathname === '/mis-tareas' ? 'active' : undefined}
-            to={{ pathname: '/mis-tareas', search: fecha ? `?fecha=${fecha}` : '' }}
-            aria-current={location.pathname === '/mis-tareas' ? 'page' : undefined}
-          >
-            V1
-          </Link>
-          <Link
-            className={location.pathname === '/mis-tareas-v2' ? 'active' : undefined}
-            to={{ pathname: '/mis-tareas-v2', search: fecha ? `?fecha=${fecha}` : '' }}
-            aria-current={location.pathname === '/mis-tareas-v2' ? 'page' : undefined}
-          >
-            V2
-          </Link>
-        </nav>
       </div>
 
       {resumen && (
@@ -580,25 +566,43 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
         </div>
       )}
 
-      <div className="jornada-tabs" role="group" aria-label="Jornada de tareas">
-        <button
-          className={`jornada-tab${jornada === 'manana' ? ' active' : ''}`}
-          onClick={() => { setJornada('manana'); reiniciarVista() }}
-          disabled={busy}
-          aria-pressed={jornada === 'manana'}
-        >
-          Mañana
-          {resumen?.manana && <span className="tab-count">{resumen.manana.total}</span>}
-        </button>
-        <button
-          className={`jornada-tab${jornada === 'tarde' ? ' active' : ''}`}
-          onClick={() => { setJornada('tarde'); reiniciarVista() }}
-          disabled={busy}
-          aria-pressed={jornada === 'tarde'}
-        >
-          Tarde
-          {resumen?.tarde && <span className="tab-count">{resumen.tarde.total}</span>}
-        </button>
+      <div className="mis-tareas-jornada-row">
+        <div className="jornada-tabs" role="group" aria-label="Jornada de tareas">
+          <button
+            className={`jornada-tab${jornada === 'manana' ? ' active' : ''}`}
+            onClick={() => { setJornada('manana'); reiniciarVista() }}
+            disabled={busy}
+            aria-pressed={jornada === 'manana'}
+          >
+            Mañana
+            {resumen?.manana && <span className="tab-count">{resumen.manana.total}</span>}
+          </button>
+          <button
+            className={`jornada-tab${jornada === 'tarde' ? ' active' : ''}`}
+            onClick={() => { setJornada('tarde'); reiniciarVista() }}
+            disabled={busy}
+            aria-pressed={jornada === 'tarde'}
+          >
+            Tarde
+            {resumen?.tarde && <span className="tab-count">{resumen.tarde.total}</span>}
+          </button>
+        </div>
+        <nav className="mis-tareas-view-switcher" aria-label="Versión de Mis tareas">
+          <Link
+            className={location.pathname === '/mis-tareas' ? 'active' : undefined}
+            to={{ pathname: '/mis-tareas', search: fecha ? `?fecha=${fecha}` : '' }}
+            aria-current={location.pathname === '/mis-tareas' ? 'page' : undefined}
+          >
+            V1
+          </Link>
+          <Link
+            className={location.pathname === '/mis-tareas-v2' ? 'active' : undefined}
+            to={{ pathname: '/mis-tareas-v2', search: fecha ? `?fecha=${fecha}` : '' }}
+            aria-current={location.pathname === '/mis-tareas-v2' ? 'page' : undefined}
+          >
+            V2
+          </Link>
+        </nav>
       </div>
 
       {availableFilterVariant && availableFilterActive && (

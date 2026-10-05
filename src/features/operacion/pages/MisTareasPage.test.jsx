@@ -34,7 +34,7 @@ function renderProtectedMisTareasRoutes(entries = ['/mis-tareas'], initialIndex)
       <Routes>
         <Route path="/" element={<p>Inicio</p>} />
         <Route path="/mis-tareas" element={<MisTareasRoute><MisTareasPage /></MisTareasRoute>} />
-        <Route path="/mis-tareas-v2" element={<MisTareasRoute><MisTareasV2Page /></MisTareasRoute>} />
+        <Route path="/mis-tareas-v2" element={<MisTareasRoute><MisTareasPage className="mis-tareas-page mis-tareas-v2-page" groupByStartTime selectionUxVariant scanabilityVariant availableFilterVariant priorityVariant /></MisTareasRoute>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -114,6 +114,8 @@ describe('MisTareasPage deposit demonstrations', () => {
     renderProtectedMisTareasRoutes(['/mis-tareas?fecha=2026-09-06'])
 
     await screen.findByText('Envio de deposito de Sucursal.')
+    expect(getMisTareas).toHaveBeenCalledTimes(1)
+    expect(getTrabajosCampo).toHaveBeenCalledTimes(1)
     fireEvent.click(screen.getByRole('link', { name: 'V2' }))
     await waitFor(() => expect(screen.getByTestId('route-state')).toHaveTextContent('/mis-tareas-v2?fecha=2026-09-06'))
     expect(document.querySelector('.mis-tareas-v2-page')).toBeInTheDocument()
@@ -129,6 +131,50 @@ describe('MisTareasPage deposit demonstrations', () => {
     await waitFor(() => expect(screen.getByTestId('route-state')).toHaveTextContent('/mis-tareas?fecha=2026-09-06'))
     fireEvent.click(screen.getByRole('button', { name: 'Adelante' }))
     await waitFor(() => expect(screen.getByTestId('route-state')).toHaveTextContent('/mis-tareas-v2?fecha=2026-09-06'))
+    expect(getMisTareas).toHaveBeenCalledTimes(1)
+    expect(getTrabajosCampo).toHaveBeenCalledTimes(1)
+  })
+
+  it('preserves loaded content and selection without refetching when switching variants for the same date', async () => {
+    renderProtectedMisTareasRoutes(['/mis-tareas?fecha=2026-09-06'])
+
+    const checkbox = await screen.findByRole('checkbox', { name: /Seleccionar Envio de deposito/i })
+    fireEvent.click(checkbox)
+    expect(screen.getByRole('button', { name: /Registrar 1 tarea/i })).toBeInTheDocument()
+    expect(getMisTareas).toHaveBeenCalledTimes(1)
+    expect(getTrabajosCampo).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('link', { name: 'V2' }))
+    await waitFor(() => expect(screen.getByTestId('route-state')).toHaveTextContent('/mis-tareas-v2?fecha=2026-09-06'))
+    expect(screen.getByText('Envio de deposito de Sucursal.')).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: /Seleccionar Envio de deposito/i })).toBeChecked()
+    expect(screen.queryByText('Cargando...')).not.toBeInTheDocument()
+    expect(getMisTareas).toHaveBeenCalledTimes(1)
+    expect(getTrabajosCampo).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('link', { name: 'V1' }))
+    await waitFor(() => expect(screen.getByTestId('route-state')).toHaveTextContent('/mis-tareas?fecha=2026-09-06'))
+    expect(screen.getByRole('checkbox', { name: /Seleccionar Envio de deposito/i })).toBeChecked()
+    expect(getMisTareas).toHaveBeenCalledTimes(1)
+    expect(getTrabajosCampo).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps an in-flight request valid when only the variant changes', async () => {
+    let resolveRequest
+    const pendingRequest = new Promise((resolve) => { resolveRequest = resolve })
+    getMisTareas.mockReturnValueOnce(pendingRequest)
+
+    renderProtectedMisTareasRoutes(['/mis-tareas?fecha=2026-09-06'])
+    await waitFor(() => expect(getMisTareas).toHaveBeenCalledTimes(1))
+
+    fireEvent.click(screen.getByRole('link', { name: 'V2' }))
+    await waitFor(() => expect(screen.getByTestId('route-state')).toHaveTextContent('/mis-tareas-v2?fecha=2026-09-06'))
+    expect(getMisTareas).toHaveBeenCalledTimes(1)
+    expect(getTrabajosCampo).toHaveBeenCalledTimes(1)
+
+    resolveRequest(taskResponse)
+    expect(await screen.findByText('Envio de deposito de Sucursal.')).toBeInTheDocument()
+    expect(document.querySelector('.mis-tareas-v2-page')).toBeInTheDocument()
   })
 
   it('renders V2 from a direct valid-date route after fresh initialization', async () => {
@@ -302,25 +348,29 @@ describe('MisTareasPage deposit demonstrations', () => {
     expect(within(originalCard).getByText(longTaskName)).not.toHaveAttribute('title')
   })
 
-  it('prioritizes urgent and expired tasks from the server date and time only in V2', async () => {
+  it('prioritizes available urgent and expired tasks without adding urgency to registered V2 tasks', async () => {
     getMisTareas.mockResolvedValue({
       ...taskResponse,
-      resumen: { ...taskResponse.resumen, total: 2, disponibles: 2, manana: { total: 2 } },
+      resumen: { ...taskResponse.resumen, total: 3, disponibles: 2, registradas: 1, manana: { total: 3 } },
       meta: { ...taskResponse.meta, hora_servidor: '10:00' },
       results: [
         { ...taskResponse.results[0], id_sucursal_tarea: 1, hora_fin_registro: '10:20', tarea: { id_tarea: 1, nombre: 'Urgente' } },
         { ...taskResponse.results[0], id_sucursal_tarea: 2, hora_fin_registro: '09:59', tarea: { id_tarea: 2, nombre: 'Vencida' } },
+        { ...taskResponse.results[0], id_sucursal_tarea: 3, disponible_para_registro: false, estado_ui: 'registrada', estado_ui_label: 'Registrada', hora_fin_registro: '10:20', tarea: { id_tarea: 3, nombre: 'Registrada' } },
       ],
     })
 
     const { unmount } = render(<MemoryRouter><MisTareasV2Page /></MemoryRouter>)
     const urgentCard = (await screen.findByText('Urgente')).closest('.tarea-card')
     const expiredCard = screen.getByText('Vencida').closest('.tarea-card')
+    const registeredCard = screen.getByTitle('Registrada').closest('.tarea-card')
 
     expect(within(urgentCard).getByRole('status')).toHaveTextContent('Quedan 20 min')
     expect(urgentCard).toHaveClass('tarea-card--priority-urgent')
     expect(within(expiredCard).getByRole('status')).toHaveTextContent('Registro vencido')
     expect(expiredCard).toHaveClass('tarea-card--priority-expired')
+    expect(within(registeredCard).getByText('Registrada', { selector: '.badge' })).toHaveClass('badge')
+    expect(within(registeredCard).queryByText('Quedan 20 min')).not.toBeInTheDocument()
 
     unmount()
     render(<MemoryRouter><MisTareasPage /></MemoryRouter>)

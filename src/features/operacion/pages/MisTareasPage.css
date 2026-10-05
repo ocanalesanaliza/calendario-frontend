@@ -121,6 +121,14 @@
 .stat-card--emphasis { box-shadow: 0 0 0 2px rgba(22, 101, 52, 0.1); }
 
 /* ── Jornada tabs ── */
+.mis-tareas-jornada-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
 .jornada-tabs {
   display: flex;
   align-self: flex-start;
@@ -212,6 +220,8 @@
   .fecha-control { width: 100%; justify-content: space-between; }
   .fecha-picker { flex: 1; max-width: 180px; }
   .stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mis-tareas-jornada-row { align-items: stretch; flex-direction: column; }
+  .mis-tareas-jornada-row .mis-tareas-view-switcher { align-self: flex-end; }
   .jornada-tabs { align-self: stretch; }
   .jornada-tab { flex: 1; min-width: 0; }
 }
