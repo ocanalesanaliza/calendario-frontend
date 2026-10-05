@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { getMisTareas, registrarTarea, registrarTareasLote } from '../services/operacionService'
 import { getTrabajosCampo, aceptarTrabajoCampo, rechazarTrabajoCampo } from '../../trabajosCampo/services/trabajosCampoService'
 import { useAuth } from '../../auth/context/AuthContext'
@@ -73,6 +73,12 @@ function getTaskPriority(tarea, meta) {
   return null
 }
 
+function isValidCalendarDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const date = new Date(`${value}T00:00:00.000Z`)
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
+}
+
 export default function MisTareasPage({ className = 'mis-tareas-page', groupByStartTime = false, selectionUxVariant = false, scanabilityVariant = false, availableFilterVariant = false, priorityVariant = false }) {
   const [data, setData]         = useState(null)
   const [loading, setLoading]   = useState(true)
@@ -81,7 +87,6 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
   const [notas, setNotas]       = useState('')
   const [savingId, setSavingId] = useState(null)
   const [regError, setRegError] = useState('')
-  const [fecha, setFecha]       = useState('')
   const [trabajosCampo, setTrabajosCampo] = useState([])
   const [campoAction, setCampoAction]     = useState(null)
   const [seleccionadas, setSeleccionadas] = useState([])
@@ -98,14 +103,15 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
   const trabajosCampoRequestVersion = useRef(0)
 
   const { perfil, revokeMyTasksAccess } = useAuth()
+  const location = useLocation()
   const navigate = useNavigate()
+  const queryFecha = new URLSearchParams(location.search).get('fecha') ?? ''
+  const fecha = isValidCalendarDate(queryFecha) ? queryFecha : ''
   perfilRef.current = perfil
   fechaRef.current = fecha
 
   const busy = savingId !== null || registrandoLote
   const esGerenteArea = perfil?.type === 'gerente_area'
-  const puedeAccederMisTareas = perfil?.can_access_my_tasks === true
-
   useEffect(() => {
     isMountedRef.current = true
     return () => {
@@ -119,10 +125,9 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
     viewVersion.current += 1
     tareasRequestVersion.current += 1
     trabajosCampoRequestVersion.current += 1
-    if (!puedeAccederMisTareas) return
     loadTareas()
     loadTrabajosCampo()
-  }, [fecha, perfil, puedeAccederMisTareas])
+  }, [fecha, perfil])
 
   function handleForbidden(error) {
     if (error?.status !== 403) return false
@@ -360,8 +365,6 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
     setAvailableFilterActive(true)
   }
 
-  if (!puedeAccederMisTareas) return <Navigate to="/" replace />
-
   function renderTaskCard(t) {
     const isRevisionGuardiaTask = esRevisionGuardia(t)
     const isSelectable = (t.disponible_para_registro || isRevisionGuardiaTask) && !busy
@@ -483,11 +486,34 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
             type="date"
             className="fecha-picker"
             value={fecha || data?.meta?.fecha_consultada || ''}
-            onChange={(e) => { setFecha(e.target.value); reiniciarVista() }}
+            onChange={(e) => {
+              const nextFecha = isValidCalendarDate(e.target.value) ? e.target.value : ''
+              const nextSearch = new URLSearchParams(location.search)
+              if (nextFecha) nextSearch.set('fecha', nextFecha)
+              else nextSearch.delete('fecha')
+              navigate({ pathname: location.pathname, search: nextSearch.toString() }, { replace: true })
+              reiniciarVista()
+            }}
             max={data?.meta?.fecha_servidor || undefined}
             disabled={busy}
           />
         </label>
+        <nav className="mis-tareas-view-switcher" aria-label="Versión de Mis tareas">
+          <Link
+            className={location.pathname === '/mis-tareas' ? 'active' : undefined}
+            to={{ pathname: '/mis-tareas', search: fecha ? `?fecha=${fecha}` : '' }}
+            aria-current={location.pathname === '/mis-tareas' ? 'page' : undefined}
+          >
+            V1
+          </Link>
+          <Link
+            className={location.pathname === '/mis-tareas-v2' ? 'active' : undefined}
+            to={{ pathname: '/mis-tareas-v2', search: fecha ? `?fecha=${fecha}` : '' }}
+            aria-current={location.pathname === '/mis-tareas-v2' ? 'page' : undefined}
+          >
+            V2
+          </Link>
+        </nav>
       </div>
 
       {resumen && (

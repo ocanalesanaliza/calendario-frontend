@@ -1,8 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MisTareasPage from './MisTareasPage'
 import MisTareasV2Page from './MisTareasV2Page'
+import { MisTareasRoute } from '../../../App'
 
 const { getMisTareas, registrarTarea, registrarTareasLote, getTrabajosCampo, aceptarTrabajoCampo, rechazarTrabajoCampo, getRevisionGuardia, guardarRevisionGuardia } = vi.hoisted(() => ({ getMisTareas: vi.fn(), registrarTarea: vi.fn(), registrarTareasLote: vi.fn(), getTrabajosCampo: vi.fn(), aceptarTrabajoCampo: vi.fn(), rechazarTrabajoCampo: vi.fn(), getRevisionGuardia: vi.fn(), guardarRevisionGuardia: vi.fn() }))
 let perfil = { type: 'gerente_sucursal', sucursal: { nombre: 'Sucursal Norte' } }
@@ -14,6 +15,30 @@ vi.mock('../services/revisionesGuardiaService', () => ({ getRevisionGuardia, gua
 vi.mock('../../auth/context/AuthContext', () => ({ useAuth: () => ({ perfil, revokeMyTasksAccess }) }))
 
 const taskResponse = { meta: { fecha_consultada: '2026-09-05', fecha_servidor: '2026-09-05', hora_servidor: '10:00', jornada_servidor: 'manana' }, resumen: { total: 1, disponibles: 1, registradas: 0, cerradas: 0, bloqueadas: 0, manana: { total: 1 }, tarde: { total: 0 } }, results: [{ id_sucursal_tarea: 44, jornada: 'manana', hora: '09:00', hora_fin_registro: '18:00', disponible_para_registro: true, estado_ui: 'disponible', estado_ui_label: 'Disponible', tarea: { id_tarea: 18, nombre: 'Envio de deposito de Sucursal.' } }] }
+
+function RouteState() {
+  const location = useLocation()
+  return <output data-testid="route-state">{location.pathname}{location.search}</output>
+}
+
+function HistoryControls() {
+  const navigate = useNavigate()
+  return <><button onClick={() => navigate(-1)}>Atrás</button><button onClick={() => navigate(1)}>Adelante</button></>
+}
+
+function renderProtectedMisTareasRoutes(entries = ['/mis-tareas'], initialIndex) {
+  return render(
+    <MemoryRouter initialEntries={entries} initialIndex={initialIndex}>
+      <HistoryControls />
+      <RouteState />
+      <Routes>
+        <Route path="/" element={<p>Inicio</p>} />
+        <Route path="/mis-tareas" element={<MisTareasRoute><MisTareasPage /></MisTareasRoute>} />
+        <Route path="/mis-tareas-v2" element={<MisTareasRoute><MisTareasV2Page /></MisTareasRoute>} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
 
 describe('MisTareasPage deposit demonstrations', () => {
   beforeEach(() => { perfil = { type: 'gerente_sucursal', can_access_my_tasks: true, sucursal: { nombre: 'Sucursal Norte' } }; getMisTareas.mockReset().mockResolvedValue(taskResponse); getTrabajosCampo.mockReset().mockResolvedValue({ results: [] }); registrarTarea.mockReset(); registrarTareasLote.mockReset(); aceptarTrabajoCampo.mockReset(); rechazarTrabajoCampo.mockReset(); getRevisionGuardia.mockReset(); guardarRevisionGuardia.mockReset(); revokeMyTasksAccess.mockReset() })
@@ -45,6 +70,79 @@ describe('MisTareasPage deposit demonstrations', () => {
     expect(screen.getByLabelText('Fecha')).toHaveValue('2026-09-05')
     expect(screen.getByRole('button', { name: 'Mañana1' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'Tarde0' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('renders the authorized V1 route with the switcher', async () => {
+    renderProtectedMisTareasRoutes()
+
+    await screen.findByText('Envio de deposito de Sucursal.')
+    expect(screen.getByRole('link', { name: 'V1' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'V2' })).toHaveAttribute('href', '/mis-tareas-v2')
+    expect(document.querySelector('.mis-tareas-v2-page')).not.toBeInTheDocument()
+  })
+
+  it('uses a valid initial date query for both data sources', async () => {
+    renderProtectedMisTareasRoutes(['/mis-tareas?fecha=2026-09-06'])
+
+    await screen.findByText('Envio de deposito de Sucursal.')
+    expect(screen.getByLabelText('Fecha')).toHaveValue('2026-09-06')
+    expect(getMisTareas).toHaveBeenCalledWith({ fecha: '2026-09-06' })
+    expect(getTrabajosCampo).toHaveBeenCalledWith({ estado: 'pendiente', fecha: '2026-09-06' })
+  })
+
+  it.each(['', '?fecha=2026-02-30', '?fecha=2026-2-3'])('keeps the fallback loaders for a missing or invalid date query', async (query) => {
+    renderProtectedMisTareasRoutes([`/mis-tareas${query}`])
+
+    await screen.findByText('Envio de deposito de Sucursal.')
+    expect(getMisTareas).toHaveBeenCalledWith({})
+    expect(getTrabajosCampo).toHaveBeenCalledWith({ estado: 'pendiente' })
+  })
+
+  it('replaces the current history entry when changing the date', async () => {
+    renderProtectedMisTareasRoutes(['/mis-tareas?fecha=2026-09-05', '/mis-tareas'], 1)
+
+    await screen.findByText('Envio de deposito de Sucursal.')
+    fireEvent.change(screen.getByLabelText('Fecha'), { target: { value: '2026-09-06' } })
+    await waitFor(() => expect(screen.getByTestId('route-state')).toHaveTextContent('/mis-tareas?fecha=2026-09-06'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Atrás' }))
+    await waitFor(() => expect(screen.getByTestId('route-state')).toHaveTextContent('/mis-tareas?fecha=2026-09-05'))
+    expect(screen.getByLabelText('Fecha')).toHaveValue('2026-09-05')
+  })
+
+  it('keeps the selected date across view switches and browser history', async () => {
+    renderProtectedMisTareasRoutes(['/mis-tareas?fecha=2026-09-06'])
+
+    await screen.findByText('Envio de deposito de Sucursal.')
+    fireEvent.click(screen.getByRole('link', { name: 'V2' }))
+    await waitFor(() => expect(screen.getByTestId('route-state')).toHaveTextContent('/mis-tareas-v2?fecha=2026-09-06'))
+    expect(document.querySelector('.mis-tareas-v2-page')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('link', { name: 'V1' }))
+    await waitFor(() => expect(screen.getByTestId('route-state')).toHaveTextContent('/mis-tareas?fecha=2026-09-06'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Atrás' }))
+    await waitFor(() => expect(screen.getByTestId('route-state')).toHaveTextContent('/mis-tareas-v2?fecha=2026-09-06'))
+    expect(screen.getByLabelText('Fecha')).toHaveValue('2026-09-06')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Atrás' }))
+    await waitFor(() => expect(screen.getByTestId('route-state')).toHaveTextContent('/mis-tareas?fecha=2026-09-06'))
+    fireEvent.click(screen.getByRole('button', { name: 'Adelante' }))
+    await waitFor(() => expect(screen.getByTestId('route-state')).toHaveTextContent('/mis-tareas-v2?fecha=2026-09-06'))
+  })
+
+  it('renders V2 from a direct valid-date route after fresh initialization', async () => {
+    const view = renderProtectedMisTareasRoutes(['/mis-tareas-v2?fecha=2026-09-06'])
+
+    await screen.findByText('Envio de deposito de Sucursal.')
+    expect(document.querySelector('.mis-tareas-v2-page')).toBeInTheDocument()
+    expect(screen.getByLabelText('Fecha')).toHaveValue('2026-09-06')
+    view.unmount()
+
+    renderProtectedMisTareasRoutes(['/mis-tareas-v2?fecha=2026-09-06'])
+    await screen.findByText('Envio de deposito de Sucursal.')
+    expect(document.querySelector('.mis-tareas-v2-page')).toBeInTheDocument()
+    expect(screen.getByLabelText('Fecha')).toHaveValue('2026-09-06')
   })
 
   it('groups only the V2 view by valid start time and leaves invalid times last', async () => {
@@ -272,38 +370,34 @@ describe('MisTareasPage deposit demonstrations', () => {
     expect(screen.queryByText(/Quedan \d+ min|Registro vencido/)).not.toBeInTheDocument()
   })
 
-  it('does not load or render Mis tareas when the capability is absent', async () => {
+  it('renders the switcher only inside the protected Mis tareas flow', async () => {
     perfil = { type: 'gerente_sucursal', can_access_my_tasks: false }
 
-    render(
-      <MemoryRouter initialEntries={['/mis-tareas']}>
-        <Routes>
-          <Route path="/" element={<p>Inicio</p>} />
-          <Route path="/mis-tareas" element={<MisTareasPage />} />
-        </Routes>
-      </MemoryRouter>,
-    )
+    renderProtectedMisTareasRoutes()
 
     expect(await screen.findByText('Inicio')).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Versión de Mis tareas' })).not.toBeInTheDocument()
     expect(getMisTareas).not.toHaveBeenCalled()
     expect(getTrabajosCampo).not.toHaveBeenCalled()
   })
 
   it('redirects when access is revoked after an authorized render without changing Hook order', async () => {
-    const renderRoutes = () => (
-      <MemoryRouter initialEntries={['/mis-tareas']}>
-        <Routes>
-          <Route path="/" element={<p>Inicio</p>} />
-          <Route path="/mis-tareas" element={<MisTareasPage />} />
-        </Routes>
-      </MemoryRouter>
-    )
-    const view = render(renderRoutes())
+    const view = renderProtectedMisTareasRoutes()
 
     await screen.findByText('Envio de deposito de Sucursal.')
     perfil = { type: 'gerente_sucursal', can_access_my_tasks: false }
 
-    expect(() => view.rerender(renderRoutes())).not.toThrow()
+    expect(() => view.rerender(
+      <MemoryRouter initialEntries={['/mis-tareas']}>
+        <HistoryControls />
+        <RouteState />
+        <Routes>
+          <Route path="/" element={<p>Inicio</p>} />
+          <Route path="/mis-tareas" element={<MisTareasRoute><MisTareasPage /></MisTareasRoute>} />
+          <Route path="/mis-tareas-v2" element={<MisTareasRoute><MisTareasV2Page /></MisTareasRoute>} />
+        </Routes>
+      </MemoryRouter>,
+    )).not.toThrow()
     expect(await screen.findByText('Inicio')).toBeInTheDocument()
   })
 
