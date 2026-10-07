@@ -1,12 +1,13 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PlantillaDetallePage from './PlantillaDetallePage'
 
-const { getPlantilla, updateTarea, getTareas } = vi.hoisted(() => ({
+const { getPlantilla, updateTarea, getTareas, duplicarPlantilla } = vi.hoisted(() => ({
   getPlantilla: vi.fn(),
   updateTarea: vi.fn(),
   getTareas: vi.fn(),
+  duplicarPlantilla: vi.fn(),
 }))
 
 vi.mock('../services/plantillasService', () => ({
@@ -14,6 +15,7 @@ vi.mock('../services/plantillasService', () => ({
   updateTarea,
   updatePlantilla: vi.fn(),
   desactivarPlantilla: vi.fn(),
+  duplicarPlantilla,
   addTarea: vi.fn(),
   desactivarTarea: vi.fn(),
   asignarSucursales: vi.fn(),
@@ -53,6 +55,7 @@ describe('PlantillaDetallePage: recurrencia por tarea', () => {
     getPlantilla.mockReset().mockResolvedValue(plantilla)
     updateTarea.mockReset().mockResolvedValue({})
     getTareas.mockReset().mockResolvedValue([])
+    duplicarPlantilla.mockReset()
   })
 
   it('permite agregar sábado desde la lista y envía la regla semanal', async () => {
@@ -103,5 +106,135 @@ describe('PlantillaDetallePage: recurrencia por tarea', () => {
 
     expect(await screen.findByText('Apertura')).toBeInTheDocument()
     expect(screen.queryByText('Registro de Guardia')).not.toBeInTheDocument()
+  })
+})
+
+describe('PlantillaDetallePage: duplicar plantilla', () => {
+  function HistoryControls() {
+    const navigate = useNavigate()
+    const location = useLocation()
+
+    return (
+      <>
+        <button onClick={() => navigate(-1)}>Volver en historial</button>
+        <span data-testid="router-state">{JSON.stringify(location.state)}</span>
+      </>
+    )
+  }
+
+  function renderDetail(initialEntry = '/plantillas/10') {
+    return render(
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <Routes>
+          <Route path="/plantillas/:id" element={<><HistoryControls /><PlantillaDetallePage /></>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+  }
+
+  beforeEach(() => {
+    getPlantilla.mockReset().mockResolvedValue(plantilla)
+    getTareas.mockReset().mockResolvedValue([])
+    duplicarPlantilla.mockReset()
+  })
+
+  it.each([true, false])('muestra la acción para una plantilla %s', async (activa) => {
+    getPlantilla.mockResolvedValue({ ...plantilla, activa })
+
+    renderDetail()
+
+    expect(await screen.findByRole('button', { name: 'Duplicar plantilla' })).toBeInTheDocument()
+  })
+
+  it('muestra la información de la duplicación y permite cancelar sin llamar a la API', async () => {
+    renderDetail()
+    fireEvent.click(await screen.findByRole('button', { name: 'Duplicar plantilla' }))
+
+    expect(screen.getByText(/nueva plantilla activa e independiente/)).toBeInTheDocument()
+    expect(screen.getByText(/sin asignaciones de sucursales/)).toBeInTheDocument()
+    expect(screen.getByText(/tareas activas y las reglas de recurrencia activas/)).toBeInTheDocument()
+    expect(screen.getByText(/plantilla original no se modificará/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirmar' })).toHaveClass('btn-primary')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(duplicarPlantilla).not.toHaveBeenCalled()
+  })
+
+  it('mantiene destructiva la confirmación de desactivar', async () => {
+    renderDetail()
+    const deactivateTemplateButton = (await screen.findAllByRole('button', { name: 'Desactivar' }))
+      .find((button) => button.classList.contains('btn-outline-danger'))
+    fireEvent.click(deactivateTemplateButton)
+
+    expect(screen.getByRole('button', { name: 'Confirmar' })).toHaveClass('btn-danger')
+  })
+
+  it('muestra una vez el mensaje en el destino y consume el estado del router', async () => {
+    getPlantilla.mockImplementation((templateId) => Promise.resolve(
+      String(templateId) === '11' ? { ...plantilla, id_plantilla: 11, nombre: 'Plantilla duplicada' } : plantilla,
+    ))
+    duplicarPlantilla.mockResolvedValue({ detail: 'Plantilla duplicada', plantilla: { id_plantilla: 11 } })
+
+    renderDetail()
+    fireEvent.click(await screen.findByRole('button', { name: 'Duplicar plantilla' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Plantilla duplicada correctamente.')
+    expect(await screen.findByRole('heading', { name: 'Plantilla duplicada' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByTestId('router-state')).toHaveTextContent('null'))
+    expect(screen.getAllByText('Plantilla duplicada correctamente.')).toHaveLength(1)
+    expect(duplicarPlantilla).toHaveBeenCalledWith('10')
+  })
+
+  it('oculta el mensaje al volver en el historial a la plantilla origen', async () => {
+    getPlantilla.mockImplementation((templateId) => Promise.resolve(
+      String(templateId) === '11' ? { ...plantilla, id_plantilla: 11, nombre: 'Plantilla duplicada' } : plantilla,
+    ))
+    duplicarPlantilla.mockResolvedValue({ id_plantilla: 11 })
+
+    renderDetail()
+    fireEvent.click(await screen.findByRole('button', { name: 'Duplicar plantilla' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
+    await screen.findByText('Plantilla duplicada correctamente.')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Volver en historial' }))
+
+    expect(await screen.findByRole('heading', { name: 'Plantilla general' })).toBeInTheDocument()
+    expect(screen.queryByText('Plantilla duplicada correctamente.')).not.toBeInTheDocument()
+  })
+
+  it('solo confirma una vez mientras la solicitud está pendiente', async () => {
+    let resolveDuplicate
+    duplicarPlantilla.mockReturnValue(new Promise((resolve) => { resolveDuplicate = resolve }))
+
+    renderDetail()
+    fireEvent.click(await screen.findByRole('button', { name: 'Duplicar plantilla' }))
+    const confirmButton = screen.getByRole('button', { name: 'Confirmar' })
+    fireEvent.click(confirmButton)
+    fireEvent.click(confirmButton)
+
+    expect(duplicarPlantilla).toHaveBeenCalledTimes(1)
+    expect(confirmButton).toBeDisabled()
+    resolveDuplicate({ id_plantilla: 11 })
+  })
+
+  it('muestra en línea el error exacto de una plantilla sin tareas activas', async () => {
+    const noActiveTasks = 'La plantilla no tiene tareas activas y no se puede duplicar.'
+    duplicarPlantilla.mockRejectedValue(new Error(noActiveTasks))
+
+    renderDetail()
+    fireEvent.click(await screen.findByRole('button', { name: 'Duplicar plantilla' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
+
+    expect(await screen.findByText(noActiveTasks)).toBeInTheDocument()
+  })
+
+  it('no muestra el mensaje transitorio al abrir o recargar directamente el destino sin estado del router', async () => {
+    getPlantilla.mockResolvedValue({ ...plantilla, id_plantilla: 11 })
+
+    renderDetail('/plantillas/11')
+
+    await screen.findByRole('heading', { name: 'Plantilla general' })
+    expect(screen.queryByText('Plantilla duplicada correctamente.')).not.toBeInTheDocument()
   })
 })

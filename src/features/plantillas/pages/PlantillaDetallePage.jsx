@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { getPlantilla, updatePlantilla, desactivarPlantilla, addTarea, updateTarea, desactivarTarea, asignarSucursales } from '../services/plantillasService'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { getPlantilla, updatePlantilla, desactivarPlantilla, duplicarPlantilla, addTarea, updateTarea, desactivarTarea, asignarSucursales } from '../services/plantillasService'
 import { getTareas } from '../../tareas/services/tareasService'
 import RecurrenceSelector from '../../tareas/components/RecurrenceSelector'
 import {
@@ -17,13 +17,32 @@ const JORNADA_LABEL = { manana: 'Mañana', tarde: 'Tarde' }
 export default function PlantillaDetallePage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const [plantilla, setPlantilla] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [modal, setModal] = useState(null)
   const [buscarTarea, setBuscarTarea] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
+  const successMessageTemplateId = useRef(null)
 
   useEffect(() => { loadData() }, [id])
+
+  useEffect(() => {
+    const duplication = location.state?.templateDuplication
+    if (duplication?.kind !== 'template-duplicated' || String(duplication.templateId) !== String(id)) return
+
+    setSuccessMessage('Plantilla duplicada correctamente.')
+    successMessageTemplateId.current = String(id)
+    navigate(location.pathname, { replace: true, state: null })
+  }, [id, location.key, location.pathname, location.state, navigate])
+
+  useEffect(() => {
+    if (successMessageTemplateId.current && successMessageTemplateId.current !== String(id)) {
+      setSuccessMessage('')
+      successMessageTemplateId.current = null
+    }
+  }, [id])
 
   async function loadData() {
     setLoading(true)
@@ -47,6 +66,22 @@ export default function PlantillaDetallePage() {
   async function handleDesactivarPlantilla() {
     await desactivarPlantilla(id)
     navigate('/plantillas')
+  }
+
+  async function handleDuplicarPlantilla() {
+    const data = await duplicarPlantilla(id)
+    const idPlantillaDuplicada = data?.id_plantilla ?? data?.id ?? data?.plantilla?.id_plantilla ?? data?.plantilla?.id
+    if (idPlantillaDuplicada == null) throw new Error('No se pudo identificar la plantilla duplicada.')
+
+    setModal(null)
+    navigate(`/plantillas/${idPlantillaDuplicada}`, {
+      state: {
+        templateDuplication: {
+          kind: 'template-duplicated',
+          templateId: idPlantillaDuplicada,
+        },
+      },
+    })
   }
 
   async function handleAddTarea(form) {
@@ -91,6 +126,7 @@ export default function PlantillaDetallePage() {
 
   return (
     <div className="detalle-page">
+      {successMessage && <p role="status">{successMessage}</p>}
       {/* Header */}
       <div className="detalle-header">
         <button className="btn-back" onClick={() => navigate('/plantillas')}>
@@ -125,6 +161,9 @@ export default function PlantillaDetallePage() {
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
               </svg>
               Editar
+            </button>
+            <button className="btn-outline" onClick={() => setModal({ type: 'duplicar' })}>
+              Duplicar plantilla
             </button>
             {plantilla.activa && (
               <button className="btn-outline btn-outline-danger" onClick={() => setModal({ type: 'desactivar' })}>
@@ -251,6 +290,16 @@ export default function PlantillaDetallePage() {
           title="Desactivar plantilla"
           message={<>¿Deseas desactivar <strong>{plantilla.nombre}</strong>?</>}
           onConfirm={handleDesactivarPlantilla}
+          onClose={() => setModal(null)}
+        />
+      )}
+
+      {modal?.type === 'duplicar' && (
+        <ConfirmModal
+          title="Duplicar plantilla"
+          message={<>Se creará una nueva plantilla activa e independiente. Comenzará sin asignaciones de sucursales. Solo se copiarán las tareas activas y las reglas de recurrencia activas. La plantilla original no se modificará.</>}
+          confirmButtonVariant="btn-primary"
+          onConfirm={handleDuplicarPlantilla}
           onClose={() => setModal(null)}
         />
       )}
@@ -752,7 +801,7 @@ function AsignarModal({ onSubmit, onClose }) {
   )
 }
 
-function ConfirmModal({ title, message, onConfirm, onClose }) {
+function ConfirmModal({ title, message, confirmButtonVariant = 'btn-danger', onConfirm, onClose }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -769,7 +818,7 @@ function ConfirmModal({ title, message, onConfirm, onClose }) {
         {error && <p className="modal-error">{error}</p>}
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-danger" onClick={handleConfirm} disabled={loading}>
+          <button className={confirmButtonVariant} onClick={handleConfirm} disabled={loading}>
             {loading ? 'Procesando...' : 'Confirmar'}
           </button>
         </div>
