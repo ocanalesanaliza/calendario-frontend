@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AdminMaestroRoute, AlmuerzosRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GerentesOperacionesRoute, MisTareasRoute, OrganizacionRoute, PlantillasAreaRoute, RendimientoRoute } from './App'
+import { AdminMaestroRoute, AlmuerzosRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GerentesOperacionesRoute, MisTareasRoute, OrganizacionRoute, PlantillasAreaRoute, RendimientoRoute, SystemsOnlyRoute } from './App'
 
 const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
 
@@ -76,6 +76,25 @@ describe('Sistemas-only routes', () => {
     )
 
     expect(screen.getByText('Gestión GO')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['an Admin Master', { es_admin_maestro: true, activo: true, habilitado: true }],
+    ['a non-Systems actor', { type: 'gerente_operaciones', activo: true, habilitado: true }],
+    ['a disabled Systems account', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: false }],
+    ['an inactive Systems account', { type: 'sistemas', es_cuenta_sistemas: true, activo: false, habilitado: true }],
+  ])('blocks %s from Admin Master assignments', async (_actor, perfil) => {
+    useAuth.mockReturnValue({ perfil })
+    render(<MemoryRouter initialEntries={['/admin-master-asignaciones']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/admin-master-asignaciones" element={<SystemsOnlyRoute><p>Asignaciones autorizadas</p></SystemsOnlyRoute>} /></Routes></MemoryRouter>)
+    expect(await screen.findByText('Inicio')).toBeInTheDocument()
+    expect(screen.queryByText('Asignaciones autorizadas')).not.toBeInTheDocument()
+  })
+
+  it('allows an active enabled Systems account to access Admin Master assignments', () => {
+    useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true } })
+    render(<MemoryRouter initialEntries={['/admin-master-asignaciones']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/admin-master-asignaciones" element={<SystemsOnlyRoute><p>Asignaciones autorizadas</p></SystemsOnlyRoute>} /></Routes></MemoryRouter>)
+
+    expect(screen.getByText('Asignaciones autorizadas')).toBeInTheDocument()
   })
 
   it('blocks lunch for a Systems account that was previously a GA', async () => {

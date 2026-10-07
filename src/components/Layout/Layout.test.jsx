@@ -51,6 +51,21 @@ describe('Layout Mis tareas navigation', () => {
     expect(screen.getByTitle('Gerentes de área')).toBeInTheDocument()
     expect(screen.getByTitle('Gerentes de operaciones')).toBeInTheDocument()
     expect(screen.getByTitle('Organización')).toHaveAttribute('href', '/organizacion')
+    expect(screen.getByTitle('Admin Masters')).toHaveAttribute('href', '/admin-master-asignaciones')
+  })
+
+  it.each([
+    ['GA', { type: 'gerente_area' }],
+    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }],
+    ['GS', { type: 'gerente_sucursal' }],
+    ['Administrador Maestro', { es_admin_maestro: true, activo: true, habilitado: true }],
+    ['disabled Systems account', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: false }],
+    ['inactive Systems account', { type: 'sistemas', es_cuenta_sistemas: true, activo: false, habilitado: true }],
+  ])('hides Admin Masters from %s', (_name, perfil) => {
+    useAuth.mockReturnValue({ perfil, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+
+    expect(screen.queryByTitle('Admin Masters')).not.toBeInTheDocument()
   })
 
   it('shows the six capability-controlled modules to a Systems master admin with granted capabilities', () => {

@@ -29,6 +29,7 @@ import InventarioDemoPage from './features/inventario/pages/InventarioDemoPage'
 import RevisionesGuardiaPage from "./features/revisionesGuardia/pages/RevisionesGuardiaPage";
 import AusenciasAreaPage from './features/ausenciasArea/pages/AusenciasAreaPage'
 import OrganizacionPage from './features/organizacion/pages/OrganizacionPage'
+import AdminMasterAssignmentsPage from './features/adminMasterAssignments/pages/AdminMasterAssignmentsPage'
 import Layout from "./components/Layout/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { getProfileCapabilities } from './features/auth/profilePolicies'
@@ -59,6 +60,12 @@ export function GerentesOperacionesRoute({ children }) {
   const { perfil } = useAuth()
   const { canManageOperationsManagers: puedeGestionarGO } = getProfileCapabilities(perfil)
   if (!puedeGestionarGO) return <Navigate to="/" replace />
+  return children
+}
+
+export function SystemsOnlyRoute({ children }) {
+  const { perfil } = useAuth()
+  if (!getProfileCapabilities(perfil).isSystemsAccount) return <Navigate to="/" replace />
   return children
 }
 
@@ -158,6 +165,7 @@ function App() {
           <Route path="/plantillas-area/:id" element={<PlantillasAreaRoute><PlantillaAreaDetallePage /></PlantillasAreaRoute>} />
           <Route path="/gerentes" element={<AreaManagerAssignmentRoute><GerentesPage /></AreaManagerAssignmentRoute>} />
           <Route path="/gerentes-operaciones" element={<GerentesOperacionesRoute><GerentesOperacionesPage /></GerentesOperacionesRoute>} />
+          <Route path="/admin-master-asignaciones" element={<SystemsOnlyRoute><AdminMasterAssignmentsPage /></SystemsOnlyRoute>} />
           <Route path="/areas" element={<AreaManagerAssignmentRoute><AreasPage /></AreaManagerAssignmentRoute>} />
           <Route path="/organizacion" element={<OrganizacionRoute><OrganizacionPage /></OrganizacionRoute>} />
           <Route path="/mis-tareas" element={<MisTareasRoute><MisTareasPage /></MisTareasRoute>} />

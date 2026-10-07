@@ -1,0 +1,13 @@
+.ama-page { padding: 2rem; }
+.ama-page-header, .ama-filter, .ama-modal-actions { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.ama-filter { justify-content: flex-start; margin: 1rem 0; }
+.ama-page button { cursor: pointer; }
+.ama-modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 1rem; background: rgb(0 0 0 / 45%); }
+.ama-modal { width: min(100%, 34rem); max-height: 90vh; overflow: auto; background: white; border-radius: .5rem; padding: 1.25rem; }
+.ama-modal-header { display: flex; align-items: center; justify-content: space-between; }
+.ama-form, .ama-field, .ama-password { display: grid; gap: .75rem; margin-top: 1rem; }
+.ama-form fieldset { display: flex; gap: 1rem; }
+.ama-field input, .ama-field select { width: 100%; box-sizing: border-box; }
+.ama-error { color: #b42318; }
+.ama-error-state { padding: 1rem; border: 1px solid #b42318; }
+.ama-password output { overflow-wrap: anywhere; font-family: monospace; font-weight: 700; }
