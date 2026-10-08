@@ -1,13 +1,81 @@
-.ama-page { padding: 2rem; }
-.ama-page-header, .ama-filter, .ama-modal-actions { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-.ama-filter { justify-content: flex-start; margin: 1rem 0; }
-.ama-page button { cursor: pointer; }
-.ama-modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 1rem; background: rgb(0 0 0 / 45%); }
-.ama-modal { width: min(100%, 34rem); max-height: 90vh; overflow: auto; background: white; border-radius: .5rem; padding: 1.25rem; }
-.ama-modal-header { display: flex; align-items: center; justify-content: space-between; }
-.ama-form, .ama-field, .ama-password { display: grid; gap: .75rem; margin-top: 1rem; }
-.ama-form fieldset { display: flex; gap: 1rem; }
-.ama-field input, .ama-field select { width: 100%; box-sizing: border-box; }
-.ama-error { color: #b42318; }
-.ama-error-state { padding: 1rem; border: 1px solid #b42318; }
-.ama-password output { overflow-wrap: anywhere; font-family: monospace; font-weight: 700; }
+.ama-page {
+  padding: 2rem;
+  color: #1e293b;
+  font-family: Roboto, Helvetica, Arial, sans-serif;
+}
+
+.ama-page-header, .ama-modal-header, .ama-modal-footer, .ama-error-state { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.ama-page-header { margin-bottom: 1.25rem; }
+.ama-page-heading h1, .ama-modal-header h2 { margin: 0; color: #1e293b; font-weight: 700; }
+.ama-page-heading h1 { font-size: 1.5rem; line-height: 1.25; }
+.ama-page-heading p { margin: .3rem 0 0; color: #64748b; font-size: .9rem; }
+
+.ama-button, .ama-filter-button, .ama-modal-close { cursor: pointer; font: inherit; }
+.ama-button { border: 1px solid transparent; border-radius: 7px; font-size: .85rem; font-weight: 600; padding: .55rem .9rem; transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
+.ama-button--primary { background: #4338ca; color: #fff; }
+.ama-button--primary:hover:not(:disabled) { background: #3730a3; }
+.ama-button--secondary { border-color: #cbd5e1; background: #fff; color: #475569; }
+.ama-button--secondary:hover:not(:disabled) { background: #f8fafc; border-color: #94a3b8; }
+.ama-button:disabled, .ama-modal-close:disabled { cursor: not-allowed; opacity: .6; }
+.ama-button:focus-visible, .ama-filter-button:focus-visible, .ama-modal-close:focus-visible, .ama-input:focus-visible, .ama-select:focus-visible, .ama-radio:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+
+.ama-filter { display: flex; width: fit-content; gap: .25rem; margin: 1rem 0; padding: .25rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; }
+.ama-filter-button { border: 0; border-radius: 6px; background: transparent; color: #64748b; font-size: .85rem; font-weight: 600; padding: .45rem .75rem; }
+.ama-filter-button[aria-pressed='true'] { background: #fff; color: #4338ca; box-shadow: 0 1px 2px rgb(15 23 42 / 12%); }
+
+.ama-state { margin: 0; }
+.ama-loading-state, .ama-empty-state { padding: 3rem 1rem; color: #64748b; font-size: .95rem; text-align: center; }
+.ama-error-state { margin-top: 1rem; padding: 1rem; border: 1px solid #fecaca; border-radius: 8px; background: #fef2f2; color: #991b1b; }
+.ama-error-state p { margin: 0; }
+.ama-retry-button { flex: 0 0 auto; border-color: #fecaca; color: #b91c1c; }
+
+.ama-table-card { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; }
+.ama-table-card table { width: 100%; min-width: 43rem; border-collapse: collapse; font-size: .9rem; }
+.ama-table-card thead { background: #f8fafc; }
+.ama-table-card th { padding: .75rem 1rem; border-bottom: 1px solid #e2e8f0; color: #64748b; font-size: .78rem; font-weight: 600; letter-spacing: .04em; text-align: left; text-transform: uppercase; white-space: nowrap; }
+.ama-table-card td { padding: .85rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; }
+.ama-table-card tbody tr:last-child td { border-bottom: 0; }
+.ama-table-card tbody tr:hover { background: #fafbfc; }
+
+.ama-modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 1rem; background: rgb(15 23 42 / 45%); }
+.ama-modal { width: min(100%, 34rem); max-height: calc(100vh - 2rem); overflow-y: auto; border: 1px solid #dbe4f0; border-radius: 12px; background: #fff; box-shadow: 0 16px 32px rgb(15 23 42 / 18%); }
+.ama-modal-header { align-items: flex-start; padding: 1.25rem 1.5rem; border-bottom: 1px solid #e2e8f0; }
+.ama-modal-header h2 { font-size: 1.1rem; line-height: 1.35; }
+.ama-modal-close { flex: 0 0 auto; width: 2rem; height: 2rem; border: 0; border-radius: 6px; background: transparent; color: #64748b; font-size: 1.5rem; line-height: 1; }
+.ama-modal-close:hover:not(:disabled) { background: #f1f5f9; color: #334155; }
+
+.ama-form, .ama-password { display: grid; gap: 1rem; padding: 1.25rem 1.5rem 1.5rem; }
+.ama-field { display: grid; gap: .3rem; }
+.ama-field-label { color: #475569; font-size: .82rem; font-weight: 600; }
+.ama-input, .ama-select { box-sizing: border-box; width: 100%; border: 1.5px solid #e2e8f0; border-radius: 7px; background: #fff; color: #1e293b; font: inherit; padding: .55rem .7rem; }
+.ama-input:focus, .ama-select:focus { border-color: #6366f1; outline: none; }
+.ama-input:disabled, .ama-select:disabled, .ama-radio:disabled { cursor: not-allowed; opacity: .6; }
+.ama-input--error, .ama-select--error { border-color: #dc2626; }
+.ama-date-input { min-height: 2.4rem; }
+.ama-field-error, .ama-form-error, .ama-password-error { color: #b42318; font-size: .82rem; }
+.ama-form-fieldset { display: flex; gap: 1rem; margin: 0; padding: .85rem 1rem; border: 1px solid #dbe4f0; border-radius: 8px; }
+.ama-form-fieldset legend { padding: 0 .25rem; color: #475569; font-size: .82rem; font-weight: 700; }
+.ama-radio-label { display: inline-flex; align-items: center; gap: .4rem; color: #475569; font-size: .85rem; }
+.ama-radio { accent-color: #4338ca; }
+.ama-modal-footer { margin-top: .25rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; }
+.ama-assignment-form, .ama-password-modal { min-width: 0; }
+.ama-modal-actions { justify-content: flex-end; }
+.ama-assignment-modal-actions, .ama-password-modal-actions { width: 100%; }
+.ama-password-copy { white-space: nowrap; }
+
+.ama-password p { margin: 0; color: #475569; font-size: .9rem; }
+.ama-password-value { overflow-wrap: anywhere; padding: .75rem; border: 1px solid #c7d2fe; border-radius: 8px; background: #eef2ff; color: #312e81; font-family: Roboto Mono, Consolas, monospace; font-weight: 700; }
+.ama-password-status { color: #166534 !important; font-size: .82rem !important; }
+
+@media (max-width: 640px) {
+  .ama-page { padding: 1.25rem; }
+  .ama-page-header, .ama-error-state { align-items: flex-start; flex-direction: column; }
+  .ama-page-action, .ama-retry-button { width: 100%; }
+  .ama-table-card th, .ama-table-card td { padding: .75rem; }
+  .ama-modal-backdrop { padding: .5rem; }
+  .ama-modal { max-height: calc(100vh - 1rem); }
+  .ama-modal-header, .ama-form, .ama-password { padding-right: 1rem; padding-left: 1rem; }
+  .ama-form-fieldset { align-items: flex-start; flex-direction: column; gap: .6rem; }
+  .ama-modal-footer { align-items: stretch; flex-direction: column-reverse; }
+  .ama-modal-footer .ama-button { width: 100%; }
+}

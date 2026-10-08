@@ -82,7 +82,7 @@ function Modal({ title, children, onClose, closeAllowed = true }) {
   return (
     <div className="ama-modal-backdrop">
       <section ref={dialogRef} className="ama-modal" role="dialog" aria-modal="true" aria-label={title} tabIndex="-1" onKeyDown={handleKeyDown}>
-        <header className="ama-modal-header"><h2>{title}</h2><button type="button" onClick={onClose} aria-label="Cerrar" disabled={!closeAllowed}>×</button></header>
+        <header className="ama-modal-header"><h2>{title}</h2><button type="button" className="ama-modal-close" onClick={onClose} aria-label="Cerrar" disabled={!closeAllowed}>×</button></header>
         {children}
       </section>
     </div>
@@ -129,10 +129,10 @@ function AssignmentModal({ eligibleProfiles, countries, onClose, onSubmit, submi
 
   return (
     <Modal title="Nueva asignación de Admin Master" onClose={onClose}>
-      <form className="ama-form" onSubmit={submit}>
-        <fieldset><legend>Perfil</legend>
-          <label><input type="radio" name="assignment-mode" checked={mode === 'existing'} onChange={() => setMode('existing')} disabled={saving} data-autofocus /> Existente</label>
-          <label><input type="radio" name="assignment-mode" checked={mode === 'new'} onChange={() => setMode('new')} disabled={saving} /> Nuevo</label>
+      <form className="ama-form ama-assignment-form" onSubmit={submit}>
+        <fieldset className="ama-form-fieldset"><legend>Perfil</legend>
+          <label className="ama-radio-label"><input className="ama-radio" type="radio" name="assignment-mode" checked={mode === 'existing'} onChange={() => setMode('existing')} disabled={saving} data-autofocus /> Existente</label>
+          <label className="ama-radio-label"><input className="ama-radio" type="radio" name="assignment-mode" checked={mode === 'new'} onChange={() => setMode('new')} disabled={saving} /> Nuevo</label>
         </fieldset>
         {mode === 'existing' ? <SelectField label="Perfil existente" value={form.profile_id} onChange={update('profile_id')} disabled={saving} error={fieldError(errors, 'profile_id')}><option value="">Seleccionar perfil</option>{eligibleProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.username || profile.email || `Perfil ${profile.id}`}</option>)}</SelectField> : <>
           <FormField label="Nombre de usuario" value={form.username} onChange={update('username')} disabled={saving} error={fieldError(errors, 'username')} />
@@ -142,8 +142,8 @@ function AssignmentModal({ eligibleProfiles, countries, onClose, onSubmit, submi
         </>}
         <SelectField label="País" value={form.country_id} onChange={update('country_id')} disabled={saving} error={fieldError(errors, 'country_id')}><option value="">Seleccionar país</option>{countries.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</SelectField>
         <FormField label="Fecha efectiva (opcional)" type="date" value={form.effective_on} onChange={update('effective_on')} disabled={saving} error={fieldError(errors, 'effective_on')} required={false} />
-        {errors.detail && <p className="ama-error" role="alert">{errors.detail}</p>}
-        <footer className="ama-modal-actions"><button type="button" onClick={onClose}>Cancelar</button><button type="submit" disabled={saving}>{saving ? 'Guardando...' : 'Crear asignación'}</button></footer>
+        {errors.detail && <p className="ama-error ama-form-error" role="alert">{errors.detail}</p>}
+        <footer className="ama-modal-footer ama-modal-actions ama-assignment-modal-actions"><button type="button" className="ama-button ama-button--secondary" onClick={onClose}>Cancelar</button><button type="submit" className="ama-button ama-button--primary" disabled={saving}>{saving ? 'Guardando...' : 'Crear asignación'}</button></footer>
       </form>
     </Modal>
   )
@@ -151,12 +151,13 @@ function AssignmentModal({ eligibleProfiles, countries, onClose, onSubmit, submi
 
 function FormField({ label, error, ...inputProps }) {
   const id = `ama-${label.replaceAll(' ', '-').toLowerCase()}`
-  return <div className="ama-field"><label htmlFor={id}>{label}</label><input id={id} required aria-describedby={error ? `${id}-error` : undefined} {...inputProps} />{error && <span id={`${id}-error`} className="ama-error" role="alert">{error}</span>}</div>
+  const inputClassName = `ama-input${inputProps.type === 'date' ? ' ama-date-input' : ''}${error ? ' ama-input--error' : ''}`
+  return <div className="ama-field"><label className="ama-field-label" htmlFor={id}>{label}</label><input id={id} className={inputClassName} required aria-describedby={error ? `${id}-error` : undefined} {...inputProps} />{error && <span id={`${id}-error`} className="ama-error ama-field-error" role="alert">{error}</span>}</div>
 }
 
 function SelectField({ label, error, children, ...selectProps }) {
   const id = `ama-${label.replaceAll(' ', '-').toLowerCase()}`
-  return <div className="ama-field"><label htmlFor={id}>{label}</label><select id={id} required aria-describedby={error ? `${id}-error` : undefined} {...selectProps}>{children}</select>{error && <span id={`${id}-error`} className="ama-error" role="alert">{error}</span>}</div>
+  return <div className="ama-field"><label className="ama-field-label" htmlFor={id}>{label}</label><select id={id} className={`ama-select${error ? ' ama-select--error' : ''}`} required aria-describedby={error ? `${id}-error` : undefined} {...selectProps}>{children}</select>{error && <span id={`${id}-error`} className="ama-error ama-field-error" role="alert">{error}</span>}</div>
 }
 
 function TemporaryPasswordModal({ password, onClose }) {
@@ -173,7 +174,7 @@ function TemporaryPasswordModal({ password, onClose }) {
       setCopyError('No se pudo copiar la contraseña. Cópiala manualmente.')
     }
   }
-  return <Modal title="Contraseña temporal" onClose={onClose}><div className="ama-password"><p>Guarda esta contraseña ahora. No volverá a mostrarse.</p><output>{password}</output>{copyError && <p className="ama-error" role="alert">{copyError}</p>}{copyStatus && <p role="status">{copyStatus}</p>}<footer className="ama-modal-actions"><button type="button" onClick={copy} data-autofocus>Copiar contraseña</button><button type="button" onClick={onClose}>Cerrar</button></footer></div></Modal>
+  return <Modal title="Contraseña temporal" onClose={onClose}><div className="ama-password ama-password-modal"><p>Guarda esta contraseña ahora. No volverá a mostrarse.</p><output className="ama-password-value">{password}</output>{copyError && <p className="ama-error ama-password-error" role="alert">{copyError}</p>}{copyStatus && <p className="ama-password-status" role="status">{copyStatus}</p>}<footer className="ama-modal-footer ama-modal-actions ama-password-modal-actions"><button type="button" className="ama-button ama-button--primary ama-password-copy" onClick={copy} data-autofocus>Copiar contraseña</button><button type="button" className="ama-button ama-button--secondary" onClick={onClose}>Cerrar</button></footer></div></Modal>
 }
 
 export default function AdminMasterAssignmentsPage() {
@@ -216,10 +217,10 @@ export default function AdminMasterAssignmentsPage() {
 
   const visibleAssignments = filter === 'active' ? assignments.filter((assignment) => assignment.lifecycle_state === 'active') : assignments
   return <main className="ama-page">
-    <header className="ama-page-header"><div><h1>Admin Masters</h1><p>Asignaciones de Admin Master por país.</p></div><button type="button" onClick={() => setModal({ type: 'assignment' })}>Nueva asignación</button></header>
-    <div className="ama-filter" role="group" aria-label="Filtro de estado"><button type="button" aria-pressed={filter === 'active'} onClick={() => setFilter('active')}>Activas</button><button type="button" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>Todas</button></div>
-    {loading ? <p className="loading-state">Cargando asignaciones...</p> : error ? <section className="ama-error-state" role="alert"><p>{error}</p><button type="button" onClick={() => void load()}>Reintentar</button></section> : visibleAssignments.length === 0 ? <p className="empty-state">No hay asignaciones para mostrar.</p> : <div className="table-card"><table><thead><tr><th>Perfil</th><th>Email</th><th>País</th><th>Fecha efectiva</th><th>Estado</th></tr></thead><tbody>{visibleAssignments.map((assignment) => <tr key={assignment.id || assignment.assignment_id || `${email(assignment)}-${assignment.effective_on}`}><td>{profileName(assignment)}</td><td>{email(assignment)}</td><td>{country(assignment)}</td><td>{assignment.effective_on || '—'}</td><td>{assignment.lifecycle_state || '—'}</td></tr>)}</tbody></table></div>}
-    {refreshError && <section className="ama-error-state" role="alert" aria-label="Error de actualización"><p>{refreshError}</p><button type="button" onClick={() => void load({ refresh: true })}>Reintentar actualización</button></section>}
+    <header className="ama-page-header"><div className="ama-page-heading"><h1>Admin Masters</h1><p>Asignaciones de Admin Master por país.</p></div><button type="button" className="ama-button ama-button--primary ama-page-action" onClick={() => setModal({ type: 'assignment' })}>Nueva asignación</button></header>
+    <div className="ama-filter" role="group" aria-label="Filtro de estado"><button type="button" className="ama-filter-button" aria-pressed={filter === 'active'} onClick={() => setFilter('active')}>Activas</button><button type="button" className="ama-filter-button" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>Todas</button></div>
+    {loading ? <p className="ama-state ama-loading-state">Cargando asignaciones...</p> : error ? <section className="ama-state ama-error-state" role="alert"><p>{error}</p><button type="button" className="ama-button ama-button--secondary ama-retry-button" onClick={() => void load()}>Reintentar</button></section> : visibleAssignments.length === 0 ? <p className="ama-state ama-empty-state">No hay asignaciones para mostrar.</p> : <div className="ama-table-card"><table><thead><tr><th>Perfil</th><th>Email</th><th>País</th><th>Fecha efectiva</th><th>Estado</th></tr></thead><tbody>{visibleAssignments.map((assignment) => <tr key={assignment.id || assignment.assignment_id || `${email(assignment)}-${assignment.effective_on}`}><td>{profileName(assignment)}</td><td>{email(assignment)}</td><td>{country(assignment)}</td><td>{assignment.effective_on || '—'}</td><td>{assignment.lifecycle_state || '—'}</td></tr>)}</tbody></table></div>}
+    {refreshError && <section className="ama-state ama-error-state" role="alert" aria-label="Error de actualización"><p>{refreshError}</p><button type="button" className="ama-button ama-button--secondary ama-retry-button" onClick={() => void load({ refresh: true })}>Reintentar actualización</button></section>}
     {modal?.type === 'assignment' && <AssignmentModal eligibleProfiles={eligibleProfiles} countries={countries} onClose={() => setModal(null)} onSubmit={create} submissionInFlightRef={submissionInFlight} />}
     {modal?.type === 'password' && <TemporaryPasswordModal password={modal.password} onClose={() => setModal(null)} />}
   </main>
