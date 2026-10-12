@@ -1,5 +1,23 @@
 import { apiRequest } from '../../../services/apiClient'
 
+function parseDetail(detail) {
+  if (typeof detail === 'string') return detail
+  if (Array.isArray(detail)) return detail.map(parseDetail).filter(Boolean).join(' ')
+  if (detail && typeof detail === 'object') {
+    return Object.values(detail).map(parseDetail).filter(Boolean).join(' ')
+  }
+  return ''
+}
+
+function requestError(data, fallback, status) {
+  const error = new Error(parseDetail(data?.detail) || fallback)
+  error.status = status
+  if (data?.detail && typeof data.detail === 'object' && !Array.isArray(data.detail)) {
+    error.fields = data.detail
+  }
+  return error
+}
+
 export async function getSucursales() {
   const res = await apiRequest('/api/sucursales/')
   const data = await res.json()
@@ -13,8 +31,15 @@ export async function createSucursal(body) {
     body: JSON.stringify(body),
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.detail || 'Error al crear sucursal')
+  if (!res.ok) throw requestError(data, 'Error al crear sucursal', res.status)
   return data
+}
+
+export async function getAreasElegibles() {
+  const res = await apiRequest('/api/sucursales/areas-elegibles/')
+  const data = await res.json()
+  if (!res.ok) throw requestError(data, 'Error al cargar áreas elegibles', res.status)
+  return data.results
 }
 
 export async function updateSucursal(id, body) {
@@ -31,6 +56,13 @@ export async function desactivarSucursal(id) {
   const res = await apiRequest(`/api/sucursales/${id}/desactivar/`, { method: 'POST' })
   const data = await res.json()
   if (!res.ok) throw new Error(data.detail || 'Error al desactivar sucursal')
+  return data
+}
+
+export async function quitarGsSucursal(id) {
+  const res = await apiRequest(`/api/sucursales/${id}/quitar-gs/`, { method: 'POST' })
+  const data = await res.json()
+  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al quitar el GS de la sucursal')
   return data
 }
 

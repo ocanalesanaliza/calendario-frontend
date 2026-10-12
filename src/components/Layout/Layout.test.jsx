@@ -10,6 +10,8 @@ const { useAuth, getTrabajosCampo, getCoberturas, getSolicitudesVacacion } = vi.
   getSolicitudesVacacion: vi.fn(),
 }))
 
+const capabilityModuleLabels = ['Sucursales', 'Usuarios', 'Plantillas', 'Situaciones especiales', 'Dashboard', 'Reportes']
+
 vi.mock('../../features/auth/context/AuthContext', () => ({ useAuth }))
 vi.mock('../../features/trabajosCampo/services/trabajosCampoService', () => ({ getTrabajosCampo }))
 vi.mock('../../features/coberturas/services/coberturasService', () => ({ getCoberturas }))
@@ -25,10 +27,13 @@ describe('Layout Mis tareas navigation', () => {
     getTrabajosCampo.mockReset()
     getCoberturas.mockReset()
     getSolicitudesVacacion.mockReset()
+    getTrabajosCampo.mockResolvedValue({ results: [] })
+    getCoberturas.mockResolvedValue({ results: [] })
+    getSolicitudesVacacion.mockResolvedValue({ results: [] })
   })
 
-  it('hides Mis tareas for a Systems account without the capability', () => {
-    useAuth.mockReturnValue({ perfil: { es_cuenta_sistemas: true, can_access_my_tasks: false }, logout: vi.fn() })
+  it('shows only the Systems management menu for an active Systems account that was previously a GA', () => {
+    useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true, can_access_my_tasks: true }, logout: vi.fn() })
 
     render(
       <MemoryRouter>
@@ -39,5 +44,173 @@ describe('Layout Mis tareas navigation', () => {
     )
 
     expect(screen.queryByTitle('Mis tareas')).not.toBeInTheDocument()
+    expect(screen.queryByTitle('Depósitos pendientes')).not.toBeInTheDocument()
+    expect(screen.queryByTitle('Calendario del área')).not.toBeInTheDocument()
+    expect(screen.queryByTitle('Mi almuerzo')).not.toBeInTheDocument()
+    expect(screen.getByTitle('Áreas')).toBeInTheDocument()
+    expect(screen.getByTitle('Gerentes de área')).toBeInTheDocument()
+    expect(screen.getByTitle('Gerentes de operaciones')).toBeInTheDocument()
+    expect(screen.getByTitle('Organización')).toHaveAttribute('href', '/organizacion')
+    expect(screen.getByTitle('Admin Masters')).toHaveAttribute('href', '/admin-master-asignaciones')
+  })
+
+  it.each([
+    ['GA', { type: 'gerente_area' }],
+    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }],
+    ['GS', { type: 'gerente_sucursal' }],
+    ['Administrador Maestro', { es_admin_maestro: true, activo: true, habilitado: true }],
+    ['disabled Systems account', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: false }],
+    ['inactive Systems account', { type: 'sistemas', es_cuenta_sistemas: true, activo: false, habilitado: true }],
+  ])('hides Admin Masters from %s', (_name, perfil) => {
+    useAuth.mockReturnValue({ perfil, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+
+    expect(screen.queryByTitle('Admin Masters')).not.toBeInTheDocument()
+  })
+
+  it('shows the six capability-controlled modules to a Systems master admin with granted capabilities', () => {
+    useAuth.mockReturnValue({
+      perfil: {
+        type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true,
+        capabilities: {
+          has_global_scope: true,
+          manage_branches: true,
+          manage_users: true,
+          manage_templates: true,
+          manage_special_situations: true,
+          access_operational_dashboard: true,
+          access_performance_reports: true,
+        },
+      },
+      logout: vi.fn(),
+    })
+
+    render(
+      <MemoryRouter>
+        <Routes>
+          <Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    capabilityModuleLabels.forEach((label) => {
+      expect(screen.getByTitle(label)).toBeInTheDocument()
+    })
+  })
+
+  it('hides the six capability-controlled modules from a Systems profile without master admin or capabilities', () => {
+    useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: false }, logout: vi.fn() })
+
+    render(
+      <MemoryRouter>
+        <Routes>
+          <Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    capabilityModuleLabels.forEach((label) => {
+      expect(screen.queryByTitle(label)).not.toBeInTheDocument()
+    })
+    expect(screen.queryByTitle('Organización')).not.toBeInTheDocument()
+  })
+
+  it('hides the restricted navigation entries for an area manager', () => {
+    useAuth.mockReturnValue({
+      perfil: {
+        type: 'gerente_area',
+        can_access_my_tasks: true,
+        capabilities: { manage_branches: true },
+      },
+      logout: vi.fn(),
+    })
+
+    render(
+      <MemoryRouter>
+        <Routes>
+          <Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.queryByTitle('Mis tareas')).not.toBeInTheDocument()
+    expect(screen.queryByTitle('Depósitos pendientes')).not.toBeInTheDocument()
+    expect(screen.queryByTitle('Conteo de inventario')).not.toBeInTheDocument()
+    expect(screen.queryByTitle('Tareas')).not.toBeInTheDocument()
+    expect(screen.getByTitle('Calendario del área')).toBeInTheDocument()
+    expect(screen.getByTitle('Mi almuerzo')).toBeInTheDocument()
+  })
+
+  it('keeps the navigation entries available to a non-area-manager profile with the same capabilities', () => {
+    useAuth.mockReturnValue({
+      perfil: {
+        type: 'gerente_sucursal',
+        can_access_my_tasks: true,
+        capabilities: { manage_branches: true },
+      },
+      logout: vi.fn(),
+    })
+
+    render(
+      <MemoryRouter>
+        <Routes>
+          <Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByTitle('Mis tareas')).toBeInTheDocument()
+    expect(screen.getByTitle('Solicitudes pendientes')).toBeInTheDocument()
+    expect(screen.getByTitle('Conteo de inventario')).toBeInTheDocument()
+    expect(screen.getByTitle('Tareas')).toBeInTheDocument()
+  })
+
+  it('hides Mis tareas and Solicitudes pendientes for an operations manager while preserving Áreas', () => {
+    useAuth.mockReturnValue({
+      perfil: {
+        type: 'gerente_operaciones',
+        activo: true,
+        habilitado: true,
+        can_access_my_tasks: true,
+      },
+      logout: vi.fn(),
+    })
+
+    render(
+      <MemoryRouter>
+        <Routes>
+          <Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.queryByTitle('Mis tareas')).not.toBeInTheDocument()
+    expect(screen.queryByTitle('Solicitudes pendientes')).not.toBeInTheDocument()
+    expect(screen.getByTitle('Áreas')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['GA', { type: 'gerente_area' }],
+    ['GS', { type: 'gerente_sucursal', can_access_my_tasks: true }],
+  ])('oculta Revisiones de guardia para %s', (_nombre, perfil) => {
+    useAuth.mockReturnValue({ perfil, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+    expect(screen.queryByTitle('Revisiones de guardia')).not.toBeInTheDocument()
+  })
+
+  it('muestra Revisiones de guardia únicamente al administrador maestro', () => {
+    useAuth.mockReturnValue({ perfil: { es_admin_maestro: true }, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+    expect(screen.getByTitle('Revisiones de guardia')).toHaveAttribute('href', '/analitica/revisiones-guardia')
+  })
+
+  it.each([
+    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }],
+    ['Administrador Maestro', { es_admin_maestro: true, activo: true, habilitado: true }],
+  ])('hides Organización from a non-Systems %s', (_nombre, perfil) => {
+    useAuth.mockReturnValue({ perfil, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+
+    expect(screen.queryByTitle('Organización')).not.toBeInTheDocument()
   })
 })

@@ -1,10 +1,18 @@
 import { apiRequest } from '../../../services/apiClient'
 
+function parseDetail(detail) {
+  if (!detail) return null
+  if (typeof detail === 'string') return detail
+  if (Array.isArray(detail)) return detail.map(parseDetail).filter(Boolean).join(' ')
+  if (typeof detail === 'object') return Object.values(detail).map(parseDetail).filter(Boolean).join(' ')
+  return String(detail)
+}
+
 export async function getUsuarios(params = {}) {
   const query = new URLSearchParams(params).toString()
   const res = await apiRequest(`/api/usuarios/${query ? `?${query}` : ''}`)
   const data = await res.json()
-  if (!res.ok) throw new Error(data.detail || 'Error al cargar usuarios')
+  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al cargar usuarios')
   return data.results
 }
 
@@ -14,7 +22,7 @@ export async function createUsuario(body) {
     body: JSON.stringify(body),
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.detail || 'Error al crear usuario')
+  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al crear usuario')
   return data
 }
 
@@ -24,7 +32,7 @@ export async function updateUsuario(id, body) {
     body: JSON.stringify(body),
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.detail || 'Error al actualizar usuario')
+  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al actualizar usuario')
   return data
 }
 
@@ -34,7 +42,7 @@ export async function cambiarSucursal(id, body) {
     body: JSON.stringify(body),
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.detail || 'Error al cambiar sucursal')
+  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al cambiar sucursal')
   return data
 }
 
@@ -43,7 +51,7 @@ export async function desactivarUsuario(id) {
     method: 'POST',
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.detail || 'Error al desactivar usuario')
+  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al desactivar usuario')
   return data
 }
 

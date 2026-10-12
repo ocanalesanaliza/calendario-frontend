@@ -1,7 +1,14 @@
 ﻿import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { getPlantilla, updatePlantilla, desactivarPlantilla, addTarea, updateTarea, desactivarTarea, asignarSucursales } from '../services/plantillasService'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { getPlantilla, updatePlantilla, desactivarPlantilla, duplicarPlantilla, addTarea, updateTarea, desactivarTarea, asignarSucursales } from '../services/plantillasService'
 import { getTareas } from '../../tareas/services/tareasService'
+import RecurrenceSelector from '../../tareas/components/RecurrenceSelector'
+import {
+  construirReglasRecurrencia,
+  obtenerLabelReglas,
+  recurrenciaDesdeReglas,
+  validarValorRecurrencia,
+} from '../../tareas/recurrenceConfig'
 import { getSucursales } from '../../sucursales/services/sucursalesService'
 import './PlantillaDetallePage.css'
 
@@ -10,18 +17,41 @@ const JORNADA_LABEL = { manana: 'Mañana', tarde: 'Tarde' }
 export default function PlantillaDetallePage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const [plantilla, setPlantilla] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [modal, setModal] = useState(null)
   const [buscarTarea, setBuscarTarea] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
+  const successMessageTemplateId = useRef(null)
 
   useEffect(() => { loadData() }, [id])
 
+  useEffect(() => {
+    const duplication = location.state?.templateDuplication
+    if (duplication?.kind !== 'template-duplicated' || String(duplication.templateId) !== String(id)) return
+
+    setSuccessMessage('Plantilla duplicada correctamente.')
+    successMessageTemplateId.current = String(id)
+    navigate(location.pathname, { replace: true, state: null })
+  }, [id, location.key, location.pathname, location.state, navigate])
+
+  useEffect(() => {
+    if (successMessageTemplateId.current && successMessageTemplateId.current !== String(id)) {
+      setSuccessMessage('')
+      successMessageTemplateId.current = null
+    }
+  }, [id])
+
   async function loadData() {
     setLoading(true)
+    setError('')
     try {
       const data = await getPlantilla(id)
       setPlantilla(data)
+    } catch (requestError) {
+      setError(requestError.message || 'No se pudo cargar la plantilla.')
     } finally {
       setLoading(false)
     }
@@ -36,6 +66,22 @@ export default function PlantillaDetallePage() {
   async function handleDesactivarPlantilla() {
     await desactivarPlantilla(id)
     navigate('/plantillas')
+  }
+
+  async function handleDuplicarPlantilla() {
+    const data = await duplicarPlantilla(id)
+    const idPlantillaDuplicada = data?.id_plantilla ?? data?.id ?? data?.plantilla?.id_plantilla ?? data?.plantilla?.id
+    if (idPlantillaDuplicada == null) throw new Error('No se pudo identificar la plantilla duplicada.')
+
+    setModal(null)
+    navigate(`/plantillas/${idPlantillaDuplicada}`, {
+      state: {
+        templateDuplication: {
+          kind: 'template-duplicated',
+          templateId: idPlantillaDuplicada,
+        },
+      },
+    })
   }
 
   async function handleAddTarea(form) {
@@ -68,6 +114,7 @@ export default function PlantillaDetallePage() {
   }
 
   if (loading) return <div className="loading-state">Cargando plantilla...</div>
+  if (error) return <div className="empty-state" role="alert">{error} <button className="btn-secondary" onClick={loadData}>Reintentar</button></div>
   if (!plantilla) return <div className="loading-state">Plantilla no encontrada.</div>
 
   const tareasActivas = plantilla.tareas?.filter((t) => t.activa) ?? []
@@ -79,6 +126,7 @@ export default function PlantillaDetallePage() {
 
   return (
     <div className="detalle-page">
+      {successMessage && <p role="status">{successMessage}</p>}
       {/* Header */}
       <div className="detalle-header">
         <button className="btn-back" onClick={() => navigate('/plantillas')}>
@@ -113,6 +161,9 @@ export default function PlantillaDetallePage() {
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
               </svg>
               Editar
+            </button>
+            <button className="btn-outline" onClick={() => setModal({ type: 'duplicar' })}>
+              Duplicar plantilla
             </button>
             {plantilla.activa && (
               <button className="btn-outline btn-outline-danger" onClick={() => setModal({ type: 'desactivar' })}>
@@ -176,7 +227,11 @@ export default function PlantillaDetallePage() {
               {tareasFiltradas.map((pt) => (
                 <tr key={pt.id_plantilla_tarea} className={!pt.activa ? 'row-inactive' : ''}>
                   <td className="td-nombre">{pt.tarea?.nombre ?? '—'}</td>
-                  <td><span className="badge badge-tipo">{pt.tarea?.recurrencia_label ?? '—'}</span></td>
+                  <td>
+                    <span className="badge badge-tipo">
+                      {obtenerLabelReglas(pt.reglas_recurrencia, pt.tarea?.recurrencia_label ?? '—')}
+                    </span>
+                  </td>
                   <td>
                     <span className={`badge ${pt.jornada === 'manana' ? 'badge-blue' : 'badge-orange'}`}>
                       {JORNADA_LABEL[pt.jornada] ?? pt.jornada}
@@ -235,6 +290,16 @@ export default function PlantillaDetallePage() {
           title="Desactivar plantilla"
           message={<>¿Deseas desactivar <strong>{plantilla.nombre}</strong>?</>}
           onConfirm={handleDesactivarPlantilla}
+          onClose={() => setModal(null)}
+        />
+      )}
+
+      {modal?.type === 'duplicar' && (
+        <ConfirmModal
+          title="Duplicar plantilla"
+          message={<>Se creará una nueva plantilla activa e independiente. Comenzará sin asignaciones de sucursales. Solo se copiarán las tareas activas y las reglas de recurrencia activas. La plantilla original no se modificará.</>}
+          confirmButtonVariant="btn-primary"
+          onConfirm={handleDuplicarPlantilla}
           onClose={() => setModal(null)}
         />
       )}
@@ -343,6 +408,10 @@ function normalizarHora(hora) {
 }
 
 function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
+  const reglasIniciales = inicial?.reglas_recurrencia?.length
+    ? inicial.reglas_recurrencia
+    : inicial?.tarea?.reglas_sugeridas ?? []
+  const recurrenciaInicial = recurrenciaDesdeReglas(reglasIniciales)
   const [catalogoTareas, setCatalogoTareas] = useState([])
   const [seleccionadas, setSeleccionadas] = useState([])
   const [buscar, setBuscar] = useState('')
@@ -352,20 +421,20 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
     hora_manana: HORAS_MANANA[0],
     hora_tarde: HORAS_TARDE[0],
     aplica_ambas_jornadas: inicial?.aplica_ambas_jornadas ?? false,
+    tipo_recurrencia: recurrenciaInicial.tipo,
+    valor_recurrencia: recurrenciaInicial.valor,
   })
+  const [recurrenciaModificada, setRecurrenciaModificada] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    getTareas().then(setCatalogoTareas).catch(() => {})
+    getTareas('sucursal')
+      .then((tareas) => setCatalogoTareas(
+        tareas.filter((tarea) => tarea.es_revision_guardia !== true),
+      ))
+      .catch(() => {})
   }, [])
-
-  useEffect(() => {
-    if (inicial) return
-    setSeleccionadas((prev) =>
-      prev.filter((idTarea) => !calcDuplicada(idTarea, form.aplica_ambas_jornadas, form.jornada))
-    )
-  }, [form.aplica_ambas_jornadas, form.jornada])
 
   function calcDuplicada(idTarea, ambas, jornada) {
     if (ambas) {
@@ -378,11 +447,38 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
   }
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
-  const setCheck = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.checked }))
-
   function handleJornadaChange(e) {
     const jornada = e.target.value
     setForm((f) => ({ ...f, jornada, hora_sugerida: jornada === 'tarde' ? HORAS_TARDE[0] : HORAS_MANANA[0] }))
+    if (!inicial) {
+      setSeleccionadas((prev) =>
+        prev.filter((idTarea) => !calcDuplicada(idTarea, form.aplica_ambas_jornadas, jornada))
+      )
+    }
+  }
+
+  function handleAmbasJornadasChange(e) {
+    const aplicaAmbas = e.target.checked
+    setForm((actual) => ({ ...actual, aplica_ambas_jornadas: aplicaAmbas }))
+    if (!inicial) {
+      setSeleccionadas((prev) =>
+        prev.filter((idTarea) => !calcDuplicada(idTarea, aplicaAmbas, form.jornada))
+      )
+    }
+  }
+
+  function handleTipoRecurrenciaChange(tipo) {
+    setRecurrenciaModificada(true)
+    setForm((actual) => ({
+      ...actual,
+      tipo_recurrencia: tipo,
+      valor_recurrencia: tipo === actual.tipo_recurrencia ? actual.valor_recurrencia : '',
+    }))
+  }
+
+  function handleValorRecurrenciaChange(valor) {
+    setRecurrenciaModificada(true)
+    setForm((actual) => ({ ...actual, valor_recurrencia: valor }))
   }
 
   function toggleTarea(idTarea) {
@@ -402,17 +498,36 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
       setError('Selecciona al menos una tarea.')
       return
     }
+    if (inicial && recurrenciaModificada) {
+      const errorRecurrencia = validarValorRecurrencia(
+        form.tipo_recurrencia,
+        form.valor_recurrencia,
+      )
+      if (errorRecurrencia) {
+        setError(errorRecurrencia)
+        return
+      }
+    }
     setLoading(true)
     try {
       if (inicial) {
-        await onSubmit({
+        const body = {
           id_tarea: inicial.tarea.id_tarea,
           jornada: form.jornada,
           hora_sugerida: form.hora_sugerida || null,
           hora_manana: form.hora_manana || null,
           hora_tarde: form.hora_tarde || null,
           aplica_ambas_jornadas: form.aplica_ambas_jornadas,
-        })
+        }
+        if (recurrenciaModificada) {
+          const reglas = construirReglasRecurrencia(
+            form.tipo_recurrencia,
+            form.valor_recurrencia,
+            reglasIniciales.length === 1 ? reglasIniciales[0] : null,
+          )
+          if (reglas !== null) body.reglas_recurrencia = reglas
+        }
+        await onSubmit(body)
       } else {
         await onSubmit({
           ids_tareas: seleccionadas,
@@ -486,7 +601,7 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
         )}
 
         <label className="check-label" style={{ marginTop: '0.25rem' }}>
-          <input type="checkbox" checked={form.aplica_ambas_jornadas} onChange={setCheck('aplica_ambas_jornadas')} disabled={!!inicial} />
+          <input type="checkbox" checked={form.aplica_ambas_jornadas} onChange={handleAmbasJornadasChange} disabled={!!inicial} />
           Aplica ambas jornadas
         </label>
 
@@ -521,6 +636,17 @@ function TareaModal({ inicial, tareasActivas = [], onSubmit, onClose }) {
               </select>
             </div>
           </div>
+        )}
+
+        {inicial && (
+          <RecurrenceSelector
+            tipo={form.tipo_recurrencia}
+            valor={form.valor_recurrencia}
+            onTipoChange={handleTipoRecurrenciaChange}
+            onValorChange={handleValorRecurrenciaChange}
+            permitirManual
+            permitirEspecial={recurrenciaInicial.especial}
+          />
         )}
 
         {error && <p className="modal-error">{error}</p>}
@@ -675,7 +801,7 @@ function AsignarModal({ onSubmit, onClose }) {
   )
 }
 
-function ConfirmModal({ title, message, onConfirm, onClose }) {
+function ConfirmModal({ title, message, confirmButtonVariant = 'btn-danger', onConfirm, onClose }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -692,7 +818,7 @@ function ConfirmModal({ title, message, onConfirm, onClose }) {
         {error && <p className="modal-error">{error}</p>}
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-danger" onClick={handleConfirm} disabled={loading}>
+          <button className={confirmButtonVariant} onClick={handleConfirm} disabled={loading}>
             {loading ? 'Procesando...' : 'Confirmar'}
           </button>
         </div>

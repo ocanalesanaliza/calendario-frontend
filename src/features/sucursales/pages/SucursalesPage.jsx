@@ -1,12 +1,14 @@
 ﻿import { useState, useEffect } from 'react'
 import {
-  getSucursales, createSucursal, updateSucursal, desactivarSucursal,
+  getSucursales, createSucursal, getAreasElegibles, updateSucursal, desactivarSucursal,
+  quitarGsSucursal,
   getHorarios, saveHorarios, updateHorario,
   getTareasSucursal,
 } from '../services/sucursalesService'
 import { getGerentes } from '../../gerentes/services/gerentesService'
 import { getPlantillas, asignarSucursales } from '../../plantillas/services/plantillasService'
 import { useAuth } from '../../auth/context/AuthContext'
+import { getProfileCapabilities } from '../../auth/profilePolicies'
 import './SucursalesPage.css'
 
 const DIAS = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
@@ -14,9 +16,10 @@ const JORNADA_LABEL = { manana: 'Mañana', tarde: 'Tarde' }
 
 export default function SucursalesPage() {
   const { perfil } = useAuth()
-  const esAdmin = perfil?.es_admin_maestro === true
+  const esAdmin = getProfileCapabilities(perfil).isMasterAdmin
   const [sucursales, setSucursales] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [busqueda, setBusqueda] = useState('')
   const [modal, setModal] = useState(null)
 
@@ -24,9 +27,12 @@ export default function SucursalesPage() {
 
   async function loadData() {
     setLoading(true)
+    setError('')
     try {
       const data = await getSucursales()
       setSucursales(data)
+    } catch (requestError) {
+      setError(requestError.message || 'No se pudieron cargar las sucursales.')
     } finally {
       setLoading(false)
     }
@@ -34,20 +40,35 @@ export default function SucursalesPage() {
 
   async function handleCreate(form, idPlantilla, fechaPlantilla) {
     const resp = await createSucursal(form)
+    const idSucursal = resp?.sucursal?.id_sucursal ?? resp?.id_sucursal
     await loadData()
-    if (idPlantilla) {
-      const idSucursal = resp?.sucursal?.id_sucursal ?? resp?.id_sucursal
-      if (idSucursal) {
-        try {
-          const body = { id_sucursal: idSucursal }
-          if (fechaPlantilla) body.fecha_inicio = fechaPlantilla
-          await asignarSucursales(idPlantilla, body)
-        } catch {
-          // sucursal creada; asignación de plantilla falló silenciosamente
-        }
+    if (idPlantilla && idSucursal) {
+      const assignment = { idSucursal, idPlantilla, fechaPlantilla }
+      try {
+        await assignTemplate(assignment)
+      } catch (requestError) {
+        setModal({ type: 'template-assignment-failed', assignment, error: requestError.message })
+        return
       }
     }
     setModal(null)
+  }
+
+  async function assignTemplate({ idSucursal, idPlantilla, fechaPlantilla }) {
+    const body = { id_sucursal: idSucursal }
+    if (fechaPlantilla) body.fecha_inicio = fechaPlantilla
+    await asignarSucursales(idPlantilla, body)
+  }
+
+  async function retryTemplateAssignment() {
+    const { assignment } = modal
+    setModal({ type: 'template-assignment-failed', assignment, error: '', retrying: true })
+    try {
+      await assignTemplate(assignment)
+      setModal(null)
+    } catch (requestError) {
+      setModal({ type: 'template-assignment-failed', assignment, error: requestError.message })
+    }
   }
 
   async function handleEdit(id, form) {
@@ -58,6 +79,12 @@ export default function SucursalesPage() {
 
   async function handleDesactivar(id) {
     await desactivarSucursal(id)
+    await loadData()
+    setModal(null)
+  }
+
+  async function handleQuitarGs(id) {
+    await quitarGsSucursal(id)
     await loadData()
     setModal(null)
   }
@@ -100,6 +127,8 @@ export default function SucursalesPage() {
 
       {loading ? (
         <div className="loading-state">Cargando sucursales...</div>
+      ) : error ? (
+        <div className="empty-state" role="alert">{error} <button className="btn-secondary" onClick={loadData}>Reintentar</button></div>
       ) : filtradas.length === 0 ? (
         <div className="empty-state">
           {busqueda ? 'Sin resultados para tu búsqueda.' : 'No hay sucursales registradas.'}
@@ -112,6 +141,8 @@ export default function SucursalesPage() {
                 <th>Nombre</th>
                 <th>Código</th>
                 <th>Gerente de área</th>
+                <th>GS asignado</th>
+                {esAdmin && <th>Guardias</th>}
                 <th>Estado</th>
                 <th>Acciones</th>
               </tr>
@@ -129,6 +160,15 @@ export default function SucursalesPage() {
                       </div>
                     ) : <span className="td-empty">—</span>}
                   </td>
+                  <td>
+                    {s.usuario_titular ? (
+                      <div className="gerente-cell">
+                        <div className="gerente-avatar gs-avatar">{s.usuario_titular.nombre.charAt(0).toUpperCase()}</div>
+                        <span>{s.usuario_titular.nombre}</span>
+                      </div>
+                    ) : <span className="td-empty">Sin GS</span>}
+                  </td>
+                  {esAdmin && <td>{s.numero_guardias ?? 0}</td>}
                   <td>
                     <span className={`badge ${s.activa ? 'badge-green' : 'badge-red'}`}>
                       {s.activa ? 'Activa' : 'Inactiva'}
@@ -153,6 +193,20 @@ export default function SucursalesPage() {
                           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                         </svg>
                       </button>
+                      {s.usuario_titular && (
+                        <button
+                          className="action-btn action-btn-danger"
+                          title="Quitar GS"
+                          aria-label={`Quitar a ${s.usuario_titular.nombre} de ${s.nombre}`}
+                          onClick={() => setModal({ type: 'quitar-gs', sucursal: s })}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                            <circle cx="9" cy="7" r="4" />
+                            <line x1="17" y1="11" x2="23" y2="11" />
+                          </svg>
+                        </button>
+                      )}
                       {s.activa && (
                         <button className="action-btn action-btn-danger" title="Desactivar" onClick={() => setModal({ type: 'desactivar', sucursal: s })}>
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -187,11 +241,26 @@ export default function SucursalesPage() {
           onClose={() => setModal(null)}
         />
       )}
+      {modal?.type === 'quitar-gs' && (
+        <QuitarGsModal
+          sucursal={modal.sucursal}
+          onConfirm={() => handleQuitarGs(modal.sucursal.id_sucursal)}
+          onClose={() => setModal(null)}
+        />
+      )}
       {modal?.type === 'horarios' && (
         <HorariosModal sucursal={modal.sucursal} onClose={() => setModal(null)} />
       )}
       {modal?.type === 'plantilla' && (
         <PlantillaModal sucursal={modal.sucursal} onClose={() => setModal(null)} />
+      )}
+      {modal?.type === 'template-assignment-failed' && (
+        <TemplateAssignmentFailureModal
+          error={modal.error}
+          retrying={modal.retrying}
+          onRetry={retryTemplateAssignment}
+          onClose={() => setModal(null)}
+        />
       )}
     </div>
   )
@@ -202,10 +271,10 @@ export default function SucursalesPage() {
 function ModalWrapper({ title, onClose, children, wide, xl }) {
   return (
     <div className="modal-overlay">
-      <div className={`modal${wide ? ' modal-wide' : ''}${xl ? ' modal-xl' : ''}`} onClick={(e) => e.stopPropagation()}>
+      <div className={`modal${wide ? ' modal-wide' : ''}${xl ? ' modal-xl' : ''}`} role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>{title}</h2>
-          <button className="modal-close" onClick={onClose}>
+          <button className="modal-close" aria-label="Cerrar" onClick={onClose}>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -218,35 +287,71 @@ function ModalWrapper({ title, onClose, children, wide, xl }) {
 }
 
 function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
+  const isCreating = !inicial
   const [gerentes, setGerentes] = useState([])
+  const [areas, setAreas] = useState([])
   const [plantillas, setPlantillas] = useState([])
   const [form, setForm] = useState({
     nombre:          inicial?.nombre ?? '',
     codigo:          inicial?.codigo ?? '',
     id_gerente_area: inicial?.gerente_area?.id_gerente_area ?? '',
+    calendar_area_id: '',
+    numero_guardias: inicial?.numero_guardias ?? 0,
   })
   const [idPlantilla, setIdPlantilla]   = useState('')
   const [fechaPlantilla, setFechaPlantilla] = useState('')
   const [error, setError]   = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
   const [loading, setLoading] = useState(false)
+  const [loadingAreas, setLoadingAreas] = useState(isCreating)
+  const [areasError, setAreasError] = useState('')
 
   useEffect(() => {
-    if (esAdmin) getGerentes().then(setGerentes).catch(() => {})
+    let active = true
+    if (isCreating) {
+      getAreasElegibles()
+        .then((data) => { if (active) setAreas(data) })
+        .catch((requestError) => { if (active) setAreasError(requestError.message || 'No se pudieron cargar las áreas elegibles.') })
+        .finally(() => { if (active) setLoadingAreas(false) })
+    }
+    if (esAdmin && !isCreating) getGerentes().then(setGerentes).catch(() => {})
     if (conPlantilla) getPlantillas().then((p) => setPlantillas(p.filter((x) => x.activa))).catch(() => {})
-  }, [esAdmin, conPlantilla])
+    return () => { active = false }
+  }, [esAdmin, conPlantilla, isCreating])
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+  const set = (k) => (e) => {
+    setForm((f) => ({ ...f, [k]: e.target.value }))
+    setFieldErrors((errors) => ({ ...errors, [k]: undefined }))
+  }
+
+  const selectedArea = areas.find((area) => String(area.id) === form.calendar_area_id)
+  const areaError = Array.isArray(fieldErrors.calendar_area_id)
+    ? fieldErrors.calendar_area_id.join(' ')
+    : fieldErrors.calendar_area_id
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+    setFieldErrors({})
+    if (isCreating && !form.calendar_area_id) {
+      setFieldErrors({ calendar_area_id: 'Selecciona un área.' })
+      return
+    }
+    const numeroGuardias = Number(form.numero_guardias)
+    if (esAdmin && (!Number.isInteger(numeroGuardias) || numeroGuardias < 0 || numeroGuardias > 4)) {
+      setError('El número de guardias debe ser un entero entre 0 y 4.')
+      return
+    }
     setLoading(true)
     try {
       const body = { nombre: form.nombre, codigo: form.codigo }
-      if (esAdmin && form.id_gerente_area) body.id_gerente_area = Number(form.id_gerente_area)
+      if (isCreating) body.calendar_area_id = Number(form.calendar_area_id)
+      if (esAdmin && !isCreating && form.id_gerente_area) body.id_gerente_area = Number(form.id_gerente_area)
+      if (esAdmin) body.numero_guardias = numeroGuardias
       await onSubmit(body, idPlantilla ? Number(idPlantilla) : null, fechaPlantilla || null)
     } catch (err) {
-      setError(err.message)
+      if (err.fields && typeof err.fields === 'object') setFieldErrors(err.fields)
+      else setError(err.message)
     } finally {
       setLoading(false)
     }
@@ -263,16 +368,67 @@ function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
           <label>Código</label>
           <input type="text" value={form.codigo} onChange={set('codigo')} required placeholder="ej. CENTRO-001" />
         </div>
+        {isCreating && (
+            <>
+              <div className="form-group">
+                <label htmlFor="calendar-area">Área <span className="label-required">*</span></label>
+                <select
+                  id="calendar-area"
+                  value={form.calendar_area_id}
+                  onChange={set('calendar_area_id')}
+                  required
+                  disabled={loadingAreas || areas.length === 0}
+                  aria-describedby={areaError ? 'calendar-area-error' : undefined}
+                >
+                  <option value="">{loadingAreas ? 'Cargando áreas...' : 'Seleccionar área'}</option>
+                  {areas.map((area) => (
+                    <option key={area.id} value={area.id}>{area.codigo} — {area.nombre}</option>
+                  ))}
+                </select>
+                {areaError && <span id="calendar-area-error" className="modal-error" role="alert">{areaError}</span>}
+                {areasError && <p className="modal-error" role="alert">{areasError}</p>}
+                {!loadingAreas && !areasError && areas.length === 0 && (
+                  <p className="modal-error" role="alert">No hay áreas elegibles disponibles para crear una sucursal.</p>
+                )}
+              </div>
+              {selectedArea?.gerente_area && (
+                <div className="form-group">
+                  <p className="form-section-label">Gerente de área asignado</p>
+                  <p>{selectedArea.gerente_area.nombre}</p>
+                </div>
+              )}
+            </>
+        )}
         {esAdmin && (
-          <div className="form-group">
-            <label>Gerente de área {!inicial && <span className="label-required">*</span>}</label>
-            <select value={form.id_gerente_area} onChange={set('id_gerente_area')} required={!inicial}>
-              <option value="">Seleccionar gerente</option>
-              {gerentes.filter((g) => g.activo).map((g) => (
-                <option key={g.id_gerente_area} value={g.id_gerente_area}>{g.nombre}</option>
-              ))}
-            </select>
-          </div>
+          <>
+            {!isCreating && (
+            <>
+              <div className="form-group">
+                <label>Gerente de área</label>
+                <select value={form.id_gerente_area} onChange={set('id_gerente_area')}>
+                  <option value="">Seleccionar gerente</option>
+                  {gerentes.filter((g) => g.activo).map((g) => (
+                    <option key={g.id_gerente_area} value={g.id_gerente_area}>{g.nombre}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+            )}
+            <div className="form-group">
+              <label htmlFor="numero-guardias">Número de guardias</label>
+              <input
+                id="numero-guardias"
+                type="number"
+                min="0"
+                max="4"
+                step="1"
+                value={form.numero_guardias}
+                onChange={set('numero_guardias')}
+                required
+              />
+              <span className="label-optional">De 0 a 4. Con 0 no se programa la Revisión de Guardia.</span>
+            </div>
+          </>
         )}
         {conPlantilla && plantillas.length > 0 && (
           <>
@@ -300,11 +456,28 @@ function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
         {error && <p className="modal-error">{error}</p>}
         <div className="modal-footer">
           <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button type="submit" className="btn-primary" disabled={loading}>
+          <button type="submit" className="btn-primary" disabled={loading || (isCreating && (loadingAreas || areas.length === 0 || !form.calendar_area_id))}>
             {loading ? 'Guardando...' : inicial ? 'Guardar cambios' : 'Crear sucursal'}
           </button>
         </div>
       </form>
+    </ModalWrapper>
+  )
+}
+
+function TemplateAssignmentFailureModal({ error, retrying, onRetry, onClose }) {
+  return (
+    <ModalWrapper title="No se pudo asignar la plantilla" onClose={onClose}>
+      <div className="modal-form">
+        <p role="alert">La sucursal fue creada, pero no se pudo asignar la plantilla.</p>
+        {error && <p className="modal-error">{error}</p>}
+        <div className="modal-footer">
+          <button type="button" className="btn-secondary" onClick={onClose} disabled={retrying}>Cerrar</button>
+          <button type="button" className="btn-primary" onClick={onRetry} disabled={retrying}>
+            {retrying ? 'Reintentando...' : 'Reintentar asignación'}
+          </button>
+        </div>
+      </div>
     </ModalWrapper>
   )
 }
@@ -328,6 +501,40 @@ function DesactivarModal({ nombre, onConfirm, onClose }) {
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
           <button className="btn-danger" onClick={handleConfirm} disabled={loading}>
             {loading ? 'Desactivando...' : 'Desactivar'}
+          </button>
+        </div>
+      </div>
+    </ModalWrapper>
+  )
+}
+
+function QuitarGsModal({ sucursal, onConfirm, onClose }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleConfirm() {
+    setLoading(true)
+    setError('')
+    try {
+      await onConfirm()
+    } catch (err) {
+      setError(err.message)
+      setLoading(false)
+    }
+  }
+
+  return (
+    <ModalWrapper title="Quitar GS de la sucursal" onClose={onClose}>
+      <div className="modal-form">
+        <p className="modal-confirm-text">
+          ¿Deseas quitar a <strong>{sucursal.usuario_titular.nombre}</strong> de la sucursal <strong>{sucursal.nombre}</strong>?
+        </p>
+        <p className="modal-confirm-help">La cuenta del GS permanecerá activa y podrás asignarla nuevamente.</p>
+        {error && <p className="modal-error" role="alert">{error}</p>}
+        <div className="modal-footer">
+          <button type="button" className="btn-secondary" onClick={onClose} disabled={loading}>Cancelar</button>
+          <button type="button" className="btn-danger" onClick={handleConfirm} disabled={loading}>
+            {loading ? 'Quitando...' : 'Quitar GS'}
           </button>
         </div>
       </div>

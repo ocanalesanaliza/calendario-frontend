@@ -41,6 +41,13 @@ export async function desactivarPlantilla(id) {
   return data
 }
 
+export async function duplicarPlantilla(id) {
+  const res = await apiRequest(`/api/plantillas/${id}/duplicar/`, { method: 'POST' })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.detail || 'Error al duplicar plantilla')
+  return data
+}
+
 export async function addTarea(idPlantilla, body) {
   const res = await apiRequest(`/api/plantillas/${idPlantilla}/tareas/`, {
     method: 'POST',

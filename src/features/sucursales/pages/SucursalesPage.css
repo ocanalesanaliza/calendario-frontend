@@ -149,6 +149,17 @@
   flex-shrink: 0;
 }
 
+.gs-avatar {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.modal-confirm-help {
+  color: #64748b;
+  font-size: .84rem;
+  line-height: 1.45;
+}
+
 /* ── Badges ── */
 .badge {
   display: inline-block;

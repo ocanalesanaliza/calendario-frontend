@@ -1,16 +1,16 @@
 ﻿import { useState, useEffect } from 'react'
 import { getTareas, createTarea, updateTarea, desactivarTarea, getSubtareas, createSubtarea, updateSubtarea, desactivarSubtarea } from '../services/tareasService'
+import RecurrenceSelector from '../components/RecurrenceSelector'
+import {
+  RECURRENCIA_LABEL,
+  TIPOS_CATALOGO,
+  normalizarValorRecurrencia,
+  validarValorRecurrencia,
+} from '../recurrenceConfig'
 import './TareasPage.css'
 
-const RECURRENCIA_LABEL = {
-  'diario':         'Diario',
-  'semanal':        'Semanal',
-  'quincenal':      'Quincenal',
-  'mensual-dias':   'Mensual',
-  'solo-sabado':    'Solo sábado',
-  'lunes-a-sabado': 'Lunes a sábado',
-  'variable':       'Variable',
-}
+const AMBITO_LABEL = { sucursal: 'Sucursal', area: 'Área' }
+const TIPOS_FILTRO_RECURRENCIA = [...TIPOS_CATALOGO, 'variable']
 
 export default function TareasPage() {
   const [tareas, setTareas] = useState([])
@@ -18,6 +18,7 @@ export default function TareasPage() {
   const [busqueda, setBusqueda] = useState('')
   const [filtroTipo, setFiltroTipo] = useState('todos')
   const [filtroEstado, setFiltroEstado] = useState('todos')
+  const [filtroAmbito, setFiltroAmbito] = useState('todos')
   const [modal, setModal] = useState(null)
 
   useEffect(() => { loadData() }, [])
@@ -57,7 +58,8 @@ export default function TareasPage() {
       filtroEstado === 'todos' ||
       (filtroEstado === 'activa' && t.activa) ||
       (filtroEstado === 'inactiva' && !t.activa)
-    return matchBusqueda && matchTipo && matchEstado
+    const matchAmbito = filtroAmbito === 'todos' || t.ambito === filtroAmbito
+    return matchBusqueda && matchTipo && matchEstado && matchAmbito
   })
 
   return (
@@ -89,8 +91,8 @@ export default function TareasPage() {
         </div>
         <select className="filtro-select" value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}>
           <option value="todos">Todos los tipos</option>
-          {Object.entries(RECURRENCIA_LABEL).map(([val, label]) => (
-            <option key={val} value={val}>{label}</option>
+          {TIPOS_FILTRO_RECURRENCIA.map((value) => (
+            <option key={value} value={value}>{RECURRENCIA_LABEL[value]}</option>
           ))}
         </select>
         <select className="filtro-select" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
@@ -98,13 +100,19 @@ export default function TareasPage() {
           <option value="activa">Activas</option>
           <option value="inactiva">Inactivas</option>
         </select>
+        <select className="filtro-select" value={filtroAmbito} onChange={(e) => setFiltroAmbito(e.target.value)}>
+          <option value="todos">Todos los ámbitos</option>
+          {Object.entries(AMBITO_LABEL).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
       </div>
 
       {loading ? (
         <div className="loading-state">Cargando tareas...</div>
       ) : filtradas.length === 0 ? (
         <div className="empty-state">
-          {busqueda || filtroTipo !== 'todos' || filtroEstado !== 'todos'
+          {busqueda || filtroTipo !== 'todos' || filtroEstado !== 'todos' || filtroAmbito !== 'todos'
             ? 'Sin resultados para los filtros aplicados.'
             : 'No hay tareas registradas.'}
         </div>
@@ -114,6 +122,7 @@ export default function TareasPage() {
             <thead>
               <tr>
                 <th>Nombre</th>
+                <th>Ámbito</th>
                 <th>Recurrencia</th>
                 <th>Peso</th>
                 <th>Recordatorio</th>
@@ -126,6 +135,7 @@ export default function TareasPage() {
               {filtradas.map((t) => (
                 <tr key={t.id_tarea}>
                   <td className="td-nombre">{t.nombre}</td>
+                  <td>{AMBITO_LABEL[t.ambito] ?? t.ambito}</td>
                   <td><span className="badge badge-tipo">{t.recurrencia_label ?? RECURRENCIA_LABEL[t.tipo_recurrencia] ?? t.tipo_recurrencia}</span></td>
                   <td><span className="peso-val">{t.peso}</span></td>
                   <td>{t.es_recordatorio ? <span className="badge badge-blue">Sí</span> : <span className="td-no">No</span>}</td>
@@ -205,8 +215,12 @@ function ModalWrapper({ title, onClose, children, wide }) {
 function TareaModal({ inicial, onSubmit, onClose }) {
   const [form, setForm] = useState({
     nombre:                   inicial?.nombre ?? '',
+    ambito:                   inicial?.ambito ?? 'sucursal',
     tipo_recurrencia:         inicial?.tipo_recurrencia ?? 'diario',
-    valor_recurrencia:        inicial?.valor_recurrencia ?? '',
+    valor_recurrencia:        normalizarValorRecurrencia(
+      inicial?.tipo_recurrencia ?? 'diario',
+      inicial?.valor_recurrencia ?? '',
+    ),
     peso:                     inicial?.peso ?? '1.00',
     es_recordatorio:          inicial?.es_recordatorio ?? false,
     bloquea_jornada_posterior: inicial?.bloquea_jornada_posterior ?? false,
@@ -217,12 +231,34 @@ function TareaModal({ inicial, onSubmit, onClose }) {
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
   const setCheck = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.checked }))
 
+  function handleTipoRecurrenciaChange(tipo) {
+    setForm((actual) => ({
+      ...actual,
+      tipo_recurrencia: tipo,
+      valor_recurrencia: tipo === actual.tipo_recurrencia ? actual.valor_recurrencia : '',
+    }))
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+    const errorRecurrencia = validarValorRecurrencia(
+      form.tipo_recurrencia,
+      form.valor_recurrencia,
+    )
+    if (errorRecurrencia) {
+      setError(errorRecurrencia)
+      return
+    }
     setLoading(true)
     try {
-      const body = { ...form, valor_recurrencia: form.valor_recurrencia || null }
+      const body = {
+        ...form,
+        valor_recurrencia: normalizarValorRecurrencia(
+          form.tipo_recurrencia,
+          form.valor_recurrencia,
+        ) || null,
+      }
       await onSubmit(body)
     } catch (err) {
       setError(err.message)
@@ -235,26 +271,27 @@ function TareaModal({ inicial, onSubmit, onClose }) {
     <ModalWrapper title={inicial ? 'Editar tarea' : 'Nueva tarea'} onClose={onClose}>
       <form className="modal-form" onSubmit={handleSubmit}>
         <div className="form-group">
-          <label>Nombre</label>
-          <input type="text" value={form.nombre} onChange={set('nombre')} required />
-        </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Tipo de recurrencia</label>
-            <select value={form.tipo_recurrencia} onChange={set('tipo_recurrencia')} required>
-              {Object.entries(RECURRENCIA_LABEL).map(([val, label]) => (
-                <option key={val} value={val}>{label}</option>
-              ))}
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Valor recurrencia <span className="label-optional">(opcional)</span></label>
-            <input type="text" placeholder="ej. lunes" value={form.valor_recurrencia} onChange={set('valor_recurrencia')} />
-          </div>
+          <label htmlFor="tarea-nombre">Nombre</label>
+          <input id="tarea-nombre" type="text" value={form.nombre} onChange={set('nombre')} required />
         </div>
         <div className="form-group">
-          <label>Peso</label>
-          <input type="number" step="0.01" min="0" value={form.peso} onChange={set('peso')} required />
+          <label htmlFor="tarea-ambito">Ámbito</label>
+          <select id="tarea-ambito" value={form.ambito} onChange={set('ambito')} required>
+            {Object.entries(AMBITO_LABEL).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </div>
+        <RecurrenceSelector
+          tipo={form.tipo_recurrencia}
+          valor={form.valor_recurrencia}
+          onTipoChange={handleTipoRecurrenciaChange}
+          onValorChange={(valor) => setForm((actual) => ({ ...actual, valor_recurrencia: valor }))}
+          permitirVariable={inicial?.tipo_recurrencia === 'variable'}
+        />
+        <div className="form-group">
+          <label htmlFor="tarea-peso">Peso</label>
+          <input id="tarea-peso" type="number" step="0.01" min="0" value={form.peso} onChange={set('peso')} required />
         </div>
         <div className="form-checks">
           <label className="check-label">

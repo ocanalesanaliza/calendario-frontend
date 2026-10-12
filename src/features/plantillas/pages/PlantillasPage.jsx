@@ -6,6 +6,7 @@ import './PlantillasPage.css'
 export default function PlantillasPage() {
   const [plantillas, setPlantillas] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [modal, setModal] = useState(null)
   const navigate = useNavigate()
 
@@ -13,9 +14,12 @@ export default function PlantillasPage() {
 
   async function loadData() {
     setLoading(true)
+    setError('')
     try {
       const data = await getPlantillas()
       setPlantillas(data)
+    } catch (requestError) {
+      setError(requestError.message || 'No se pudieron cargar las plantillas.')
     } finally {
       setLoading(false)
     }
@@ -54,6 +58,8 @@ export default function PlantillasPage() {
 
       {loading ? (
         <div className="loading-state">Cargando plantillas...</div>
+      ) : error ? (
+        <div className="empty-state" role="alert">{error} <button className="btn-secondary" onClick={loadData}>Reintentar</button></div>
       ) : plantillas.length === 0 ? (
         <div className="empty-state">No hay plantillas registradas.</div>
       ) : (

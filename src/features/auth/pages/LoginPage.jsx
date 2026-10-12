@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { login, decodeToken } from '../services/authService'
+import { login, decodeToken, getRememberedEmail, forgetRememberedEmail } from '../services/authService'
 import { useAuth } from '../context/AuthContext'
 import './LoginPage.css'
 
@@ -11,15 +11,52 @@ function LoginPage() {
   const [remember, setRemember] = useState(true)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [forgettingEmail, setForgettingEmail] = useState(false)
+  const hasInteracted = useRef(false)
   const navigate = useNavigate()
   const { setAuthData } = useAuth()
 
+  useEffect(() => {
+    const controller = new AbortController()
+
+    getRememberedEmail({ signal: controller.signal })
+      .then((savedEmail) => {
+        if (!controller.signal.aborted && !hasInteracted.current && savedEmail) {
+          setEmail(savedEmail)
+        }
+      })
+      .catch(() => {
+        // Remembering an email is optional; a failed lookup must not prevent login.
+      })
+
+    return () => controller.abort()
+  }, [])
+
+  const handleRememberChange = async (e) => {
+    const checked = e.target.checked
+    hasInteracted.current = true
+    setRemember(checked)
+    if (checked) return
+
+    setError('')
+    setForgettingEmail(true)
+    try {
+      await forgetRememberedEmail()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setForgettingEmail(false)
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (loading || forgettingEmail) return
+    hasInteracted.current = true
     setError('')
     setLoading(true)
     try {
-      const data = await login(email, password)
+      const data = await login(email, password, remember)
       setAuthData(data.access, data.refresh, remember)
       const claims = decodeToken(data.access)
       if (claims.perfil?.debe_cambiar_password) {
@@ -40,15 +77,11 @@ function LoginPage() {
         {/* Logo / Brand */}
         <div className="login-brand">
           <div className="login-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8"  y1="2" x2="8"  y2="6" />
-              <line x1="3"  y1="10" x2="21" y2="10" />
-              <circle cx="8"  cy="15" r="1" fill="currentColor" stroke="none" />
-              <circle cx="12" cy="15" r="1" fill="currentColor" stroke="none" />
-              <circle cx="16" cy="15" r="1" fill="currentColor" stroke="none" />
-            </svg>
+            <img
+              src="/android-chrome-192x192.png"
+              alt="Logo"
+              className="login-logo"
+            />
           </div>
           <h1 className="login-title">Taskly</h1>
           <p className="login-subtitle">Tu calendario de tareas</p>
@@ -64,7 +97,10 @@ function LoginPage() {
                 type="email"
                 placeholder="usuario@correo.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  hasInteracted.current = true
+                  setEmail(e.target.value)
+                }}
                 required
                 autoComplete="email"
               />
@@ -110,7 +146,8 @@ function LoginPage() {
               <input
                 type="checkbox"
                 checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
+                onChange={handleRememberChange}
+                disabled={loading || forgettingEmail}
               />
               <span>Recordarme</span>
             </label>
@@ -119,7 +156,7 @@ function LoginPage() {
 
           {error && <p className="login-error">{error}</p>}
 
-          <button type="submit" className="login-btn" disabled={loading}>
+          <button type="submit" className="login-btn" disabled={loading || forgettingEmail}>
             {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </button>
         </form>

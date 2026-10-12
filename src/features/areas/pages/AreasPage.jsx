@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { createArea, deactivateArea, getArea, getAreas, updateArea } from '../services/areasService'
+import { useAuth } from '../../auth/context/AuthContext'
+import Toast from '../../../components/Toast/Toast'
+import AreaManagerAssignmentModal from '../../asignaciones/components/AreaManagerAssignmentModal'
+import AreaTemplateAssignmentModal from '../components/AreaTemplateAssignmentModal'
+import { assignAreaToManager, getEligibleAreaManagers, reassignAreaToManager } from '../../asignaciones/services/areaManagerAssignmentService'
+import { getProfileCapabilities } from '../../auth/profilePolicies'
+import { getCompanies, getCountries, getRegions } from '../../organizacion/services/organizacionService'
 import './AreasPage.css'
 
 const fields = ['nombre', 'codigo']
@@ -67,10 +74,129 @@ function Modal({ title, onClose, children }) {
   )
 }
 
-function FormModal({ area, onClose, onSubmit }) {
+function itemsFrom(data) {
+  return Array.isArray(data) ? data : data?.results || []
+}
+
+function FormModal({ area, isSystemsAccount, onClose, onSubmit }) {
   const [form, setForm] = useState({ nombre: area?.nombre || '', codigo: area?.codigo || '' })
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
+  const [companies, setCompanies] = useState([])
+  const [regions, setRegions] = useState([])
+  const [countries, setCountries] = useState([])
+  const [companyId, setCompanyId] = useState('')
+  const [regionId, setRegionId] = useState('')
+  const [countryId, setCountryId] = useState('')
+  const [countryTouched, setCountryTouched] = useState(false)
+  const [catalogError, setCatalogError] = useState('')
+  const [hydratingCountry, setHydratingCountry] = useState(Boolean(isSystemsAccount && area?.country_id))
+  const hydrationRequestRef = useRef(0)
+  const skipRegionLoadRef = useRef('')
+  const skipCountryLoadRef = useRef('')
+
+  useEffect(() => {
+    if (!isSystemsAccount) return undefined
+
+    let active = true
+    getCompanies()
+      .then((data) => {
+        if (active) setCompanies(itemsFrom(data))
+      })
+      .catch((error) => {
+        if (active) setCatalogError(apiMessage(error, 'No se pudieron cargar las compañías.'))
+      })
+
+    return () => { active = false }
+  }, [isSystemsAccount])
+
+  useEffect(() => {
+    const requestId = ++hydrationRequestRef.current
+    if (!isSystemsAccount || !area?.country_id || !companies.length) {
+      setHydratingCountry(false)
+      return undefined
+    }
+
+    let active = true
+    setHydratingCountry(true)
+
+    async function hydrateCountryHierarchy() {
+      try {
+        for (const company of companies) {
+          const companyRegions = itemsFrom(await getRegions(company.id))
+          if (!active || requestId !== hydrationRequestRef.current) return
+
+          for (const region of companyRegions) {
+            const regionCountries = itemsFrom(await getCountries(region.id))
+            if (!active || requestId !== hydrationRequestRef.current) return
+
+            if (regionCountries.some((country) => Number(country.id) === Number(area.country_id))) {
+              skipRegionLoadRef.current = String(company.id)
+              skipCountryLoadRef.current = String(region.id)
+              setCompanyId(String(company.id))
+              setRegions(companyRegions)
+              setRegionId(String(region.id))
+              setCountries(regionCountries)
+              setCountryId(String(area.country_id))
+              setHydratingCountry(false)
+              return
+            }
+          }
+        }
+
+        if (active && requestId === hydrationRequestRef.current) {
+          setCatalogError('No se pudo cargar la jerarquía organizacional.')
+          setHydratingCountry(false)
+        }
+      } catch (error) {
+        if (active && requestId === hydrationRequestRef.current) {
+          setCatalogError(apiMessage(error, 'No se pudo cargar la jerarquía organizacional.'))
+          setHydratingCountry(false)
+        }
+      }
+    }
+
+    void hydrateCountryHierarchy()
+    return () => { active = false }
+  }, [area?.country_id, companies, isSystemsAccount])
+
+  useEffect(() => {
+    if (!isSystemsAccount || !companyId) return undefined
+    if (skipRegionLoadRef.current === companyId) {
+      skipRegionLoadRef.current = ''
+      return undefined
+    }
+
+    let active = true
+    getRegions(companyId)
+      .then((data) => {
+        if (active) setRegions(itemsFrom(data))
+      })
+      .catch((error) => {
+        if (active) setCatalogError(apiMessage(error, 'No se pudieron cargar las regiones.'))
+      })
+
+    return () => { active = false }
+  }, [companyId, isSystemsAccount])
+
+  useEffect(() => {
+    if (!isSystemsAccount || !regionId) return undefined
+    if (skipCountryLoadRef.current === regionId) {
+      skipCountryLoadRef.current = ''
+      return undefined
+    }
+
+    let active = true
+    getCountries(regionId)
+      .then((data) => {
+        if (active) setCountries(itemsFrom(data))
+      })
+      .catch((error) => {
+        if (active) setCatalogError(apiMessage(error, 'No se pudieron cargar los países.'))
+      })
+
+    return () => { active = false }
+  }, [isSystemsAccount, regionId])
 
   function fieldError(field) {
     return Array.isArray(errors[field]) ? errors[field].join(' ') : errors[field]
@@ -85,7 +211,10 @@ function FormModal({ area, onClose, onSubmit }) {
       const body = Object.fromEntries(
         Object.entries(form).filter(([key, value]) => !area || value !== (area[key] || '')),
       )
-      await onSubmit(body)
+      await onSubmit({
+        ...body,
+        ...(isSystemsAccount && countryTouched ? { country_id: countryId ? Number(countryId) : null } : {}),
+      })
     } catch (error) {
       setErrors(typeof error.fields === 'object' ? error.fields : {
         detail: apiMessage(error, 'No se pudo guardar el área.'),
@@ -116,6 +245,56 @@ function FormModal({ area, onClose, onSubmit }) {
             </div>
           )
         })}
+
+        {isSystemsAccount && (
+          <fieldset className="area-form-group">
+            <legend>País (opcional)</legend>
+            <label>
+              Compañía
+              <select value={companyId} onChange={(event) => {
+                hydrationRequestRef.current += 1
+                skipRegionLoadRef.current = ''
+                skipCountryLoadRef.current = ''
+                setHydratingCountry(false)
+                setCompanyId(event.target.value)
+                setRegionId('')
+                setRegions([])
+                setCountryId('')
+                setCountries([])
+              }}>
+                <option value="">Seleccionar compañía</option>
+                {companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
+              </select>
+            </label>
+            <label>
+              Región
+              <select value={regionId} disabled={!companyId} onChange={(event) => {
+                hydrationRequestRef.current += 1
+                skipCountryLoadRef.current = ''
+                setHydratingCountry(false)
+                setRegionId(event.target.value)
+                setCountryId('')
+                setCountries([])
+              }}>
+                <option value="">Seleccionar región</option>
+                {regions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}
+              </select>
+            </label>
+            <label>
+              País
+              <select value={countryId} disabled={!regionId || hydratingCountry} onChange={(event) => {
+                hydrationRequestRef.current += 1
+                setHydratingCountry(false)
+                setCountryId(event.target.value)
+                setCountryTouched(true)
+              }}>
+                <option value="">{hydratingCountry ? 'Cargando jerarquía...' : 'Sin país'}</option>
+                {countries.map((country) => <option key={country.id} value={country.id}>{country.name}</option>)}
+              </select>
+            </label>
+            {catalogError && <span role="alert">{catalogError}</span>}
+          </fieldset>
+        )}
 
         {errors.detail && (
           <p role="alert">
@@ -164,10 +343,13 @@ function ConfirmModal({ area, onClose, onConfirm }) {
 }
 
 export default function AreasPage() {
+  const { perfil } = useAuth()
   const [areas, setAreas] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [modal, setModal] = useState(null)
+  const [toast, setToast] = useState(null)
+  const { canManageOperationsManagers: canManageAreas, canManageAreaManagers: canManageAssignments, canManageAreaTemplateAssignments, isSystemsAccount } = getProfileCapabilities(perfil)
 
   async function load() {
     setLoading(true)
@@ -184,6 +366,7 @@ export default function AreasPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load()
   }, [])
 
@@ -204,6 +387,20 @@ export default function AreasPage() {
     }
   }
 
+  async function assignManager(area, gerenteAreaId) {
+    await assignAreaToManager(gerenteAreaId, area.id)
+    await load()
+    close()
+    setToast({ message: 'Gerente de área asignado correctamente.', type: 'success' })
+  }
+
+  async function reassignManager(area, gerenteAreaId) {
+    await reassignAreaToManager(gerenteAreaId, area.id)
+    await load()
+    close()
+    setToast({ message: 'Reasignación programada correctamente.', type: 'success' })
+  }
+
   return (
     <div className="areas-page">
       <header className="areas-page-header">
@@ -211,12 +408,12 @@ export default function AreasPage() {
           <h1>Áreas</h1>
           <p>{areas.length} área{areas.length !== 1 ? 's' : ''} registrada{areas.length !== 1 ? 's' : ''}</p>
         </div>
-        <button onClick={() => setModal({ type: 'create' })}>
+        {canManageAreas && <button onClick={() => setModal({ type: 'create' })}>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
           </svg>
           Nueva área
-        </button>
+        </button>}
       </header>
 
       {loading ? (
@@ -251,13 +448,27 @@ export default function AreasPage() {
                   </td>
                   <td className="areas-actions-cell">
                     <div className="row-actions">
-                      <button className="action-btn" title="Editar" aria-label="Editar" onClick={() => void openDetail(area)}>
+                      {canManageAreas && <button className="action-btn" title="Editar" aria-label="Editar" onClick={() => void openDetail(area)}>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                         </svg>
-                      </button>
-                      {area.activa !== false && (
+                      </button>}
+                      {canManageAssignments && area.activa !== false && (
+                        <button className="action-btn" title="Asignar gerente de área" aria-label={`Asignar gerente de área a ${area.nombre}`} onClick={() => setModal({ type: 'assign-manager', area })}>
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="7" r="4" /><path d="M5.5 21a6.5 6.5 0 0 1 13 0" /><path d="M19 8v6M16 11h6" />
+                          </svg>
+                        </button>
+                      )}
+                      {canManageAreaTemplateAssignments && area.activa !== false && (
+                        <button className="action-btn" title="Asignar plantilla de área" aria-label={`Asignar plantilla de área a ${area.nombre}`} onClick={() => setModal({ type: 'assign-template', area })}>
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="5" y="3" width="14" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" />
+                          </svg>
+                        </button>
+                      )}
+                      {canManageAreas && area.activa !== false && (
                         <button className="action-btn action-btn-danger" title="Desactivar" aria-label="Desactivar" onClick={() => setModal({ type: 'deactivate', area })}>
                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <circle cx="12" cy="12" r="10" />
@@ -275,11 +486,12 @@ export default function AreasPage() {
       )}
 
       {modal?.type === 'create' && (
-        <FormModal onClose={close} onSubmit={(body) => mutation(() => createArea(body))} />
+        <FormModal isSystemsAccount={isSystemsAccount} onClose={close} onSubmit={(body) => mutation(() => createArea(body))} />
       )}
       {modal?.type === 'edit' && (
         <FormModal
           area={modal.area}
+          isSystemsAccount={isSystemsAccount}
           onClose={close}
           onSubmit={(body) => mutation(() => updateArea(modal.area.id, body))}
         />
@@ -291,6 +503,18 @@ export default function AreasPage() {
           onConfirm={() => mutation(() => deactivateArea(modal.area.id))}
         />
       )}
+      {modal?.type === 'assign-manager' && (
+        <AreaManagerAssignmentModal
+          target={modal.area}
+          targetType="area"
+           loadEligible={() => getEligibleAreaManagers(modal.area.id)}
+           onAssign={(gerenteAreaId) => assignManager(modal.area, gerenteAreaId)}
+           onReassign={isSystemsAccount ? (gerenteAreaId) => reassignManager(modal.area, gerenteAreaId) : undefined}
+           onClose={close}
+        />
+      )}
+      {modal?.type === 'assign-template' && <AreaTemplateAssignmentModal area={modal.area} onClose={close} />}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   )
 }

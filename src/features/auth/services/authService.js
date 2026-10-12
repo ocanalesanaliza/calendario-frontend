@@ -7,16 +7,54 @@ export function decodeToken(token) {
   return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')))
 }
 
-export async function login(email, password) {
+export function normalizeCurrentProfile(payload) {
+  if (payload?.perfil && typeof payload.perfil === 'object' && !Array.isArray(payload.perfil)) {
+    return payload.perfil
+  }
+
+  return payload
+}
+
+export async function getCurrentProfile() {
+  const res = await apiRequest('/api/auth/me/')
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.detail || 'No se pudo obtener el perfil actual.')
+  return normalizeCurrentProfile(data)
+}
+
+export async function login(email, password, remember = false) {
   const res = await fetch(`${BASE_URL}/api/auth/login/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    credentials: 'include',
+    body: JSON.stringify({ email, password, remember_email: remember }),
   })
 
   const data = await res.json()
   if (!res.ok) throw new Error(data.detail || 'Error al iniciar sesión')
   return data
+}
+
+export async function getRememberedEmail({ signal } = {}) {
+  const res = await fetch(`${BASE_URL}/api/auth/remembered-email/`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+    signal,
+  })
+
+  if (!res.ok) throw new Error('No se pudo recuperar el correo guardado.')
+  const data = await res.json()
+  return typeof data?.email === 'string' ? data.email : ''
+}
+
+export async function forgetRememberedEmail() {
+  const res = await fetch(`${BASE_URL}/api/auth/remembered-email/`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+
+  if (!res.ok) throw new Error('No se pudo olvidar el correo guardado. Inténtalo de nuevo.')
 }
 
 export async function forgotPassword(email) {

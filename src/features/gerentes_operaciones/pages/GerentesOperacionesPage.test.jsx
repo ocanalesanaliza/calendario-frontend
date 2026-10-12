@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { GerentesOperacionesRoute } from '../../../App'
+import { AreaManagerAssignmentRoute, GerentesOperacionesRoute } from '../../../App'
 import GerentesOperacionesPage from './GerentesOperacionesPage'
 
 const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn() }))
@@ -35,7 +35,7 @@ const list = {
 describe('GerentesOperacionesPage', () => {
   beforeEach(() => {
     apiRequest.mockReset()
-    useAuth.mockReturnValue({ perfil: { es_cuenta_sistemas: true, activo: true, habilitado: true } })
+    useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true } })
     navigator.clipboard = { writeText: vi.fn().mockResolvedValue() }
   })
 
@@ -58,8 +58,8 @@ describe('GerentesOperacionesPage', () => {
   it.each([
     ['/gerentes-operaciones', 'Administración GO'],
     ['/areas', 'Administración Áreas'],
-  ])('allows %s when Systems status claims are absent', (path, content) => {
-    useAuth.mockReturnValue({ perfil: { es_cuenta_sistemas: true } })
+  ])('blocks %s when Systems status claims are absent', async (path, content) => {
+    useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: true } })
 
     render(
       <MemoryRouter initialEntries={[path]}>
@@ -71,14 +71,15 @@ describe('GerentesOperacionesPage', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByText(content)).toBeInTheDocument()
+    expect(await screen.findByText('Inicio')).toBeInTheDocument()
+    expect(screen.queryByText(content)).not.toBeInTheDocument()
   })
 
   it.each([
-    ['/gerentes-operaciones', 'Administración GO', 'inactive Systems account', { es_cuenta_sistemas: true, activo: false }],
-    ['/areas', 'Administración Áreas', 'inactive Systems account', { es_cuenta_sistemas: true, activo: false }],
-    ['/gerentes-operaciones', 'Administración GO', 'disabled Systems account', { es_cuenta_sistemas: true, habilitado: false }],
-    ['/areas', 'Administración Áreas', 'disabled Systems account', { es_cuenta_sistemas: true, habilitado: false }],
+    ['/gerentes-operaciones', 'Administración GO', 'inactive Systems account', { type: 'sistemas', es_cuenta_sistemas: true, activo: false }],
+    ['/areas', 'Administración Áreas', 'inactive Systems account', { type: 'sistemas', es_cuenta_sistemas: true, activo: false }],
+    ['/gerentes-operaciones', 'Administración GO', 'disabled Systems account', { type: 'sistemas', es_cuenta_sistemas: true, habilitado: false }],
+    ['/areas', 'Administración Áreas', 'disabled Systems account', { type: 'sistemas', es_cuenta_sistemas: true, habilitado: false }],
   ])('blocks %s for a %s', async (path, content, _, perfil) => {
     useAuth.mockReturnValue({ perfil })
 
@@ -107,6 +108,21 @@ describe('GerentesOperacionesPage', () => {
     )
 
     expect(screen.getByText('Administración GO')).toBeInTheDocument()
+  })
+
+  it('allows an active operations manager into only the area-manager assignment pages', () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_operaciones', activo: true, habilitado: true } })
+
+    render(
+      <MemoryRouter initialEntries={['/areas']}>
+        <Routes>
+          <Route path="/" element={<p>Inicio</p>} />
+          <Route path="/areas" element={<AreaManagerAssignmentRoute><p>Asignaciones de área</p></AreaManagerAssignmentRoute>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText('Asignaciones de área')).toBeInTheDocument()
   })
 
   it('creates with apellido and optional selected area IDs', async () => {

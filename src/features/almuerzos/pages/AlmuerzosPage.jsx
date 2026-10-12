@@ -23,13 +23,49 @@ const CIERRE_LABEL = {
 
 export default function AlmuerzosPage() {
   const { perfil } = useAuth()
-  const esGerente = perfil?.type === 'gerente_area'
+  const isAreaManager = perfil?.type === 'gerente_area'
+  const [activeTab, setActiveTab] = useState('personal')
+  const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0)
 
-  return esGerente ? <DashboardAlmuerzos /> : <MiAlmuerzo />
+  if (!isAreaManager) {
+    return (
+      <div className="almuerzos-page">
+        <MiAlmuerzo />
+      </div>
+    )
+  }
+
+  return (
+    <div className="almuerzos-page">
+      <div className="tab-bar" role="tablist" aria-label="Almuerzos">
+        <button
+          className={`tab-btn${activeTab === 'personal' ? ' active' : ''}`}
+          role="tab"
+          aria-selected={activeTab === 'personal'}
+          onClick={() => setActiveTab('personal')}
+        >
+          Mi almuerzo
+        </button>
+        <button
+          className={`tab-btn${activeTab === 'team' ? ' active' : ''}`}
+          role="tab"
+          aria-selected={activeTab === 'team'}
+          onClick={() => setActiveTab('team')}
+        >
+          Equipo
+        </button>
+      </div>
+
+      {activeTab === 'personal' ? (
+        <MiAlmuerzo onUpdated={() => setDashboardRefreshKey((current) => current + 1)} />
+      ) : (
+        <DashboardAlmuerzos refreshKey={dashboardRefreshKey} />
+      )}
+    </div>
+  )
 }
 
-/* ── Vista gerente_sucursal ── */
-function MiAlmuerzo() {
+function MiAlmuerzo({ onUpdated }) {
   const [almuerzo, setAlmuerzo] = useState(null)
   const [loading, setLoading]   = useState(true)
   const [saving, setSaving]     = useState(false)
@@ -42,8 +78,9 @@ function MiAlmuerzo() {
     try {
       const data = await getMiAlmuerzo()
       setAlmuerzo(data)
-    } catch {
+    } catch (requestError) {
       setAlmuerzo(null)
+      setError(requestError.message)
     } finally {
       setLoading(false)
     }
@@ -55,6 +92,7 @@ function MiAlmuerzo() {
     try {
       await activarAlmuerzo()
       await loadAlmuerzo()
+      onUpdated?.()
     } catch (err) {
       setError(err.message)
     } finally {
@@ -66,8 +104,9 @@ function MiAlmuerzo() {
     setSaving(true)
     setError('')
     try {
-      await cerrarAlmuerzo({})
+      await cerrarAlmuerzo()
       await loadAlmuerzo()
+      onUpdated?.()
     } catch (err) {
       setError(err.message)
     } finally {
@@ -80,10 +119,10 @@ function MiAlmuerzo() {
   const estado = almuerzo?.estado ?? 'no_iniciado'
 
   return (
-    <div className="almuerzos-page">
+    <section className="almuerzo-personal">
       <div className="page-header">
         <div>
-          <h1>Almuerzo</h1>
+          <h1>Mi almuerzo</h1>
           <p>{almuerzo?.fecha ?? 'Hoy'}</p>
         </div>
       </div>
@@ -130,7 +169,7 @@ function MiAlmuerzo() {
           </div>
         )}
 
-        {error && <p className="almuerzo-error">{error}</p>}
+        {error && <p className="almuerzo-error" role="alert">{error}</p>}
 
         <div className="almuerzo-acciones">
           {almuerzo?.puede_activar && (
@@ -145,37 +184,40 @@ function MiAlmuerzo() {
           )}
         </div>
       </div>
-    </div>
+    </section>
   )
 }
 
-/* ── Vista gerente_area (dashboard) ── */
-function DashboardAlmuerzos() {
+function DashboardAlmuerzos({ refreshKey }) {
   const [registros, setRegistros] = useState([])
   const [loading, setLoading]     = useState(true)
+  const [error, setError]         = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
   const [fecha, setFecha]         = useState('')
 
-  useEffect(() => { loadDashboard() }, [filtroEstado, fecha])
+  useEffect(() => { loadDashboard() }, [filtroEstado, fecha, refreshKey])
 
   async function loadDashboard() {
     setLoading(true)
+    setError('')
     try {
       const params = {}
       if (filtroEstado) params.estado = filtroEstado
       if (fecha)        params.fecha  = fecha
       const data = await getDashboardAlmuerzos(params)
       setRegistros(data.results ?? [])
+    } catch (requestError) {
+      setRegistros([])
+      setError(requestError.message)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="almuerzos-page">
+    <section className="almuerzo-dashboard">
       <div className="page-header">
         <div>
-          <h1>Dashboard almuerzos</h1>
           <p>Estado de almuerzos del equipo</p>
         </div>
       </div>
@@ -195,7 +237,9 @@ function DashboardAlmuerzos() {
         </select>
       </div>
 
-      {loading ? (
+      {error ? (
+        <p className="almuerzo-error" role="alert">{error}</p>
+      ) : loading ? (
         <div className="loading-state">Cargando...</div>
       ) : registros.length === 0 ? (
         <div className="empty-state">Sin registros para los filtros aplicados.</div>
@@ -205,6 +249,7 @@ function DashboardAlmuerzos() {
             <thead>
               <tr>
                 <th>Usuario</th>
+                <th>Sucursal actual</th>
                 <th>Fecha</th>
                 <th>Estado</th>
                 <th>Inicio</th>
@@ -216,6 +261,7 @@ function DashboardAlmuerzos() {
               {registros.map((r) => (
                 <tr key={r.id_almuerzo ?? r.usuario?.id_usuario}>
                   <td className="td-nombre">{r.usuario?.nombre ?? '—'}</td>
+                  <td>{r.sucursal_actual?.nombre ?? r.sucursal?.nombre ?? '—'}</td>
                   <td>{r.fecha}</td>
                   <td>
                     <span className={`badge ${ESTADO_COLOR[r.estado] ?? 'badge-tipo'}`}>
@@ -231,7 +277,7 @@ function DashboardAlmuerzos() {
           </table>
         </div>
       )}
-    </div>
+    </section>
   )
 }
 
