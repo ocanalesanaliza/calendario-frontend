@@ -65,6 +65,58 @@ describe('AdminMasterAssignmentsPage', () => {
     expect(screen.queryByText('only-once')).not.toBeInTheDocument()
   })
 
+  it('excludes user-nested active profiles and blocks a stale selected profile locally', async () => {
+    const catalog = {
+      results: [{ id: 1, user: { id: 7, username: 'ana' }, lifecycle_state: 'active' }],
+      eligible_profiles: [{ id: 7, username: 'ana' }, { id: 8, username: 'luis' }],
+      countries: [{ id: 3, name: 'México' }],
+    }
+    apiRequest.mockResolvedValueOnce(response(catalog))
+    render(<AdminMasterAssignmentsPage />)
+    await screen.findByText('ana')
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva asignación' }))
+
+    const profileSelect = screen.getByLabelText('Perfil existente')
+    expect(screen.queryByRole('option', { name: 'ana' })).not.toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'luis' })).toBeInTheDocument()
+
+    profileSelect.append(new Option('ana', '7'))
+    fireEvent.change(profileSelect, { target: { value: '7' } })
+    fireEvent.change(screen.getByLabelText('País'), { target: { value: '3' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Crear asignación' }))
+
+    const error = await screen.findByText('Este perfil ya tiene una asignación activa y no puede asignarse a otro país.')
+    expect(error).toHaveAttribute('role', 'alert')
+    expect(profileSelect).toHaveAttribute('aria-describedby', error.id)
+    expect(apiRequest).toHaveBeenCalledTimes(1)
+  })
+
+  it('excludes profile-nested active profiles and blocks a stale selected profile locally', async () => {
+    const catalog = {
+      results: [{ id: 1, profile: { id: 7, username: 'ana' }, lifecycle_state: 'active' }],
+      eligible_profiles: [{ id: 7, username: 'ana' }, { id: 8, username: 'luis' }],
+      countries: [{ id: 3, name: 'México' }],
+    }
+    apiRequest.mockResolvedValueOnce(response(catalog))
+    render(<AdminMasterAssignmentsPage />)
+    await screen.findByText('ana')
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva asignación' }))
+
+    const profileSelect = screen.getByLabelText('Perfil existente')
+    expect(screen.queryByRole('option', { name: 'ana' })).not.toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'luis' })).toBeInTheDocument()
+
+    profileSelect.append(new Option('ana', '7'))
+    fireEvent.change(profileSelect, { target: { value: '7' } })
+    fireEvent.change(screen.getByLabelText('País'), { target: { value: '3' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Crear asignación' }))
+
+    const error = await screen.findByText('Este perfil ya tiene una asignación activa y no puede asignarse a otro país.')
+    expect(error).toHaveAttribute('role', 'alert')
+    expect(profileSelect).toHaveAttribute('aria-describedby', error.id)
+    expect(apiRequest).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps the password modal after a failed refresh and retries with GET only', async () => {
     const catalog = { results: [], eligible_profiles: [{ id: 7, username: 'ana' }], countries: [{ id: 3, name: 'México' }] }
     apiRequest.mockResolvedValueOnce(response(catalog)).mockResolvedValueOnce(response({ password_temporal: 'only-once' })).mockResolvedValueOnce(response({ detail: 'Actualización no disponible' }, false, 500)).mockResolvedValueOnce(response(catalog))

@@ -23,6 +23,10 @@ function assignmentsFrom(data) {
   return Array.isArray(data) ? data : data?.results || []
 }
 
+function assignmentProfileId(assignment) {
+  return assignment.profile?.id ?? assignment.user?.id
+}
+
 function profileName(assignment) {
   const profile = assignment.profile || assignment.user || {}
   return assignment.profile_name || profile.username || profile.email || '—'
@@ -89,7 +93,7 @@ function Modal({ title, children, onClose, closeAllowed = true }) {
   )
 }
 
-function AssignmentModal({ eligibleProfiles, countries, onClose, onSubmit, submissionInFlightRef }) {
+function AssignmentModal({ eligibleProfiles, activeProfileIds, countries, onClose, onSubmit, submissionInFlightRef }) {
   const [mode, setMode] = useState('existing')
   const [form, setForm] = useState({ profile_id: '', username: '', email: '', first_name: '', last_name: '', country_id: '', effective_on: '' })
   const [errors, setErrors] = useState({})
@@ -104,6 +108,7 @@ function AssignmentModal({ eligibleProfiles, countries, onClose, onSubmit, submi
     if (!form.country_id || !/^\d+$/.test(form.country_id)) nextErrors.country_id = 'Selecciona un país válido.'
     if (form.effective_on && !isIsoDate(form.effective_on)) nextErrors.effective_on = 'Ingresa una fecha ISO válida (YYYY-MM-DD).'
     if (mode === 'existing' && (!form.profile_id || !/^\d+$/.test(form.profile_id))) nextErrors.profile_id = 'Selecciona un perfil válido.'
+    if (mode === 'existing' && activeProfileIds.has(form.profile_id)) nextErrors.profile_id = 'Este perfil ya tiene una asignación activa y no puede asignarse a otro país.'
     if (mode === 'new' && !form.username.trim()) nextErrors.username = 'El nombre de usuario es obligatorio.'
     if (mode === 'new' && !form.email.trim()) nextErrors.email = 'El email es obligatorio.'
     if (mode === 'new' && !form.first_name.trim()) nextErrors.first_name = 'El nombre es obligatorio.'
@@ -216,12 +221,18 @@ export default function AdminMasterAssignmentsPage() {
   }
 
   const visibleAssignments = filter === 'active' ? assignments.filter((assignment) => assignment.lifecycle_state === 'active') : assignments
+  const activeProfileIds = new Set(assignments
+    .filter((assignment) => assignment.lifecycle_state === 'active')
+    .map(assignmentProfileId)
+    .filter((profileId) => profileId !== undefined && profileId !== null)
+    .map(String))
+  const availableProfiles = eligibleProfiles.filter((profile) => !activeProfileIds.has(String(profile.id)))
   return <main className="ama-page">
     <header className="ama-page-header"><div className="ama-page-heading"><h1>Admin Masters</h1><p>Asignaciones de Admin Master por país.</p></div><button type="button" className="ama-button ama-button--primary ama-page-action" onClick={() => setModal({ type: 'assignment' })}>Nueva asignación</button></header>
     <div className="ama-filter" role="group" aria-label="Filtro de estado"><button type="button" className="ama-filter-button" aria-pressed={filter === 'active'} onClick={() => setFilter('active')}>Activas</button><button type="button" className="ama-filter-button" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>Todas</button></div>
     {loading ? <p className="ama-state ama-loading-state">Cargando asignaciones...</p> : error ? <section className="ama-state ama-error-state" role="alert"><p>{error}</p><button type="button" className="ama-button ama-button--secondary ama-retry-button" onClick={() => void load()}>Reintentar</button></section> : visibleAssignments.length === 0 ? <p className="ama-state ama-empty-state">No hay asignaciones para mostrar.</p> : <div className="ama-table-card"><table><thead><tr><th>Perfil</th><th>Email</th><th>País</th><th>Fecha efectiva</th><th>Estado</th></tr></thead><tbody>{visibleAssignments.map((assignment) => <tr key={assignment.id || assignment.assignment_id || `${email(assignment)}-${assignment.effective_on}`}><td>{profileName(assignment)}</td><td>{email(assignment)}</td><td>{country(assignment)}</td><td>{assignment.effective_on || '—'}</td><td>{assignment.lifecycle_state || '—'}</td></tr>)}</tbody></table></div>}
     {refreshError && <section className="ama-state ama-error-state" role="alert" aria-label="Error de actualización"><p>{refreshError}</p><button type="button" className="ama-button ama-button--secondary ama-retry-button" onClick={() => void load({ refresh: true })}>Reintentar actualización</button></section>}
-    {modal?.type === 'assignment' && <AssignmentModal eligibleProfiles={eligibleProfiles} countries={countries} onClose={() => setModal(null)} onSubmit={create} submissionInFlightRef={submissionInFlight} />}
+    {modal?.type === 'assignment' && <AssignmentModal eligibleProfiles={availableProfiles} activeProfileIds={activeProfileIds} countries={countries} onClose={() => setModal(null)} onSubmit={create} submissionInFlightRef={submissionInFlight} />}
     {modal?.type === 'password' && <TemporaryPasswordModal password={modal.password} onClose={() => setModal(null)} />}
   </main>
 }
