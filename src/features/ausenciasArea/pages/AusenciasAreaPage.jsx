@@ -24,7 +24,14 @@ const isPending = (item) => ['pending', 'pendiente'].includes(status(item))
 const statusLabel = (item) => ({ pending: 'Pendiente', pendiente: 'Pendiente', approved: 'Aprobada', rejected: 'Rechazada', rechazada: 'Rechazada', cancelled: 'Cancelada', cancelada: 'Cancelada' }[status(item)] ?? status(item))
 const gaOf = (item) => item?.gerente_area ?? item?.area_manager ?? item?.ga
 const gaId = (item) => gaOf(item)?.id ?? gaOf(item)?.id_gerente_area ?? item?.gerente_area_id
-const gaName = (item) => gaOf(item)?.nombre ?? gaOf(item)?.name ?? item?.gerente_area_nombre ?? `GA #${gaId(item)}`
+const gaName = (item) => {
+  const name = gaOf(item)?.nombre ?? gaOf(item)?.name ?? item?.gerente_area_nombre
+  if (typeof name === 'string' && name.trim()) return name.trim()
+  const id = gaId(item)
+  return (typeof id === 'number' && Number.isFinite(id)) || (typeof id === 'string' && /^\d+$/.test(id.trim()))
+    ? `GA #${id}`
+    : '—'
+}
 const typeOf = (item) => item?.type ?? item?.tipo
 const slotLabel = (slot) => slots.find(([value]) => value === slot)?.[1] ?? slot ?? '—'
 const vacationSegmentsOf = (request) => request?.segments ?? request?.segmentos ?? []
@@ -460,9 +467,10 @@ export default function AusenciasAreaPage() {
             ) : (
               <div className="ausencias-area-admin-table-card">
               <table className="ausencias-area-admin-table ausencias-area-admin-table--vacations">
-                <thead><tr><th>Período solicitado</th><th>Motivo</th><th>Estado</th><th>Acciones</th></tr></thead>
+                <thead><tr><th>Gerente Área</th><th>Período solicitado</th><th>Motivo</th><th>Estado</th><th>Acciones</th></tr></thead>
                 <tbody>{vacations.map((request) => (
                   <tr key={idOf(request)}>
+                    <td className="ausencias-area-admin-table__name">{gaName(request)}</td>
                     <td className="ausencias-area-admin-table__period">{vacationPeriodOf(request)}</td>
                     <td className="ausencias-area-admin-table__reason">{vacationReasonOf(request)}</td><td><span className={`ausencias-area-admin-badge ausencias-area-admin-badge--${status(request)}`}>{statusLabel(request)}</span></td>
                     <td>{isPending(request) ? <div className="ausencias-area-admin-actions"><button className="ausencias-area-admin-action ausencias-area-admin-action--approve" type="button" aria-label="Aprobar" title="Aprobar" onClick={() => setModal({ type: 'resolve', action: 'approve', request })}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg></button><button className="ausencias-area-admin-action ausencias-area-admin-action--reject" type="button" aria-label="Rechazar" title="Rechazar" onClick={() => setModal({ type: 'resolve', action: 'reject', request })}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button></div> : '—'}</td>
@@ -479,7 +487,7 @@ export default function AusenciasAreaPage() {
             {situations.length === 0 ? <p className="ausencias-area-admin-state ausencias-area-admin-state--empty">No hay situaciones especiales registradas.</p> : (
               <div className="ausencias-area-admin-table-card">
               <table className="ausencias-area-admin-table">
-                <thead><tr><th>GA</th><th>Fecha</th><th>Tipo</th><th>Razón</th><th>Jornada</th><th>Estado</th><th>Acciones</th></tr></thead>
+                <thead><tr><th>Gerente Área</th><th>Fecha</th><th>Tipo</th><th>Razón</th><th>Jornada</th><th>Estado</th><th>Acciones</th></tr></thead>
                 <tbody>{situations.map((situation) => (
                   <tr key={idOf(situation)} className={situation.active === false || situation.activa === false ? 'ausencias-area-admin-table__row--inactive' : undefined}>
                     <td className="ausencias-area-admin-table__name">{gaName(situation)}</td><td>{dateOf(situation)}</td><td><span className="ausencias-area-admin-badge ausencias-area-admin-badge--type">{typeOf(situation) ?? '—'}</span></td><td className="ausencias-area-admin-table__reason">{reasonOf(situation)}</td>
