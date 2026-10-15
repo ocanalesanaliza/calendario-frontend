@@ -31,7 +31,7 @@ describe('SucursalesPage: número de guardias', () => {
   beforeEach(() => {
     apiRequest.mockReset()
     useAuth.mockReset()
-    mockRequests({ areas: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro', gerente_area: { id_gerente_area: 2, nombre: 'GA Centro', email: 'ga@example.com' } }] })
+    mockRequests({ areas: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro', country: { id: 1, name: 'Honduras' }, gerente_area: { id_gerente_area: 2, nombre: 'GA Centro', email: 'ga@example.com' } }] })
   })
 
   it('permite al administrador maestro configurar de 0 a 4 guardias al crear', async () => {
@@ -55,7 +55,7 @@ describe('SucursalesPage: número de guardias', () => {
 
     await waitFor(() => expect(apiRequest).toHaveBeenCalledWith('/api/sucursales/', {
       method: 'POST',
-      body: JSON.stringify({ nombre: 'Sucursal Centro', codigo: 'CENTRO-01', calendar_area_id: 8, numero_guardias: 3 }),
+      body: JSON.stringify({ nombre: 'Sucursal Centro', codigo: 'CENTRO-01', calendar_area_id: 8, country_id: 1, numero_guardias: 3 }),
     }))
   })
 
@@ -75,7 +75,7 @@ describe('SucursalesPage: número de guardias', () => {
 
     await waitFor(() => expect(apiRequest).toHaveBeenCalledWith('/api/sucursales/', {
       method: 'POST',
-      body: JSON.stringify({ nombre: 'Sucursal Centro', codigo: 'CENTRO-01', calendar_area_id: 8 }),
+      body: JSON.stringify({ nombre: 'Sucursal Centro', codigo: 'CENTRO-01', calendar_area_id: 8, country_id: 1 }),
     }))
   })
 
@@ -105,7 +105,7 @@ describe('SucursalesPage: número de guardias', () => {
   it('muestra el error de calendar_area_id junto al campo Área', async () => {
     useAuth.mockReturnValue({ perfil: { type: 'gerente_area', es_admin_maestro: false } })
     mockRequests({
-      areas: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro', gerente_area: { nombre: 'GA Centro', email: 'ga@example.com' } }],
+      areas: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro', country: { id: 1, name: 'Honduras' }, gerente_area: { nombre: 'GA Centro', email: 'ga@example.com' } }],
       createResponse: response({ detail: { calendar_area_id: 'El área ya no está disponible.' } }, 400),
     })
     render(<SucursalesPage />)
@@ -122,7 +122,7 @@ describe('SucursalesPage: número de guardias', () => {
   it('informa la asignación de plantilla fallida después de crear la sucursal y la reintenta sin crearla otra vez', async () => {
     useAuth.mockReturnValue({ perfil: { type: 'gerente_area', es_admin_maestro: false } })
     mockRequests({
-      areas: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro' }],
+      areas: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro', country: { id: 1, name: 'Honduras' } }],
       templates: [{ id_plantilla: 4, nombre: 'Apertura', activa: true }],
       assignmentResponses: [response({ detail: 'No se pudo asignar.' }, 500), response({})],
     })
@@ -164,7 +164,7 @@ describe('SucursalesPage: número de guardias', () => {
     await screen.findByRole('dialog', { name: 'Nueva sucursal' })
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
 
-    await act(async () => { resolveAreas(response({ count: 1, results: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro' }] })) })
+    await act(async () => { resolveAreas(response({ count: 1, results: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro', country: { id: 1, name: 'Honduras' } }] })) })
 
     expect(screen.queryByRole('dialog', { name: 'Nueva sucursal' })).not.toBeInTheDocument()
     expect(consoleError).not.toHaveBeenCalled()
@@ -187,6 +187,86 @@ describe('SucursalesPage: número de guardias', () => {
       method: 'PATCH',
       body: JSON.stringify({ nombre: 'Sucursal Centro', codigo: 'CENTRO-01', id_gerente_area: 2, numero_guardias: 4 }),
     }))
+  })
+
+  it('muestra el país fijo del área elegida y lo envía como country_id numérico', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', es_admin_maestro: false } })
+    render(<SucursalesPage />)
+    await screen.findByText('No hay sucursales registradas.')
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva sucursal' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Nueva sucursal' })
+    llenarBasicos(dialog)
+
+    expect(within(dialog).queryByText('Honduras')).not.toBeInTheDocument()
+    fireEvent.change(await within(dialog).findByLabelText(/Área/), { target: { value: '8' } })
+
+    expect(within(dialog).getByText('Honduras')).toBeInTheDocument()
+    expect(within(dialog).queryByRole('combobox', { name: /País/i })).not.toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Crear sucursal' }))
+
+    await waitFor(() => expect(apiRequest).toHaveBeenCalledWith('/api/sucursales/', {
+      method: 'POST',
+      body: JSON.stringify({ nombre: 'Sucursal Centro', codigo: 'CENTRO-01', calendar_area_id: 8, country_id: 1 }),
+    }))
+  })
+
+  it('actualiza el país fijo y country_id al cambiar el área', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', es_admin_maestro: false } })
+    mockRequests({
+      areas: [
+        { id: 8, codigo: 'CENTRO', nombre: 'Centro', country: { id: 1, name: 'Honduras' } },
+        { id: 9, codigo: 'NORTE', nombre: 'Norte', country: { id: 2, name: 'Guatemala' } },
+      ],
+    })
+    render(<SucursalesPage />)
+    await screen.findByText('No hay sucursales registradas.')
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva sucursal' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Nueva sucursal' })
+    llenarBasicos(dialog)
+    const area = await within(dialog).findByLabelText(/Área/)
+    fireEvent.change(area, { target: { value: '8' } })
+    expect(within(dialog).getByText('Honduras')).toBeInTheDocument()
+    fireEvent.change(area, { target: { value: '9' } })
+    expect(within(dialog).getByText('Guatemala')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Honduras')).not.toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Crear sucursal' }))
+
+    await waitFor(() => expect(apiRequest).toHaveBeenCalledWith('/api/sucursales/', {
+      method: 'POST',
+      body: JSON.stringify({ nombre: 'Sucursal Centro', codigo: 'CENTRO-01', calendar_area_id: 9, country_id: 2 }),
+    }))
+  })
+
+  it('muestra los errores country_id junto al país y los limpia al reabrir', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', es_admin_maestro: false } })
+    mockRequests({
+      areas: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro', country: { id: 1, name: 'Honduras' } }],
+      createResponse: response({ detail: { country_id: 'El país no coincide con el área.' } }, 400),
+    })
+    render(<SucursalesPage />)
+    await screen.findByText('No hay sucursales registradas.')
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva sucursal' }))
+    let dialog = await screen.findByRole('dialog', { name: 'Nueva sucursal' })
+    llenarBasicos(dialog)
+    fireEvent.change(await within(dialog).findByLabelText(/Área/), { target: { value: '8' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Crear sucursal' }))
+    const countryError = await within(dialog).findByText('El país no coincide con el área.')
+    expect(countryError.previousElementSibling).toHaveTextContent('Honduras')
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva sucursal' }))
+    dialog = await screen.findByRole('dialog', { name: 'Nueva sucursal' })
+    expect(within(dialog).queryByText('El país no coincide con el área.')).not.toBeInTheDocument()
+    expect(within(dialog).queryByText('Honduras')).not.toBeInTheDocument()
+  })
+
+  it('tolerates legacy null country_id in the list without country lookups', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', es_admin_maestro: false } })
+    mockRequests({ sucursales: [{ id_sucursal: 15, nombre: 'Sucursal Legacy', codigo: 'LEGACY-01', activa: true, country_id: null }] })
+    render(<SucursalesPage />)
+
+    expect(await screen.findByText('Sucursal Legacy')).toBeInTheDocument()
+    expect(apiRequest).not.toHaveBeenCalledWith(expect.stringMatching(/countr/i), expect.anything())
   })
 
   it('permite quitar el GS asignado sin desactivar su cuenta', async () => {

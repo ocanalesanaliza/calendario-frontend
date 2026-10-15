@@ -321,13 +321,20 @@ function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
 
   const set = (k) => (e) => {
     setForm((f) => ({ ...f, [k]: e.target.value }))
-    setFieldErrors((errors) => ({ ...errors, [k]: undefined }))
+    setFieldErrors((errors) => ({
+      ...errors,
+      [k]: undefined,
+      ...(k === 'calendar_area_id' ? { country_id: undefined } : {}),
+    }))
   }
 
   const selectedArea = areas.find((area) => String(area.id) === form.calendar_area_id)
   const areaError = Array.isArray(fieldErrors.calendar_area_id)
     ? fieldErrors.calendar_area_id.join(' ')
     : fieldErrors.calendar_area_id
+  const countryError = Array.isArray(fieldErrors.country_id)
+    ? fieldErrors.country_id.join(' ')
+    : fieldErrors.country_id
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -345,7 +352,10 @@ function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
     setLoading(true)
     try {
       const body = { nombre: form.nombre, codigo: form.codigo }
-      if (isCreating) body.calendar_area_id = Number(form.calendar_area_id)
+      if (isCreating) {
+        body.calendar_area_id = Number(form.calendar_area_id)
+        if (selectedArea?.country?.id != null) body.country_id = Number(selectedArea.country.id)
+      }
       if (esAdmin && !isCreating && form.id_gerente_area) body.id_gerente_area = Number(form.id_gerente_area)
       if (esAdmin) body.numero_guardias = numeroGuardias
       await onSubmit(body, idPlantilla ? Number(idPlantilla) : null, fechaPlantilla || null)
@@ -391,6 +401,13 @@ function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
                   <p className="modal-error" role="alert">No hay áreas elegibles disponibles para crear una sucursal.</p>
                 )}
               </div>
+              {selectedArea?.country && (
+                <div className="form-group">
+                  <p className="form-section-label">País</p>
+                  <p>{selectedArea.country.name}</p>
+                  {countryError && <span className="modal-error" role="alert">{countryError}</span>}
+                </div>
+              )}
               {selectedArea?.gerente_area && (
                 <div className="form-group">
                   <p className="form-section-label">Gerente de área asignado</p>
