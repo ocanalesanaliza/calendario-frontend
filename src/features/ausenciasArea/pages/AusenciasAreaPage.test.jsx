@@ -144,6 +144,28 @@ describe('AusenciasAreaPage', () => {
     expect(actOnGAVacationRequest).toHaveBeenCalledWith(4, 'cancel', { reason: '' }, 'command-key')
   })
 
+  it('shows the requester identity supplied by the vacation list without another request', async () => {
+    setup(manager, { vacations: [{ ...request, gerente_area: { id: 8, nombre: 'Ana GA' } }] })
+
+    const [vacationTable, specialSituationsTable] = await screen.findAllByRole('table')
+    expect(within(vacationTable).getByRole('columnheader', { name: 'Gerente Área' })).toBeInTheDocument()
+    expect(within(vacationTable).getByText('Ana GA')).toBeInTheDocument()
+    expect(within(specialSituationsTable).getByText('Ana GA')).toBeInTheDocument()
+    expect(getGAVacationRequests).toHaveBeenCalledTimes(1)
+    expect(getGASpecialSituations).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders an em dash instead of an undefined GA when requester data is null', async () => {
+    setup(manager, {
+      vacations: [{ ...request, gerente_area_id: null, gerente_area: null }],
+      special: [{ ...situation, gerente_area_id: null, gerente_area: null }],
+    })
+
+    const [vacationTable, specialSituationsTable] = await screen.findAllByRole('table')
+    expect(within(vacationTable).getAllByRole('row')[1]).toHaveTextContent('—')
+    expect(within(specialSituationsTable).getAllByRole('row')[1]).toHaveTextContent('—')
+    expect(screen.queryByText('GA #undefined')).not.toBeInTheDocument()
+  })
   it('lets GO approve and reject with a reason and shows special situation controls', async () => {
     setup(manager)
     expect(await screen.findByRole('button', { name: 'Nueva situación' })).toHaveClass('ausencias-area-admin-new-situation')
@@ -171,7 +193,7 @@ describe('AusenciasAreaPage', () => {
     expect(within(vacationTable).getByRole('columnheader', { name: 'Período solicitado' })).toBeInTheDocument()
     expect(within(vacationTable).queryByRole('columnheader', { name: 'Fecha' })).not.toBeInTheDocument()
     expect(within(vacationTable).queryByRole('columnheader', { name: 'Segmentos' })).not.toBeInTheDocument()
-    expect(cells[0]).toHaveTextContent('14 de septiembre de 2026 · Mañana')
+    expect(cells[1]).toHaveTextContent('14 de septiembre de 2026 · Mañana')
   })
 
   it('compresses consecutive full-day segments into an administrative period range', async () => {
