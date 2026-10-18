@@ -50,12 +50,13 @@ describe('AdminMasterAssignmentsPage', () => {
   })
 
   it('posts the exact existing-profile shape without an optional effective date and shows an ephemeral password', async () => {
-    const catalog = { results: [], eligible_profiles: [{ id: 7, username: 'ana' }], countries: [{ id: 3, name: 'México' }] }
+    const catalog = { results: [], eligible_profiles: [{ id: 7, username: 'ana' }], countries: [{ id: 3, name: 'México', label: 'Analiza · Centroamérica · México' }] }
     apiRequest.mockResolvedValueOnce(response(catalog)).mockResolvedValueOnce(response({ password_temporal: 'only-once' })).mockResolvedValueOnce(response(catalog))
     render(<AdminMasterAssignmentsPage />)
     await screen.findByText('No hay asignaciones para mostrar.')
     fireEvent.click(screen.getByRole('button', { name: 'Nueva asignación' }))
     fireEvent.change(screen.getByLabelText('Perfil existente'), { target: { value: '7' } })
+    expect(screen.getByRole('option', { name: 'Analiza · Centroamérica · México' })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('País'), { target: { value: '3' } })
     fireEvent.click(screen.getByRole('button', { name: 'Crear asignación' }))
     await waitFor(() => expect(apiRequest).toHaveBeenNthCalledWith(2, '/api/v1/admin-master-assignments/', { method: 'POST', body: JSON.stringify({ mode: 'existing', profile_id: 7, country_id: 3 }) }))
@@ -299,7 +300,7 @@ describe('AdminMasterAssignmentsPage', () => {
   })
 
   it('posts the exact new-profile shape and keeps the modal open with field errors', async () => {
-    apiRequest.mockResolvedValueOnce(response({ results: [], eligible_profiles: [], countries: [{ id: 3, name: 'México' }] })).mockResolvedValueOnce(response({ detail: { email: ['Ya está asignado.'] } }, false, 409))
+    apiRequest.mockResolvedValueOnce(response({ results: [], eligible_profiles: [], countries: [{ id: 3, name: 'México', label: 'Analiza · Centroamérica · México' }] })).mockResolvedValueOnce(response({ detail: { email: ['Ya está asignado.'] } }, false, 409))
     render(<AdminMasterAssignmentsPage />)
     await screen.findByText('No hay asignaciones para mostrar.')
     fireEvent.click(screen.getByRole('button', { name: 'Nueva asignación' }))
@@ -308,6 +309,7 @@ describe('AdminMasterAssignmentsPage', () => {
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'marta@example.com' } })
     fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Marta' } })
     fireEvent.change(screen.getByLabelText('Apellido'), { target: { value: 'García' } })
+    expect(screen.getByRole('option', { name: 'Analiza · Centroamérica · México' })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('País'), { target: { value: '3' } })
     fireEvent.change(screen.getByLabelText('Fecha efectiva (opcional)'), { target: { value: '2026-10-01' } })
     fireEvent.click(screen.getByRole('button', { name: 'Crear asignación' }))
@@ -326,6 +328,15 @@ describe('AdminMasterAssignmentsPage', () => {
     expect(screen.getByRole('button', { name: 'Cancelar' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Crear asignación' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Cerrar' })).toBeEnabled()
+  })
+
+  it('renders a name-only country option for the legacy country shape', async () => {
+    apiRequest.mockResolvedValueOnce(response({ results: [], eligible_profiles: [], countries: [{ id: 3, name: 'México' }] }))
+    render(<AdminMasterAssignmentsPage />)
+    await screen.findByText('No hay asignaciones para mostrar.')
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva asignación' }))
+
+    expect(screen.getByRole('option', { name: 'México' })).toBeInTheDocument()
   })
 
   it('associates non-conflict field errors with their controls', async () => {

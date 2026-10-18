@@ -145,7 +145,7 @@ function AssignmentModal({ eligibleProfiles, activeProfileIds, countries, onClos
           <FormField label="Nombre" value={form.first_name} onChange={update('first_name')} disabled={saving} error={fieldError(errors, 'first_name')} />
           <FormField label="Apellido" value={form.last_name} onChange={update('last_name')} disabled={saving} error={fieldError(errors, 'last_name')} />
         </>}
-        <SelectField label="País" value={form.country_id} onChange={update('country_id')} disabled={saving} error={fieldError(errors, 'country_id')}><option value="">Seleccionar país</option>{countries.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</SelectField>
+        <SelectField label="País" value={form.country_id} onChange={update('country_id')} disabled={saving} error={fieldError(errors, 'country_id')}><option value="">Seleccionar país</option>{countries.map((item) => <option key={item.id} value={item.id}>{item.label ?? item.name}</option>)}</SelectField>
         <FormField label="Fecha efectiva (opcional)" type="date" value={form.effective_on} onChange={update('effective_on')} disabled={saving} error={fieldError(errors, 'effective_on')} required={false} />
         {errors.detail && <p className="ama-error ama-form-error" role="alert">{errors.detail}</p>}
         <footer className="ama-modal-footer ama-modal-actions ama-assignment-modal-actions"><button type="button" className="ama-button ama-button--secondary" onClick={onClose}>Cancelar</button><button type="submit" className="ama-button ama-button--primary" disabled={saving}>{saving ? 'Guardando...' : 'Crear asignación'}</button></footer>
