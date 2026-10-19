@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { createAdminMasterAssignment, getAdminMasterAssignments } from '../services/adminMasterAssignmentsService'
+import { createAdminMasterAssignment, getAdminMasterAssignments, revokeAdminMasterAssignment } from '../services/adminMasterAssignmentsService'
 import './AdminMasterAssignmentsPage.css'
 
 const isIsoDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`))
 const fieldError = (errors, field) => Array.isArray(errors[field]) ? errors[field].join(' ') : errors[field]
 const assignmentFields = ['profile_id', 'username', 'email', 'first_name', 'last_name', 'country_id', 'effective_on']
+const revokeFields = ['effective_on', 'reason']
 const submissionInFlight = { current: false }
+const revokeSubmissionInFlight = { current: false }
 
 function submissionErrors(error) {
   const fields = error.fields && typeof error.fields === 'object' && !Array.isArray(error.fields) ? error.fields : {}
@@ -15,6 +17,18 @@ function submissionErrors(error) {
     .map(([, value]) => Array.isArray(value) ? value.join(' ') : value)
     .filter(Boolean)
   const detail = globalErrors.join(' ') || (!Object.keys(knownErrors).length ? (error.status === 409 ? 'Ya existe una asignación que entra en conflicto.' : error.message) : '')
+
+  return { ...knownErrors, detail }
+}
+
+function revokeSubmissionErrors(error) {
+  const fields = error.fields && typeof error.fields === 'object' && !Array.isArray(error.fields) ? error.fields : {}
+  const knownErrors = Object.fromEntries(Object.entries(fields).filter(([field]) => revokeFields.includes(field)))
+  const globalErrors = Object.entries(fields)
+    .filter(([field]) => !revokeFields.includes(field))
+    .map(([, value]) => Array.isArray(value) ? value.join(' ') : value)
+    .filter(Boolean)
+  const detail = globalErrors.join(' ') || (!Object.keys(knownErrors).length ? error.message : '')
 
   return { ...knownErrors, detail }
 }
@@ -39,6 +53,10 @@ function email(assignment) {
 
 function country(assignment) {
   return assignment.country_name || assignment.country?.name || assignment.country || '—'
+}
+
+function lifecycleState(assignment) {
+  return ({ active: 'Activa', revoked: 'Revocada', replaced: 'Reemplazada', transferred: 'Transferida' })[assignment.lifecycle_state] || assignment.lifecycle_state || '—'
 }
 
 function Modal({ title, children, onClose, closeAllowed = true }) {
@@ -154,6 +172,44 @@ function AssignmentModal({ eligibleProfiles, activeProfileIds, countries, onClos
   )
 }
 
+function RevokeModal({ onClose, onSubmit, submissionInFlightRef }) {
+  const [form, setForm] = useState({ effective_on: '', reason: '' })
+  const [errors, setErrors] = useState({})
+  const [saving, setSaving] = useState(false)
+  const update = (field) => (event) => setForm({ ...form, [field]: event.target.value })
+
+  async function submit(event) {
+    event.preventDefault()
+    if (saving || submissionInFlightRef.current) return
+    const nextErrors = {}
+    if (!isIsoDate(form.effective_on)) nextErrors.effective_on = 'Ingresa una fecha ISO válida (YYYY-MM-DD).'
+    if (!form.reason.trim()) nextErrors.reason = 'El motivo de revocación es obligatorio.'
+    if (Object.keys(nextErrors).length) return setErrors(nextErrors)
+
+    submissionInFlightRef.current = true
+    setSaving(true)
+    setErrors({})
+    try {
+      await onSubmit({ effective_on: form.effective_on, reason: form.reason.trim() })
+    } catch (error) {
+      setErrors(revokeSubmissionErrors(error))
+      setSaving(false)
+    } finally {
+      submissionInFlightRef.current = false
+    }
+  }
+
+  return <Modal title="Revocar asignación de Admin Master" onClose={onClose}>
+    <form className="ama-form ama-revoke-form" onSubmit={submit}>
+      <p className="ama-revoke-description">La revocación no crea una asignación de reemplazo.</p>
+      <FormField label="Fecha efectiva de revocación" type="date" value={form.effective_on} onChange={update('effective_on')} disabled={saving} error={fieldError(errors, 'effective_on')} required={false} data-autofocus />
+      <FormField label="Motivo de revocación" value={form.reason} onChange={update('reason')} disabled={saving} error={fieldError(errors, 'reason')} required={false} />
+      {errors.detail && <p className="ama-error ama-form-error" role="alert">{errors.detail}</p>}
+      <footer className="ama-modal-footer ama-modal-actions ama-revoke-modal-actions"><button type="button" className="ama-button ama-button--secondary" onClick={onClose} disabled={saving}>Cancelar</button><button type="submit" className="ama-button ama-button--primary" disabled={saving}>{saving ? 'Revocando...' : 'Revocar asignación'}</button></footer>
+    </form>
+  </Modal>
+}
+
 function FormField({ label, error, ...inputProps }) {
   const id = `ama-${label.replaceAll(' ', '-').toLowerCase()}`
   const inputClassName = `ama-input${inputProps.type === 'date' ? ' ama-date-input' : ''}${error ? ' ama-input--error' : ''}`
@@ -220,9 +276,15 @@ export default function AdminMasterAssignmentsPage() {
     void load({ refresh: true })
   }
 
-  const visibleAssignments = filter === 'active' ? assignments.filter((assignment) => assignment.lifecycle_state === 'active') : assignments
+  async function revoke(assignment, body) {
+    await revokeAdminMasterAssignment(assignment.id || assignment.assignment_id, body)
+    setModal(null)
+    void load({ refresh: true })
+  }
+
+  const visibleAssignments = filter === 'active' ? assignments.filter((assignment) => assignment.is_current === true) : assignments
   const activeProfileIds = new Set(assignments
-    .filter((assignment) => assignment.lifecycle_state === 'active')
+    .filter((assignment) => assignment.is_current === true)
     .map(assignmentProfileId)
     .filter((profileId) => profileId !== undefined && profileId !== null)
     .map(String))
@@ -230,9 +292,10 @@ export default function AdminMasterAssignmentsPage() {
   return <main className="ama-page">
     <header className="ama-page-header"><div className="ama-page-heading"><h1>Admin Masters</h1><p>Asignaciones de Admin Master por país.</p></div><button type="button" className="ama-button ama-button--primary ama-page-action" onClick={() => setModal({ type: 'assignment' })}>Nueva asignación</button></header>
     <div className="ama-filter" role="group" aria-label="Filtro de estado"><button type="button" className="ama-filter-button" aria-pressed={filter === 'active'} onClick={() => setFilter('active')}>Activas</button><button type="button" className="ama-filter-button" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>Todas</button></div>
-    {loading ? <p className="ama-state ama-loading-state">Cargando asignaciones...</p> : error ? <section className="ama-state ama-error-state" role="alert"><p>{error}</p><button type="button" className="ama-button ama-button--secondary ama-retry-button" onClick={() => void load()}>Reintentar</button></section> : visibleAssignments.length === 0 ? <p className="ama-state ama-empty-state">No hay asignaciones para mostrar.</p> : <div className="ama-table-card"><table><thead><tr><th>Perfil</th><th>Email</th><th>País</th><th>Fecha efectiva</th><th>Estado</th></tr></thead><tbody>{visibleAssignments.map((assignment) => <tr key={assignment.id || assignment.assignment_id || `${email(assignment)}-${assignment.effective_on}`}><td>{profileName(assignment)}</td><td>{email(assignment)}</td><td>{country(assignment)}</td><td>{assignment.effective_on || '—'}</td><td>{assignment.lifecycle_state || '—'}</td></tr>)}</tbody></table></div>}
+    {loading ? <p className="ama-state ama-loading-state">Cargando asignaciones...</p> : error ? <section className="ama-state ama-error-state" role="alert"><p>{error}</p><button type="button" className="ama-button ama-button--secondary ama-retry-button" onClick={() => void load()}>Reintentar</button></section> : visibleAssignments.length === 0 ? <p className="ama-state ama-empty-state">No hay asignaciones para mostrar.</p> : <div className="ama-table-card"><table><thead><tr><th>Perfil</th><th>Email</th><th>Organización</th><th>País</th><th>Inicio</th><th>Fin</th><th>Vigencia</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{visibleAssignments.map((assignment) => <tr key={assignment.id || assignment.assignment_id || `${email(assignment)}-${assignment.starts_on || assignment.effective_on}`}><td>{profileName(assignment)}</td><td>{email(assignment)}</td><td>{assignment.organization?.name || '—'}</td><td>{country(assignment)}</td><td>{assignment.starts_on || assignment.effective_on || '—'}</td><td>{assignment.ends_on || '—'}</td><td>{assignment.is_current === true ? 'Vigente' : 'Histórica'}</td><td>{lifecycleState(assignment)}</td><td>{assignment.is_current === true && <button type="button" className="ama-button ama-button--secondary ama-revoke-button" onClick={() => setModal({ type: 'revoke', assignment })}>Revocar</button>}</td></tr>)}</tbody></table></div>}
     {refreshError && <section className="ama-state ama-error-state" role="alert" aria-label="Error de actualización"><p>{refreshError}</p><button type="button" className="ama-button ama-button--secondary ama-retry-button" onClick={() => void load({ refresh: true })}>Reintentar actualización</button></section>}
     {modal?.type === 'assignment' && <AssignmentModal eligibleProfiles={availableProfiles} activeProfileIds={activeProfileIds} countries={countries} onClose={() => setModal(null)} onSubmit={create} submissionInFlightRef={submissionInFlight} />}
+    {modal?.type === 'revoke' && <RevokeModal onClose={() => setModal(null)} onSubmit={(body) => revoke(modal.assignment, body)} submissionInFlightRef={revokeSubmissionInFlight} />}
     {modal?.type === 'password' && <TemporaryPasswordModal password={modal.password} onClose={() => setModal(null)} />}
   </main>
 }
