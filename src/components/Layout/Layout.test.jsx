@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { AlmuerzosRoute } from '../../App'
 import Layout from './Layout'
 
 const { useAuth, getTrabajosCampo, getCoberturas, getSolicitudesVacacion } = vi.hoisted(() => ({
@@ -98,7 +99,7 @@ describe('Layout Mis tareas navigation', () => {
     })
   })
 
-  it('shows Admin Master only the universal lunch and granted branch management navigation', () => {
+  it('hides Mi almuerzo for an Admin Master while keeping Calendario del área hidden and the lunch route available', () => {
     localStorage.getItem.mockReturnValue('0')
     useAuth.mockReturnValue({
       perfil: {
@@ -111,11 +112,23 @@ describe('Layout Mis tareas navigation', () => {
     render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
 
     expect(screen.getByText('Admin Master')).toBeInTheDocument()
-    expect(screen.getByText('Mi almuerzo')).toBeInTheDocument()
+    expect(screen.queryByText('Mi almuerzo')).not.toBeInTheDocument()
+    expect(screen.queryByText('Calendario del área')).not.toBeInTheDocument()
     expect(screen.getByText('Sucursales').closest('a')).toHaveAttribute('href', '/sucursales')
     ;['Admin Masters', 'Áreas', 'Usuarios', 'Plantillas', 'Rendimiento', 'Solicitudes pendientes', 'Status', 'Reportes', 'Revisiones de guardia', 'Configuración'].forEach((label) => {
       expect(screen.queryByText(label)).not.toBeInTheDocument()
     })
+
+    render(
+      <MemoryRouter initialEntries={['/almuerzos']}>
+        <Routes>
+          <Route path="/" element={<p>Inicio</p>} />
+          <Route path="/almuerzos" element={<AlmuerzosRoute><p>Almuerzo autorizado</p></AlmuerzosRoute>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText('Almuerzo autorizado')).toBeInTheDocument()
   })
 
   it('hides the six capability-controlled modules from a Systems profile without master admin or capabilities', () => {
