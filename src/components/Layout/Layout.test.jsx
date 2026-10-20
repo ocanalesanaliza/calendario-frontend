@@ -98,6 +98,26 @@ describe('Layout Mis tareas navigation', () => {
     })
   })
 
+  it('shows Admin Master only the universal lunch and granted branch management navigation', () => {
+    localStorage.getItem.mockReturnValue('0')
+    useAuth.mockReturnValue({
+      perfil: {
+        type: 'admin_master',
+        capabilities: { manage_branches: true },
+      },
+      logout: vi.fn(),
+    })
+
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+
+    expect(screen.getByText('Admin Master')).toBeInTheDocument()
+    expect(screen.getByText('Mi almuerzo')).toBeInTheDocument()
+    expect(screen.getByText('Sucursales').closest('a')).toHaveAttribute('href', '/sucursales')
+    ;['Admin Masters', 'Áreas', 'Usuarios', 'Plantillas', 'Rendimiento', 'Solicitudes pendientes', 'Status', 'Reportes', 'Revisiones de guardia', 'Configuración'].forEach((label) => {
+      expect(screen.queryByText(label)).not.toBeInTheDocument()
+    })
+  })
+
   it('hides the six capability-controlled modules from a Systems profile without master admin or capabilities', () => {
     useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: false }, logout: vi.fn() })
 

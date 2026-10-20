@@ -19,6 +19,7 @@ function Layout() {
   const {
     isAreaManager: esGerenteArea,
     isBranchManager: esSucursal,
+    isAdminMaster,
     isMasterAdmin: esAdmin,
     isOperationsManager: esGerenteOperaciones,
     canAccessLunch,
@@ -628,7 +629,7 @@ function Layout() {
               <div className="sidebar-user-info">
                 <span className="sidebar-user-name">{perfil?.nombre || 'Usuario'}</span>
                 <span className="sidebar-user-role">
-                  {esAdmin ? 'Admin maestro' : esGerenteOperaciones ? 'Gerente de operaciones' : esGerenteArea ? 'Gerente de área' : 'Gerente de sucursal'}
+                  {isAdminMaster ? 'Admin Master' : esAdmin ? 'Admin maestro' : esGerenteOperaciones ? 'Gerente de operaciones' : esGerenteArea ? 'Gerente de área' : 'Gerente de sucursal'}
                 </span>
               </div>
             )}
