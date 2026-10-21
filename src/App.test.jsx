@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AdminMaestroRoute, AlmuerzosRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GerentesOperacionesRoute, MisTareasRoute, OrganizacionRoute, PendientesRoute, PlantillasAreaRoute, RendimientoRoute, SystemsOnlyRoute } from './App'
+import { AdminMaestroRoute, AlmuerzosRoute, AusenciasAreaRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GerentesOperacionesRoute, MisTareasRoute, OrganizacionRoute, PendientesRoute, PlantillasAreaRoute, RendimientoRoute, SystemsOnlyRoute } from './App'
 
 const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
 
@@ -231,6 +231,26 @@ describe('CalendarioAreaRoute', () => {
 
     expect(await screen.findByText('Inicio')).toBeInTheDocument()
      expect(screen.queryByText('Calendario autorizado')).not.toBeInTheDocument()
+  })
+})
+
+describe('AusenciasAreaRoute', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  it.each([
+    ['GA', { type: 'gerente_area' }, true],
+    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, true],
+    ['active Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, true],
+    ['plain Admin Master', { type: 'admin_master' }, true],
+    ['global Admin Master', { es_admin_maestro: true }, true],
+    ['GS', { type: 'gerente_sucursal' }, false],
+    ['inactive Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: false, habilitado: true }, false],
+  ])('uses the same area-absence capability for %s', async (_role, perfil, admitted) => {
+    useAuth.mockReturnValue({ perfil })
+    render(<MemoryRouter initialEntries={['/ausencias-area']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/ausencias-area" element={<AusenciasAreaRoute><p>Ausencias autorizadas</p></AusenciasAreaRoute>} /></Routes></MemoryRouter>)
+
+    if (admitted) expect(screen.getByText('Ausencias autorizadas')).toBeInTheDocument()
+    else expect(await screen.findByText('Inicio')).toBeInTheDocument()
   })
 })
 describe('RendimientoRoute', () => {

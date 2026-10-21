@@ -208,6 +208,22 @@ describe('Layout Mis tareas navigation', () => {
     expect(screen.getByTitle('Solicitudes pendientes')).toHaveAttribute('href', '/solicitudes-pendientes')
   })
 
+  it.each([
+    ['GA', { type: 'gerente_area' }, true],
+    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, true],
+    ['active Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, true],
+    ['plain Admin Master', { type: 'admin_master' }, true],
+    ['global Admin Master', { es_admin_maestro: true }, true],
+    ['GS', { type: 'gerente_sucursal' }, false],
+    ['disabled Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: false }, false],
+  ])('uses the area-absence capability to show navigation to %s', (_role, perfil, visible) => {
+    useAuth.mockReturnValue({ perfil, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+
+    if (visible) expect(screen.getByTitle('Vacaciones y situaciones del área')).toHaveAttribute('href', '/ausencias-area')
+    else expect(screen.queryByTitle('Vacaciones y situaciones del área')).not.toBeInTheDocument()
+  })
+
   it('hides Mis tareas and Solicitudes pendientes for an operations manager while preserving Áreas', () => {
     useAuth.mockReturnValue({
       perfil: {

@@ -10,7 +10,7 @@ const slots = [['full_day', 'Jornada completa'], ['morning', 'Mañana'], ['after
 const records = (data) => Array.isArray(data) ? data : data?.results ?? data?.items ?? []
 const idOf = (item) => item?.id ?? item?.id_request ?? item?.id_vacation_request ?? item?.id_ga_special_situation
 const errorText = (error, fallback) => {
-  if (error?.status === 403) return 'No tienes permisos para realizar esta acción. El servidor mantiene la autorización.'
+  if ([403, 404].includes(error?.status)) return 'No tienes permisos para realizar esta acción. El servidor mantiene la autorización.'
   if (error?.status === 409) return 'La información cambió o entra en conflicto. Revisa el listado e inténtalo de nuevo.'
   if (error?.status === 400) return `Revisa los datos enviados. ${error.message || ''}`.trim()
   return error?.message || fallback
@@ -243,11 +243,16 @@ function ResolveForm({ request, action, onClose, onConflict, onSubmit }) {
 
   async function submit(event) {
     event.preventDefault()
+    const trimmedReason = reason.trim()
+    if (action === 'reject' && !trimmedReason) {
+      setError('El motivo es obligatorio para rechazar la solicitud.')
+      return
+    }
     setSaving(true)
     setError('')
     try {
       idempotencyKey.current ??= createIdempotencyKey()
-      await onSubmit(idOf(request), action, { reason: reason.trim() }, idempotencyKey.current)
+      await onSubmit(idOf(request), action, { reason: trimmedReason }, idempotencyKey.current)
       onClose()
     } catch (requestError) {
       if (invalidatesCommandKey(requestError)) {
@@ -372,7 +377,7 @@ function SituationForm({ catalog, catalogError, catalogLoading, onCatalogDateCha
 
 export default function AusenciasAreaPage() {
   const { perfil } = useAuth()
-  const { isAreaManager, canManageAreaAbsences } = getProfileCapabilities(perfil)
+  const { isAreaManager, canSubmitOwnGAVacations, canDecideGAVacations, canCancelOwnGAVacations, canManageGASpecialSituations } = getProfileCapabilities(perfil)
   const [vacations, setVacations] = useState([])
   const [situations, setSituations] = useState([])
   const [loading, setLoading] = useState(true)
@@ -380,12 +385,12 @@ export default function AusenciasAreaPage() {
   const [retry, setRetry] = useState(0)
   const [modal, setModal] = useState(null)
   const [catalog, setCatalog] = useState(null)
-  const [catalogLoading, setCatalogLoading] = useState(canManageAreaAbsences)
+  const [catalogLoading, setCatalogLoading] = useState(canManageGASpecialSituations)
   const [catalogError, setCatalogError] = useState('')
   const catalogRequest = useRef(0)
 
   async function loadCatalog(date, endDate) {
-    if (!canManageAreaAbsences) return
+    if (!canManageGASpecialSituations) return
     const request = ++catalogRequest.current
     setCatalogLoading(true)
     setCatalogError('')
@@ -406,7 +411,7 @@ export default function AusenciasAreaPage() {
     setLoading(true)
     setError('')
     try {
-      const [requests, special] = await Promise.all([getGAVacationRequests(), canManageAreaAbsences ? getGASpecialSituations() : Promise.resolve([])])
+      const [requests, special] = await Promise.all([getGAVacationRequests(), canManageGASpecialSituations ? getGASpecialSituations() : Promise.resolve([])])
       setVacations(records(requests))
       setSituations(records(special))
     } catch (requestError) {
@@ -419,7 +424,7 @@ export default function AusenciasAreaPage() {
   useEffect(() => {
     void load()
     void loadCatalog()
-  }, [retry, canManageAreaAbsences])
+  }, [retry, canManageGASpecialSituations])
 
   async function command(command, ...args) {
     await command(...args)
@@ -427,18 +432,18 @@ export default function AusenciasAreaPage() {
   }
 
   async function refreshAfterConflict() {
-    await Promise.all([load(), canManageAreaAbsences ? loadCatalog() : Promise.resolve()])
+    await Promise.all([load(), canManageGASpecialSituations ? loadCatalog() : Promise.resolve()])
   }
 
   function renderContent() {
-    if (error) return <div role="alert" className={canManageAreaAbsences ? 'ausencias-area-admin-state ausencias-area-admin-state--error' : undefined}><p>{error}</p><button className={canManageAreaAbsences ? 'ausencias-area-admin-state__retry' : undefined} onClick={() => setRetry((value) => value + 1)}>Reintentar</button></div>
-    if (loading) return <p role="status" className={canManageAreaAbsences ? 'ausencias-area-admin-state' : undefined}>Cargando ausencias...</p>
+    if (error) return <div role="alert" className={canManageGASpecialSituations ? 'ausencias-area-admin-state ausencias-area-admin-state--error' : undefined}><p>{error}</p><button className={canManageGASpecialSituations ? 'ausencias-area-admin-state__retry' : undefined} onClick={() => setRetry((value) => value + 1)}>Reintentar</button></div>
+    if (loading) return <p role="status" className={canManageGASpecialSituations ? 'ausencias-area-admin-state' : undefined}>Cargando ausencias...</p>
 
     return (
       <>
         <section className="ausencias-area-section">
           <h2>{isAreaManager ? 'Mis solicitudes' : 'Solicitudes de vacaciones'}</h2>
-          {vacations.length === 0 ? <p className={canManageAreaAbsences ? 'ausencias-area-admin-state ausencias-area-admin-state--empty' : undefined}>No hay solicitudes de vacaciones.</p> : (
+          {vacations.length === 0 ? <p className={canManageGASpecialSituations ? 'ausencias-area-admin-state ausencias-area-admin-state--empty' : undefined}>No hay solicitudes de vacaciones.</p> : (
             isAreaManager ? (
               <div className="ausencias-area-request-list">
                 {vacations.map((request) => (
@@ -452,7 +457,7 @@ export default function AusenciasAreaPage() {
                         <p><span>{(request.segments ?? request.segmentos ?? []).map((segment) => `${segment.date ?? segment.fecha} · ${slotLabel(segment.slot ?? segment.jornada)}`).join(', ') || '—'}</span><span>{reasonOf(request)}</span></p>
                       </div>
                       <span className="ausencias-area-status-badge">{statusLabel(request)}</span>
-                      {isPending(request) && <button className="ausencias-area-request-card__cancel" type="button" aria-label="Cancelar solicitud" title="Cancelar solicitud" onClick={() => setModal({ type: 'cancel', request })}><span aria-hidden="true">×</span></button>}
+                      {canCancelOwnGAVacations && isPending(request) && <button className="ausencias-area-request-card__cancel" type="button" aria-label="Cancelar solicitud" title="Cancelar solicitud" onClick={() => setModal({ type: 'cancel', request })}><span aria-hidden="true">×</span></button>}
                     </div>
                   </article>
                 ))}
@@ -465,7 +470,7 @@ export default function AusenciasAreaPage() {
                   <tr key={idOf(request)}>
                     <td className="ausencias-area-admin-table__period">{vacationPeriodOf(request)}</td>
                     <td className="ausencias-area-admin-table__reason">{vacationReasonOf(request)}</td><td><span className={`ausencias-area-admin-badge ausencias-area-admin-badge--${status(request)}`}>{statusLabel(request)}</span></td>
-                    <td>{isPending(request) ? <div className="ausencias-area-admin-actions"><button className="ausencias-area-admin-action ausencias-area-admin-action--approve" type="button" aria-label="Aprobar" title="Aprobar" onClick={() => setModal({ type: 'resolve', action: 'approve', request })}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg></button><button className="ausencias-area-admin-action ausencias-area-admin-action--reject" type="button" aria-label="Rechazar" title="Rechazar" onClick={() => setModal({ type: 'resolve', action: 'reject', request })}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button></div> : '—'}</td>
+                    <td>{canDecideGAVacations && isPending(request) ? <div className="ausencias-area-admin-actions"><button className="ausencias-area-admin-action ausencias-area-admin-action--approve" type="button" aria-label="Aprobar" title="Aprobar" onClick={() => setModal({ type: 'resolve', action: 'approve', request })}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg></button><button className="ausencias-area-admin-action ausencias-area-admin-action--reject" type="button" aria-label="Rechazar" title="Rechazar" onClick={() => setModal({ type: 'resolve', action: 'reject', request })}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button></div> : '—'}</td>
                   </tr>
                 ))}</tbody>
               </table>
@@ -473,7 +478,7 @@ export default function AusenciasAreaPage() {
             )
           )}
         </section>
-        {canManageAreaAbsences && (
+        {canManageGASpecialSituations && (
           <section className="ausencias-area-section">
 
             {situations.length === 0 ? <p className="ausencias-area-admin-state ausencias-area-admin-state--empty">No hay situaciones especiales registradas.</p> : (
@@ -501,8 +506,8 @@ export default function AusenciasAreaPage() {
     <section className="ausencias-area-page">
       <header className="page-header ausencias-area-page__header">
         <div><h1>Vacaciones y situaciones del área</h1><p>{isAreaManager ? 'Gestiona tus solicitudes de vacaciones.' : 'Resuelve vacaciones y administra situaciones especiales de gerentes de área.'}</p></div>
-        {isAreaManager && <button className="ausencias-area-page__new-request" type="button" onClick={() => setModal({ type: 'vacation' })}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>Nueva solicitud</button>}
-        {canManageAreaAbsences && <button className="ausencias-area-admin-new-situation" type="button" onClick={() => setModal({ type: 'situation' })}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>Nueva situación</button>}
+        {canSubmitOwnGAVacations && <button className="ausencias-area-page__new-request" type="button" onClick={() => setModal({ type: 'vacation' })}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>Nueva solicitud</button>}
+        {canManageGASpecialSituations && <button className="ausencias-area-admin-new-situation" type="button" onClick={() => setModal({ type: 'situation' })}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>Nueva situación</button>}
       </header>
       {renderContent()}
       {modal?.type === 'vacation' && <VacationForm onClose={() => setModal(null)} onConflict={refreshAfterConflict} onSubmit={(body, key) => command(createGAVacationRequest, body, key)} />}
