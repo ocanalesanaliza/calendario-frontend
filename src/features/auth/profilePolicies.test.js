@@ -2,6 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { getProfileCapabilities } from './profilePolicies'
 
 describe('getProfileCapabilities', () => {
+  it.each([
+    ['GS', { type: 'gerente_sucursal' }, true],
+    ['GA', { type: 'gerente_area' }, true],
+    ['Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, true],
+    ['Admin Master', { type: 'admin_master' }, true],
+    ['GO', { type: 'gerente_operaciones' }, false],
+  ])('sets pending-request access for %s to %s', (_role, profile, expected) => {
+    expect(getProfileCapabilities(profile).canAccessPendingRequests).toBe(expected)
+  })
+
   it('grants all planned modules to Systems with Master Admin capabilities', () => {
     const capabilities = getProfileCapabilities({
       type: 'sistemas',

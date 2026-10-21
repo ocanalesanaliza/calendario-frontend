@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AdminMaestroRoute, AlmuerzosRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GerentesOperacionesRoute, MisTareasRoute, OrganizacionRoute, PlantillasAreaRoute, RendimientoRoute, SystemsOnlyRoute } from './App'
+import { AdminMaestroRoute, AlmuerzosRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GerentesOperacionesRoute, MisTareasRoute, OrganizacionRoute, PendientesRoute, PlantillasAreaRoute, RendimientoRoute, SystemsOnlyRoute } from './App'
 
 const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
 
@@ -58,6 +58,24 @@ describe('MisTareasRoute', () => {
     renderMisTareasRoute()
 
     expect(await screen.findByText('Inicio')).toBeInTheDocument()
+  })
+})
+
+describe('PendientesRoute', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  it.each([
+    ['GS', { type: 'gerente_sucursal' }, true],
+    ['GA', { type: 'gerente_area' }, true],
+    ['Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, true],
+    ['Admin Master', { type: 'admin_master' }, true],
+    ['GO', { type: 'gerente_operaciones' }, false],
+  ])('uses the shared pending-request capability for %s', async (_role, perfil, admitted) => {
+    useAuth.mockReturnValue({ perfil })
+    render(<MemoryRouter initialEntries={['/solicitudes-pendientes']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/solicitudes-pendientes" element={<PendientesRoute><p>Solicitudes autorizadas</p></PendientesRoute>} /></Routes></MemoryRouter>)
+
+    if (admitted) expect(screen.getByText('Solicitudes autorizadas')).toBeInTheDocument()
+    else expect(await screen.findByText('Inicio')).toBeInTheDocument()
   })
 })
 

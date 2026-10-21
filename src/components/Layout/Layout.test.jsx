@@ -11,7 +11,7 @@ const { useAuth, getTrabajosCampo, getCoberturas, getSolicitudesVacacion } = vi.
   getSolicitudesVacacion: vi.fn(),
 }))
 
-const capabilityModuleLabels = ['Sucursales', 'Usuarios', 'Plantillas', 'Situaciones especiales', 'Dashboard', 'Reportes']
+const capabilityModuleLabels = ['Sucursales', 'Usuarios', 'Plantillas', 'Situaciones especiales', 'Status', 'Reportes']
 
 vi.mock('../../features/auth/context/AuthContext', () => ({ useAuth }))
 vi.mock('../../features/trabajosCampo/services/trabajosCampoService', () => ({ getTrabajosCampo }))
@@ -115,7 +115,7 @@ describe('Layout Mis tareas navigation', () => {
     expect(screen.queryByText('Mi almuerzo')).not.toBeInTheDocument()
     expect(screen.queryByText('Calendario del área')).not.toBeInTheDocument()
     expect(screen.getByText('Sucursales').closest('a')).toHaveAttribute('href', '/sucursales')
-    ;['Admin Masters', 'Áreas', 'Usuarios', 'Plantillas', 'Rendimiento', 'Solicitudes pendientes', 'Status', 'Reportes', 'Revisiones de guardia', 'Configuración'].forEach((label) => {
+    ;['Admin Masters', 'Áreas', 'Usuarios', 'Plantillas', 'Rendimiento', 'Status', 'Reportes', 'Revisiones de guardia', 'Configuración'].forEach((label) => {
       expect(screen.queryByText(label)).not.toBeInTheDocument()
     })
 
@@ -196,6 +196,16 @@ describe('Layout Mis tareas navigation', () => {
     expect(screen.getByTitle('Solicitudes pendientes')).toBeInTheDocument()
     expect(screen.getByTitle('Conteo de inventario')).toBeInTheDocument()
     expect(screen.getByTitle('Tareas')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }],
+    ['Admin Master', { type: 'admin_master' }],
+  ])('uses the pending-request capability to show Solicitudes pendientes to %s', (_role, perfil) => {
+    useAuth.mockReturnValue({ perfil, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+
+    expect(screen.getByTitle('Solicitudes pendientes')).toHaveAttribute('href', '/solicitudes-pendientes')
   })
 
   it('hides Mis tareas and Solicitudes pendientes for an operations manager while preserving Áreas', () => {
