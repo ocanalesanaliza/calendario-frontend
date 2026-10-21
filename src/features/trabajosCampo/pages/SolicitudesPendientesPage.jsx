@@ -18,6 +18,13 @@ import VacacionModal from '../../vacacionesProgramadas/components/VacacionModal'
 import './SolicitudesPendientesPage.css'
 
 const GENERIC_ERROR = 'No se pudieron cargar las solicitudes. Intenta nuevamente.'
+const ESTADO_CAMPO_BADGE = {
+  pendiente: 'badge-yellow',
+  aceptado: 'badge-green',
+  rechazado: 'badge-red',
+  cancelado: 'badge-tipo',
+  vencida: 'badge-orange',
+}
 
 export default function SolicitudesPendientesPage() {
   const { perfil } = useAuth()
@@ -29,6 +36,7 @@ export default function SolicitudesPendientesPage() {
 }
 
 function DecisionRequestsView() {
+  const [tab, setTab] = useState('pendientes')
   const [fieldWork, setFieldWork] = useState([])
   const [vacations, setVacations] = useState([])
   const [loading, setLoading] = useState(true)
@@ -76,11 +84,17 @@ function DecisionRequestsView() {
   return (
     <div className="solicitudes-pendientes-page">
       <div className="page-header"><div><h1>Solicitudes pendientes</h1><p>Trabajo de campo y vacaciones programadas que te han solicitado</p></div></div>
-      {error && <p role="alert">{error}</p>}
-      {loading ? <Loading /> : <>
-        <RequestSection title="Trabajo de campo pendiente" requests={fieldWork} kind="fieldWork" idKey="id_trabajo_campo" action={action} onApprove={(id) => decide('fieldWork', id, 'approve')} onReject={(id) => setRejection({ kind: 'fieldWork', id })} />
-        <RequestSection title="Vacaciones programadas pendientes" requests={vacations} kind="vacation" idKey="id_solicitud_vacacion" action={action} onApprove={(id) => decide('vacation', id, 'approve')} onReject={(id) => setRejection({ kind: 'vacation', id })} />
-      </>}
+      <div className="tab-bar">
+        <button className={`tab-btn${tab === 'pendientes' ? ' active' : ''}`} onClick={() => setTab('pendientes')}>Pendientes</button>
+        <button className={`tab-btn${tab === 'historial' ? ' active' : ''}`} onClick={() => setTab('historial')}>Historial de solicitudes</button>
+      </div>
+      {tab === 'pendientes' ? <>
+        {error && <p role="alert">{error}</p>}
+        {loading ? <Loading /> : <>
+          <RequestSection title="Trabajo de campo pendiente" requests={fieldWork} kind="fieldWork" idKey="id_trabajo_campo" action={action} onApprove={(id) => decide('fieldWork', id, 'approve')} onReject={(id) => setRejection({ kind: 'fieldWork', id })} />
+          <RequestSection title="Vacaciones programadas pendientes" requests={vacations} kind="vacation" idKey="id_solicitud_vacacion" action={action} onApprove={(id) => decide('vacation', id, 'approve')} onReject={(id) => setRejection({ kind: 'vacation', id })} />
+        </>}
+      </> : <HistorialSolicitudes />}
       {rejection && <RejectionReasonDialog onClose={() => setRejection(null)} onConfirm={async (reason) => {
         const succeeded = await decide(rejection.kind, rejection.id, 'reject', reason)
         if (succeeded) setRejection(null)
@@ -103,6 +117,53 @@ function RequestSection({ title, requests, kind, idKey, action, onApprove, onRej
       })}
     </div>}
   </section>
+}
+
+const PAGE_SIZE_HISTORIAL = 10
+
+function HistorialSolicitudes() {
+  const [busqueda, setBusqueda] = useState('')
+  const [page, setPage] = useState(1)
+  const [data, setData] = useState({ results: [], count: 0, total_pages: 0 })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => { setPage(1) }, [busqueda])
+
+  const loadHistorial = useCallback(async () => {
+    setLoading(true)
+    try {
+      const params = { page, page_size: PAGE_SIZE_HISTORIAL }
+      if (busqueda.trim()) params.buscar = busqueda.trim()
+      const res = await getTrabajosCampo(params)
+      setData({
+        results: res.results ?? [],
+        count: res.count ?? 0,
+        total_pages: res.total_pages ?? 0,
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [busqueda, page])
+
+  useEffect(() => { loadHistorial() }, [loadHistorial])
+
+  return <>
+    <div className="toolbar"><div className="search-wrapper">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+      <input type="text" placeholder="Buscar por nombre, email o motivo..." value={busqueda} onChange={(event) => setBusqueda(event.target.value)} />
+    </div></div>
+    {loading ? <Loading /> : data.results.length === 0 ? <div className="empty-state">No hay solicitudes en el historial.</div> : <div className="campo-enviadas-list">
+      {data.results.map((request) => <div key={request.id_trabajo_campo} className="campo-enviada-row">
+        <div className="campo-enviada-info"><p className="campo-enviada-nombre">{request.usuario?.nombre}</p><p className="campo-enviada-meta">{request.fecha} · {request.jornada === 'manana' ? 'Mañana' : 'Tarde'}{request.motivo ? ` · ${request.motivo}` : ''}</p></div>
+        <span className={`badge ${ESTADO_CAMPO_BADGE[request.estado] ?? 'badge-tipo'}`}>{request.estado_label}</span>
+      </div>)}
+    </div>}
+    {data.total_pages > 1 && <div className="paginacion">
+      <button className="btn-secondary" disabled={page <= 1} onClick={() => setPage((currentPage) => currentPage - 1)}>Anterior</button>
+      <span className="paginacion-info">Página {page} de {data.total_pages}</span>
+      <button className="btn-secondary" disabled={page >= data.total_pages} onClick={() => setPage((currentPage) => currentPage + 1)}>Siguiente</button>
+    </div>}
+  </>
 }
 
 function RejectionReasonDialog({ onClose, onConfirm }) {

@@ -63,11 +63,15 @@ describe('SolicitudesPendientesPage', () => {
   })
 
   it.each([
+    ['GA', { type: 'gerente_area' }],
     ['Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }],
     ['Admin Master', { type: 'admin_master' }],
-  ])('%s receives the decision-capable view with both request families and no cancellation actions', async (_role, profile) => {
+  ])('%s receives the administrative pending and history tabs', async (_role, profile) => {
     setup(profile)
 
+    const pendingTab = await screen.findByRole('button', { name: 'Pendientes' })
+    expect(pendingTab).toHaveClass('active')
+    expect(screen.getByRole('button', { name: 'Historial de solicitudes' })).toBeInTheDocument()
     expect(await screen.findByText('Trabajo de campo pendiente')).toBeInTheDocument()
     expect(screen.getByText('Vacaciones programadas pendientes')).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Aceptar' })).toHaveLength(2)
@@ -80,9 +84,38 @@ describe('SolicitudesPendientesPage', () => {
 
     expect(await screen.findByText('Mis solicitudes de trabajo de campo')).toBeInTheDocument()
     expect(screen.getByText('Vacaciones programadas')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Pendientes' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Historial de solicitudes' })).not.toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Cancelar solicitud' })).toHaveLength(2)
     expect(screen.queryByRole('button', { name: 'Aceptar' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Rechazar' })).not.toBeInTheDocument()
+  })
+
+  it('restores field-work-only history search, pagination, and status presentation without decision controls', async () => {
+    const historyRequest = { ...fieldWork, estado: 'aceptado', estado_label: 'Aceptada' }
+    setup({ type: 'gerente_area' })
+    await screen.findByText('Trabajo de campo pendiente')
+    getTrabajosCampo.mockImplementation((params) => Promise.resolve(
+      params?.estado === 'pendiente'
+        ? { results: [fieldWork] }
+        : { results: [historyRequest], count: 11, total_pages: 2 }
+    ))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Historial de solicitudes' }))
+
+    expect(await screen.findByText('GS Uno')).toBeInTheDocument()
+    expect(screen.getByText('Aceptada')).toBeInTheDocument()
+    expect(screen.queryByText('Vacaciones programadas pendientes')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Aceptar' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Rechazar' })).not.toBeInTheDocument()
+    expect(getTrabajosCampo).toHaveBeenCalledWith({ page: 1, page_size: 10 })
+    expect(getSolicitudesVacacion).toHaveBeenCalledTimes(1)
+
+    fireEvent.change(screen.getByPlaceholderText('Buscar por nombre, email o motivo...'), { target: { value: 'GS Uno' } })
+    await waitFor(() => expect(getTrabajosCampo).toHaveBeenLastCalledWith({ page: 1, page_size: 10, buscar: 'GS Uno' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
+    await waitFor(() => expect(getTrabajosCampo).toHaveBeenLastCalledWith({ page: 2, page_size: 10, buscar: 'GS Uno' }))
   })
 
   it.each([
