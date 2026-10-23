@@ -20,6 +20,7 @@ function Layout() {
   const {
     isAreaManager: esGerenteArea,
     isBranchManager: esSucursal,
+    isAdminMaster,
     isMasterAdmin: esAdmin,
     isOperationsManager: esGerenteOperaciones,
     canAccessLunch,
@@ -35,6 +36,7 @@ function Layout() {
     canAccessPerformanceReports,
     canAccessAreaAbsences,
     isSystemsAccount,
+    canAccessPendingRequests,
   } = getProfileCapabilities(perfil)
   const hideRestrictedNavigation = esGerenteArea
 
@@ -202,7 +204,7 @@ function Layout() {
         {
           to: '/almuerzos',
           label: 'Mi almuerzo',
-          visible: canAccessLunch,
+          visible: canAccessLunch && !isAdminMaster,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               {/* Tenedor y cuchillo: almuerzo. */}
@@ -227,7 +229,7 @@ function Layout() {
         {
           to: '/solicitudes-pendientes',
           label: 'Solicitudes pendientes',
-          visible: esSucursal || esGerenteArea,
+          visible: canAccessPendingRequests,
           badge: notificacionesVisibles.length,
           // Bandeja de entrada: solicitudes que esperan respuesta.
           icon: (
@@ -446,7 +448,7 @@ function Layout() {
       items: [
         {
           to: '/dashboard',
-          label: 'Dashboard',
+          label: 'Status',
           visible: canAccessOperationalDashboard,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -536,7 +538,7 @@ function Layout() {
             <circle cx="12" cy="15" r="1" fill="currentColor" stroke="none" />
             <circle cx="16" cy="15" r="1" fill="currentColor" stroke="none" />
           </svg>
-          <span>Taskly</span>
+          <span>CRONOS</span>
         </Link>
 
         <div className="topbar-actions">

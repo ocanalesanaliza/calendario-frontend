@@ -327,11 +327,21 @@ function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
 
   const set = (k) => (e) => {
     setForm((f) => ({ ...f, [k]: e.target.value }))
-    setFieldErrors((errors) => ({ ...errors, [k]: undefined }))
+    setFieldErrors((errors) => ({
+      ...errors,
+      [k]: undefined,
+      ...(k === 'calendar_area_id' ? { country_id: undefined } : {}),
+    }))
   }
 
   const selectedArea = areas.find((area) => String(area.id) === form.calendar_area_id)
   const sinAreas = isCreating && !loadingAreas && !areasError && areas.length === 0
+  const areaError = Array.isArray(fieldErrors.calendar_area_id)
+    ? fieldErrors.calendar_area_id.join(' ')
+    : fieldErrors.calendar_area_id
+  const countryError = Array.isArray(fieldErrors.country_id)
+    ? fieldErrors.country_id.join(' ')
+    : fieldErrors.country_id
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -352,7 +362,10 @@ function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
     setLoading(true)
     try {
       const body = { nombre: form.nombre, codigo: form.codigo }
-      if (isCreating) body.calendar_area_id = Number(form.calendar_area_id)
+      if (isCreating) {
+        body.calendar_area_id = Number(form.calendar_area_id)
+        if (selectedArea?.country?.id != null) body.country_id = Number(selectedArea.country.id)
+      }
       if (esAdmin && !isCreating && form.id_gerente_area) body.id_gerente_area = Number(form.id_gerente_area)
       if (esAdmin) body.numero_guardias = numeroGuardias
       await onSubmit(body, idPlantilla ? Number(idPlantilla) : null, fechaPlantilla || null)
@@ -398,7 +411,7 @@ function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
 
         {isCreating && (
           <FormSection title="Área">
-            <Field label="Área" required error={fieldErrors.calendar_area_id}>
+            <Field label="Área" required error={areaError}>
               <select
                 value={form.calendar_area_id}
                 onChange={set('calendar_area_id')}
@@ -413,6 +426,11 @@ function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
             </Field>
             {areasError && <Aviso tipo="error">{areasError}</Aviso>}
             {sinAreas && <Aviso tipo="warning">No hay áreas elegibles disponibles para crear una sucursal.</Aviso>}
+            {selectedArea?.country && (
+              <Field label="País" error={countryError}>
+                <p>{selectedArea.country.name}</p>
+              </Field>
+            )}
             {selectedArea?.gerente_area && (
               <div className="sk-gerente-asignado">
                 <Avatar nombre={selectedArea.gerente_area.nombre} />

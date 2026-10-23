@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import SucursalesPage from './SucursalesPage'
+import { desactivarSucursal, getSucursales, quitarGsSucursal, updateSucursal } from '../services/sucursalesService'
 
 const { apiRequest, useAuth } = vi.hoisted(() => ({ apiRequest: vi.fn(), useAuth: vi.fn() }))
 vi.mock('../../../services/apiClient', () => ({ apiRequest }))
@@ -8,10 +9,12 @@ vi.mock('../../auth/context/AuthContext', () => ({ useAuth }))
 
 const response = (data, status = 200) => ({ ok: status < 400, status, json: async () => data })
 
-function mockRequests({ sucursales = [], areas = [], createResponse = response({ sucursal: { id_sucursal: 15 } }, 201), templates = [], assignmentResponses = [] } = {}) {
+function mockRequests({ sucursales = [], areas = [], createResponse = response({ sucursal: { id_sucursal: 15 } }, 201), patchResponse = response({ sucursal: { id_sucursal: 15 } }), deactivateResponse = response({}), gsRemovalResponse = response({}), templates = [], assignmentResponses = [] } = {}) {
   apiRequest.mockImplementation(async (path, options = {}) => {
     if (path === '/api/sucursales/' && options.method === 'POST') return createResponse
-    if (path === '/api/sucursales/15/' && options.method === 'PATCH') return response({ sucursal: { id_sucursal: 15 } })
+    if (path === '/api/sucursales/15/' && options.method === 'PATCH') return patchResponse
+    if (path === '/api/sucursales/15/desactivar/' && options.method === 'POST') return deactivateResponse
+    if (path === '/api/sucursales/15/quitar-gs/' && options.method === 'POST') return gsRemovalResponse
     if (path === '/api/sucursales/') return response({ results: sucursales })
     if (path === '/api/sucursales/areas-elegibles/') return response({ count: areas.length, results: areas })
     if (path === '/api/gerentes-area/') return response({ results: [{ id_gerente_area: 2, nombre: 'GA Centro', activo: true }] })
@@ -31,7 +34,7 @@ describe('SucursalesPage: número de guardias', () => {
   beforeEach(() => {
     apiRequest.mockReset()
     useAuth.mockReset()
-    mockRequests({ areas: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro', gerente_area: { id_gerente_area: 2, nombre: 'GA Centro', email: 'ga@example.com' } }] })
+    mockRequests({ areas: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro', country: { id: 1, name: 'Honduras' }, gerente_area: { id_gerente_area: 2, nombre: 'GA Centro', email: 'ga@example.com' } }] })
   })
 
   it('permite al administrador maestro configurar de 0 a 4 guardias al crear', async () => {
@@ -55,7 +58,7 @@ describe('SucursalesPage: número de guardias', () => {
 
     await waitFor(() => expect(apiRequest).toHaveBeenCalledWith('/api/sucursales/', {
       method: 'POST',
-      body: JSON.stringify({ nombre: 'Sucursal Centro', codigo: 'CENTRO-01', calendar_area_id: 8, numero_guardias: 3 }),
+      body: JSON.stringify({ nombre: 'Sucursal Centro', codigo: 'CENTRO-01', calendar_area_id: 8, country_id: 1, numero_guardias: 3 }),
     }))
   })
 
@@ -75,7 +78,7 @@ describe('SucursalesPage: número de guardias', () => {
 
     await waitFor(() => expect(apiRequest).toHaveBeenCalledWith('/api/sucursales/', {
       method: 'POST',
-      body: JSON.stringify({ nombre: 'Sucursal Centro', codigo: 'CENTRO-01', calendar_area_id: 8 }),
+      body: JSON.stringify({ nombre: 'Sucursal Centro', codigo: 'CENTRO-01', calendar_area_id: 8, country_id: 1 }),
     }))
   })
 
@@ -105,7 +108,7 @@ describe('SucursalesPage: número de guardias', () => {
   it('muestra el error de calendar_area_id junto al campo Área', async () => {
     useAuth.mockReturnValue({ perfil: { type: 'gerente_area', es_admin_maestro: false } })
     mockRequests({
-      areas: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro', gerente_area: { nombre: 'GA Centro', email: 'ga@example.com' } }],
+      areas: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro', country: { id: 1, name: 'Honduras' }, gerente_area: { nombre: 'GA Centro', email: 'ga@example.com' } }],
       createResponse: response({ detail: { calendar_area_id: 'El área ya no está disponible.' } }, 400),
     })
     render(<SucursalesPage />)
@@ -122,7 +125,7 @@ describe('SucursalesPage: número de guardias', () => {
   it('informa la asignación de plantilla fallida después de crear la sucursal y la reintenta sin crearla otra vez', async () => {
     useAuth.mockReturnValue({ perfil: { type: 'gerente_area', es_admin_maestro: false } })
     mockRequests({
-      areas: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro' }],
+      areas: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro', country: { id: 1, name: 'Honduras' } }],
       templates: [{ id_plantilla: 4, nombre: 'Apertura', activa: true }],
       assignmentResponses: [response({ detail: 'No se pudo asignar.' }, 500), response({})],
     })
@@ -164,7 +167,7 @@ describe('SucursalesPage: número de guardias', () => {
     await screen.findByRole('dialog', { name: 'Nueva sucursal' })
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
 
-    await act(async () => { resolveAreas(response({ count: 1, results: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro' }] })) })
+    await act(async () => { resolveAreas(response({ count: 1, results: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro', country: { id: 1, name: 'Honduras' } }] })) })
 
     expect(screen.queryByRole('dialog', { name: 'Nueva sucursal' })).not.toBeInTheDocument()
     expect(consoleError).not.toHaveBeenCalled()
@@ -187,6 +190,86 @@ describe('SucursalesPage: número de guardias', () => {
       method: 'PATCH',
       body: JSON.stringify({ nombre: 'Sucursal Centro', codigo: 'CENTRO-01', id_gerente_area: 2, numero_guardias: 4 }),
     }))
+  })
+
+  it('muestra el país fijo del área elegida y lo envía como country_id numérico', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', es_admin_maestro: false } })
+    render(<SucursalesPage />)
+    await screen.findByText('No hay sucursales registradas.')
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva sucursal' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Nueva sucursal' })
+    llenarBasicos(dialog)
+
+    expect(within(dialog).queryByText('Honduras')).not.toBeInTheDocument()
+    fireEvent.change(await within(dialog).findByLabelText(/Área/), { target: { value: '8' } })
+
+    expect(within(dialog).getByText('Honduras')).toBeInTheDocument()
+    expect(within(dialog).queryByRole('combobox', { name: /País/i })).not.toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Crear sucursal' }))
+
+    await waitFor(() => expect(apiRequest).toHaveBeenCalledWith('/api/sucursales/', {
+      method: 'POST',
+      body: JSON.stringify({ nombre: 'Sucursal Centro', codigo: 'CENTRO-01', calendar_area_id: 8, country_id: 1 }),
+    }))
+  })
+
+  it('actualiza el país fijo y country_id al cambiar el área', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', es_admin_maestro: false } })
+    mockRequests({
+      areas: [
+        { id: 8, codigo: 'CENTRO', nombre: 'Centro', country: { id: 1, name: 'Honduras' } },
+        { id: 9, codigo: 'NORTE', nombre: 'Norte', country: { id: 2, name: 'Guatemala' } },
+      ],
+    })
+    render(<SucursalesPage />)
+    await screen.findByText('No hay sucursales registradas.')
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva sucursal' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Nueva sucursal' })
+    llenarBasicos(dialog)
+    const area = await within(dialog).findByLabelText(/Área/)
+    fireEvent.change(area, { target: { value: '8' } })
+    expect(within(dialog).getByText('Honduras')).toBeInTheDocument()
+    fireEvent.change(area, { target: { value: '9' } })
+    expect(within(dialog).getByText('Guatemala')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Honduras')).not.toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Crear sucursal' }))
+
+    await waitFor(() => expect(apiRequest).toHaveBeenCalledWith('/api/sucursales/', {
+      method: 'POST',
+      body: JSON.stringify({ nombre: 'Sucursal Centro', codigo: 'CENTRO-01', calendar_area_id: 9, country_id: 2 }),
+    }))
+  })
+
+  it('muestra los errores country_id junto al país y los limpia al reabrir', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', es_admin_maestro: false } })
+    mockRequests({
+      areas: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro', country: { id: 1, name: 'Honduras' } }],
+      createResponse: response({ detail: { country_id: 'El país no coincide con el área.' } }, 400),
+    })
+    render(<SucursalesPage />)
+    await screen.findByText('No hay sucursales registradas.')
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva sucursal' }))
+    let dialog = await screen.findByRole('dialog', { name: 'Nueva sucursal' })
+    llenarBasicos(dialog)
+    fireEvent.change(await within(dialog).findByLabelText(/Área/), { target: { value: '8' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Crear sucursal' }))
+    const countryError = await within(dialog).findByText('El país no coincide con el área.')
+    expect(countryError.previousElementSibling).toHaveTextContent('Honduras')
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva sucursal' }))
+    dialog = await screen.findByRole('dialog', { name: 'Nueva sucursal' })
+    expect(within(dialog).queryByText('El país no coincide con el área.')).not.toBeInTheDocument()
+    expect(within(dialog).queryByText('Honduras')).not.toBeInTheDocument()
+  })
+
+  it('tolerates legacy null country_id in the list without country lookups', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', es_admin_maestro: false } })
+    mockRequests({ sucursales: [{ id_sucursal: 15, nombre: 'Sucursal Legacy', codigo: 'LEGACY-01', activa: true, country_id: null }] })
+    render(<SucursalesPage />)
+
+    expect(await screen.findByText('Sucursal Legacy')).toBeInTheDocument()
+    expect(apiRequest).not.toHaveBeenCalledWith(expect.stringMatching(/countr/i), expect.anything())
   })
 
   it('permite quitar el GS asignado sin desactivar su cuenta', async () => {
@@ -221,5 +304,114 @@ describe('SucursalesPage: número de guardias', () => {
     await waitFor(() => expect(apiRequest).toHaveBeenCalledWith('/api/sucursales/15/quitar-gs/', { method: 'POST' }))
     expect(await screen.findByRole('cell', { name: 'Sin GS' })).toBeInTheDocument()
     expect(screen.queryByTitle('Quitar GS')).not.toBeInTheDocument()
+  })
+
+  it('conserva el modal, los datos y la lista ante creación denegada', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', es_admin_maestro: false } })
+    const sucursal = { id_sucursal: 15, nombre: 'Sucursal Existente', codigo: 'EXISTENTE-01', activa: true }
+    mockRequests({
+      sucursales: [sucursal],
+      areas: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro', country: { id: 1, name: 'Honduras' } }],
+      createResponse: response({ detail: 'No tienes permiso para crear sucursales.' }, 403),
+    })
+    render(<SucursalesPage />)
+    expect(await screen.findByText('Sucursal Existente')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva sucursal' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Nueva sucursal' })
+    llenarBasicos(dialog)
+    fireEvent.change(await within(dialog).findByLabelText(/Área/), { target: { value: '8' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Crear sucursal' }))
+
+    expect(await within(dialog).findByText('No tienes permiso para crear sucursales.')).toBeInTheDocument()
+    expect(within(dialog).getByDisplayValue('Sucursal Centro')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText(/Área/)).toHaveValue('8')
+    expect(screen.getByText('Sucursal Existente')).toBeInTheDocument()
+    expect(apiRequest.mock.calls.filter(([path, options]) => path === '/api/sucursales/' && !options?.method)).toHaveLength(1)
+  })
+
+  it('conserva el modal, los datos y la lista ante PATCH denegado', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', es_admin_maestro: false } })
+    const sucursal = { id_sucursal: 15, nombre: 'Sucursal Centro', codigo: 'CENTRO-01', activa: true }
+    mockRequests({ sucursales: [sucursal], patchResponse: response({ detail: 'No tienes permiso para editar esta sucursal.' }, 403) })
+    render(<SucursalesPage />)
+    await screen.findByText('Sucursal Centro')
+    fireEvent.click(screen.getByTitle('Editar'))
+    const dialog = screen.getByRole('dialog', { name: 'Editar sucursal' })
+    fireEvent.change(within(dialog).getByDisplayValue('Sucursal Centro'), { target: { value: 'Sucursal Actualizada' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(await within(dialog).findByText('No tienes permiso para editar esta sucursal.')).toBeInTheDocument()
+    expect(within(dialog).getByDisplayValue('Sucursal Actualizada')).toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: 'Sucursal Centro' })).toBeInTheDocument()
+    expect(apiRequest.mock.calls.filter(([path, options]) => path === '/api/sucursales/' && !options?.method)).toHaveLength(1)
+  })
+
+  it('conserva el modal y la lista ante desactivación denegada', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', es_admin_maestro: false } })
+    const sucursal = { id_sucursal: 15, nombre: 'Sucursal Centro', codigo: 'CENTRO-01', activa: true }
+    mockRequests({ sucursales: [sucursal], deactivateResponse: response({ detail: 'No tienes permiso para desactivar esta sucursal.' }, 403) })
+    render(<SucursalesPage />)
+    await screen.findByText('Sucursal Centro')
+    fireEvent.click(screen.getByTitle('Desactivar'))
+    const dialog = screen.getByRole('dialog', { name: 'Desactivar sucursal' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Desactivar' }))
+
+    expect(await within(dialog).findByText('No tienes permiso para desactivar esta sucursal.')).toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: 'Sucursal Centro' })).toBeInTheDocument()
+    expect(apiRequest.mock.calls.filter(([path, options]) => path === '/api/sucursales/' && !options?.method)).toHaveLength(1)
+  })
+
+  it('conserva el modal y la lista ante retiro de GS denegado', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', es_admin_maestro: false } })
+    const sucursal = { id_sucursal: 15, nombre: 'Sucursal Centro', codigo: 'CENTRO-01', activa: true, usuario_titular: { id_usuario: 12, nombre: 'GS Ana' } }
+    mockRequests({ sucursales: [sucursal], gsRemovalResponse: response({ detail: 'No tienes permiso para quitar este GS.' }, 403) })
+    render(<SucursalesPage />)
+    await screen.findByText('Sucursal Centro')
+    fireEvent.click(screen.getByTitle('Quitar GS'))
+    const dialog = screen.getByRole('dialog', { name: 'Quitar GS de la sucursal' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Quitar GS' }))
+
+    expect(await within(dialog).findByText('No tienes permiso para quitar este GS.')).toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: /GS Ana/ })).toBeInTheDocument()
+    expect(apiRequest.mock.calls.filter(([path, options]) => path === '/api/sucursales/' && !options?.method)).toHaveLength(1)
+  })
+
+  it('recarga las áreas elegibles al reabrir el modal de creación', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', es_admin_maestro: false } })
+    const areas = [
+      response({ results: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro', country: { id: 1, name: 'Honduras' } }] }),
+      response({ results: [{ id: 9, codigo: 'NORTE', nombre: 'Norte', country: { id: 2, name: 'Guatemala' } }] }),
+    ]
+    apiRequest.mockImplementation(async (path) => {
+      if (path === '/api/sucursales/') return response({ results: [] })
+      if (path === '/api/sucursales/areas-elegibles/') return areas.shift()
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    render(<SucursalesPage />)
+    await screen.findByText('No hay sucursales registradas.')
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva sucursal' }))
+    let dialog = await screen.findByRole('dialog', { name: 'Nueva sucursal' })
+    expect(await within(dialog).findByRole('option', { name: 'CENTRO — Centro' })).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva sucursal' }))
+    dialog = await screen.findByRole('dialog', { name: 'Nueva sucursal' })
+
+    expect(await within(dialog).findByRole('option', { name: 'NORTE — Norte' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('option', { name: 'CENTRO — Centro' })).not.toBeInTheDocument()
+  })
+
+  it('normaliza los errores de lista y mutaciones con estado HTTP', async () => {
+    apiRequest.mockImplementation(async (path) => {
+      if (path === '/api/sucursales/') return response({ detail: { nombre: ['Denegado.'] } }, 403)
+      if (path === '/api/sucursales/15/') return response({ detail: 'PATCH denegado.' }, 403)
+      if (path === '/api/sucursales/15/desactivar/') return response({ detail: 'Desactivación denegada.' }, 403)
+      if (path === '/api/sucursales/15/quitar-gs/') return response({ detail: 'Retiro denegado.' }, 403)
+      throw new Error(`Unexpected request: ${path}`)
+    })
+
+    await expect(getSucursales()).rejects.toMatchObject({ message: 'Denegado.', status: 403, fields: { nombre: ['Denegado.'] } })
+    await expect(updateSucursal(15, {})).rejects.toMatchObject({ message: 'PATCH denegado.', status: 403 })
+    await expect(desactivarSucursal(15)).rejects.toMatchObject({ message: 'Desactivación denegada.', status: 403 })
+    await expect(quitarGsSucursal(15)).rejects.toMatchObject({ message: 'Retiro denegado.', status: 403 })
   })
 })

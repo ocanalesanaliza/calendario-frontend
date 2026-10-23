@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { AlmuerzosRoute } from '../../App'
 import Layout from './Layout'
 
 const { useAuth, getTrabajosCampo, getCoberturas, getSolicitudesVacacion } = vi.hoisted(() => ({
@@ -10,7 +11,7 @@ const { useAuth, getTrabajosCampo, getCoberturas, getSolicitudesVacacion } = vi.
   getSolicitudesVacacion: vi.fn(),
 }))
 
-const capabilityModuleLabels = ['Sucursales', 'Usuarios', 'Plantillas', 'Situaciones especiales', 'Dashboard', 'Reportes']
+const capabilityModuleLabels = ['Sucursales', 'Usuarios', 'Plantillas', 'Situaciones especiales', 'Status', 'Reportes']
 
 vi.mock('../../features/auth/context/AuthContext', () => ({ useAuth }))
 vi.mock('../../features/trabajosCampo/services/trabajosCampoService', () => ({ getTrabajosCampo }))
@@ -98,6 +99,38 @@ describe('Layout Mis tareas navigation', () => {
     })
   })
 
+  it('hides Mi almuerzo for an Admin Master while keeping Calendario del área hidden and the lunch route available', () => {
+    localStorage.getItem.mockReturnValue('0')
+    useAuth.mockReturnValue({
+      perfil: {
+        type: 'admin_master',
+        capabilities: { manage_branches: true },
+      },
+      logout: vi.fn(),
+    })
+
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+
+    expect(screen.getByText('Admin Master')).toBeInTheDocument()
+    expect(screen.queryByText('Mi almuerzo')).not.toBeInTheDocument()
+    expect(screen.queryByText('Calendario del área')).not.toBeInTheDocument()
+    expect(screen.getByText('Sucursales').closest('a')).toHaveAttribute('href', '/sucursales')
+    ;['Admin Masters', 'Áreas', 'Usuarios', 'Plantillas', 'Rendimiento', 'Status', 'Reportes', 'Revisiones de guardia', 'Configuración'].forEach((label) => {
+      expect(screen.queryByText(label)).not.toBeInTheDocument()
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/almuerzos']}>
+        <Routes>
+          <Route path="/" element={<p>Inicio</p>} />
+          <Route path="/almuerzos" element={<AlmuerzosRoute><p>Almuerzo autorizado</p></AlmuerzosRoute>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText('Almuerzo autorizado')).toBeInTheDocument()
+  })
+
   it('hides the six capability-controlled modules from a Systems profile without master admin or capabilities', () => {
     useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: false }, logout: vi.fn() })
 
@@ -163,6 +196,32 @@ describe('Layout Mis tareas navigation', () => {
     expect(screen.getByRole('link', { name: 'Solicitudes pendientes' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Conteo de inventario' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Tareas' })).toBeInTheDocument()
+  })
+
+  it.each([
+    ['Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }],
+    ['Admin Master', { type: 'admin_master' }],
+  ])('uses the pending-request capability to show Solicitudes pendientes to %s', (_role, perfil) => {
+    useAuth.mockReturnValue({ perfil, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+
+    expect(screen.getByTitle('Solicitudes pendientes')).toHaveAttribute('href', '/solicitudes-pendientes')
+  })
+
+  it.each([
+    ['GA', { type: 'gerente_area' }, true],
+    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, true],
+    ['active Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, true],
+    ['plain Admin Master', { type: 'admin_master' }, true],
+    ['global Admin Master', { es_admin_maestro: true }, true],
+    ['GS', { type: 'gerente_sucursal' }, false],
+    ['disabled Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: false }, false],
+  ])('uses the area-absence capability to show navigation to %s', (_role, perfil, visible) => {
+    useAuth.mockReturnValue({ perfil, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+
+    if (visible) expect(screen.getByTitle('Vacaciones y situaciones del área')).toHaveAttribute('href', '/ausencias-area')
+    else expect(screen.queryByTitle('Vacaciones y situaciones del área')).not.toBeInTheDocument()
   })
 
   it('hides Mis tareas and Solicitudes pendientes for an operations manager while preserving Áreas', () => {

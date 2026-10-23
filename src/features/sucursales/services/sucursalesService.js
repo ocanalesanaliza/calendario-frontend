@@ -21,7 +21,7 @@ function requestError(data, fallback, status) {
 export async function getSucursales() {
   const res = await apiRequest('/api/sucursales/')
   const data = await res.json()
-  if (!res.ok) throw new Error(data.detail || 'Error al cargar sucursales')
+  if (!res.ok) throw requestError(data, 'Error al cargar sucursales', res.status)
   return data.results
 }
 
@@ -48,21 +48,21 @@ export async function updateSucursal(id, body) {
     body: JSON.stringify(body),
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.detail || 'Error al actualizar sucursal')
+  if (!res.ok) throw requestError(data, 'Error al actualizar sucursal', res.status)
   return data
 }
 
 export async function desactivarSucursal(id) {
   const res = await apiRequest(`/api/sucursales/${id}/desactivar/`, { method: 'POST' })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.detail || 'Error al desactivar sucursal')
+  if (!res.ok) throw requestError(data, 'Error al desactivar sucursal', res.status)
   return data
 }
 
 export async function quitarGsSucursal(id) {
   const res = await apiRequest(`/api/sucursales/${id}/quitar-gs/`, { method: 'POST' })
   const data = await res.json()
-  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al quitar el GS de la sucursal')
+  if (!res.ok) throw requestError(data, 'Error al quitar el GS de la sucursal', res.status)
   return data
 }
 

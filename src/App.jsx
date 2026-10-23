@@ -52,7 +52,7 @@ export function RendimientoRoute({ children }) {
   return children
 }
 
-function PendientesRoute({ children }) {
+export function PendientesRoute({ children }) {
   const { perfil } = useAuth()
   const { canAccessPendingRequests } = getProfileCapabilities(perfil)
   if (perfil && !canAccessPendingRequests) {

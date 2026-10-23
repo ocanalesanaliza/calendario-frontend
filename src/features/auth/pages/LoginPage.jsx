@@ -83,7 +83,7 @@ function LoginPage() {
               className="login-logo"
             />
           </div>
-          <h1 className="login-title">Taskly</h1>
+          <h1 className="login-title">Cronos</h1>
           <p className="login-subtitle">Tu calendario de tareas</p>
         </div>
 
