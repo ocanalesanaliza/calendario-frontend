@@ -1,0 +1,174 @@
+/*
+ * Selector de empresa para cuentas de Sistemas.
+ * Cada tarjeta usa el color de su calendario: índigo (Analiza) y verde azulado (Tuvet).
+ * Ver docs/configuracion_diseño/04_pantallas_seguimiento.md (Selector de empresa).
+ */
+.selector-empresa {
+  --se-bg: #eef1f6;
+  --se-barra: #0f172a;
+  --se-texto: #0f172a;
+  --se-texto-suave: #475569;
+  --se-borde: #e2e8f0;
+  --se-tareas: #4f46e5;
+  --se-tareas-suave: #e0e7ff;
+  --se-tuvet: #0f766e;
+  --se-tuvet-suave: #ccfbf1;
+  --se-foco: #6366f1;
+
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--se-bg);
+  color: var(--se-texto);
+}
+
+.selector-empresa-barra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  padding: 0 1.5rem;
+  background: var(--se-barra);
+}
+
+.selector-empresa-marca { color: #f1f5f9; font-size: 1.1rem; font-weight: 700; }
+
+.selector-empresa-salir {
+  min-height: 40px;
+  padding: 0 1rem;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: transparent;
+  color: #e2e8f0;
+  cursor: pointer;
+  font: inherit;
+  font-size: .9rem;
+  transition: background 160ms ease;
+}
+
+.selector-empresa-salir:hover { background: #1e293b; }
+.selector-empresa-salir:focus-visible { outline: 2px solid #a5b4fc; outline-offset: 2px; }
+
+.selector-empresa-contenido {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 3.5rem 1.5rem;
+  box-sizing: border-box;
+}
+
+.selector-empresa-encabezado { display: flex; flex-direction: column; gap: .5rem; }
+.selector-empresa-rol { margin: 0; color: var(--se-tareas); font-size: .8rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.selector-empresa-encabezado h1 { margin: 0; font-size: 1.75rem; font-weight: 700; letter-spacing: -.01em; text-wrap: balance; }
+.selector-empresa-encabezado p { margin: 0; max-width: 60ch; color: var(--se-texto-suave); font-size: .95rem; line-height: 1.5; }
+
+.selector-empresa-aviso {
+  margin: 0;
+  padding: .75rem 1rem;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  background: #fffbeb;
+  color: #854d0e;
+  font-size: .9rem;
+}
+
+.selector-empresa-tarjetas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.selector-empresa-tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 1.5rem;
+  border: 1.5px solid var(--se-borde);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .06);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.selector-empresa-tarjeta:hover {
+  box-shadow: 0 12px 28px rgba(15, 23, 42, .10);
+  transform: translateY(-2px);
+}
+
+.selector-empresa-tarjeta:focus-visible { outline: 3px solid var(--se-foco); outline-offset: 3px; }
+
+.selector-empresa-icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+}
+
+.selector-empresa-icono svg { width: 26px; height: 26px; }
+
+.selector-empresa-texto { display: flex; flex: 1; flex-direction: column; gap: .3rem; }
+.selector-empresa-nombre { font-size: 1.35rem; font-weight: 700; }
+.selector-empresa-modulo { font-size: .9rem; font-weight: 600; }
+.selector-empresa-descripcion { color: var(--se-texto-suave); font-size: .9rem; line-height: 1.5; }
+
+.selector-empresa-entrar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  min-height: 44px;
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: .95rem;
+  font-weight: 600;
+}
+
+.selector-empresa-entrar svg { width: 18px; height: 18px; transition: transform 180ms ease; }
+.selector-empresa-tarjeta:hover .selector-empresa-entrar svg { transform: translateX(3px); }
+
+/* Analiza: índigo (#4f46e5, 6.29:1 con blanco) */
+.selector-empresa-tareas:hover { border-color: var(--se-tareas); }
+.selector-empresa-tareas .selector-empresa-icono { background: var(--se-tareas-suave); color: var(--se-tareas); }
+.selector-empresa-tareas .selector-empresa-modulo { color: var(--se-tareas); }
+.selector-empresa-tareas .selector-empresa-entrar { background: var(--se-tareas); }
+
+/* Tuvet: verde azulado (#0f766e, 5.47:1 con blanco) */
+.selector-empresa-tuvet:hover { border-color: var(--se-tuvet); }
+.selector-empresa-tuvet .selector-empresa-icono { background: var(--se-tuvet-suave); color: var(--se-tuvet); }
+.selector-empresa-tuvet .selector-empresa-modulo { color: var(--se-tuvet); }
+.selector-empresa-tuvet .selector-empresa-entrar { background: var(--se-tuvet); }
+
+.selector-empresa-esqueleto {
+  height: 250px;
+  border-radius: 16px;
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: selector-empresa-brillo 1.2s ease-in-out infinite;
+}
+
+@keyframes selector-empresa-brillo { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+@media (max-width: 640px) {
+  .selector-empresa-contenido { padding: 2rem 1rem; }
+  .selector-empresa-encabezado h1 { font-size: 1.4rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .selector-empresa *,
+  .selector-empresa *::before,
+  .selector-empresa *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  .selector-empresa-tarjeta:hover { transform: none; }
+}

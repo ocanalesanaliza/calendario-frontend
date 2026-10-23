@@ -1,0 +1,114 @@
+/*
+ * Catálogo de tareas (Analiza) con el diseño del kit compartido (TuvetUi + tema .tema-analiza).
+ * Todo va limitado a .tareas-catalogo para no afectar a otras páginas.
+ * Ver docs/configuracion_diseño/03_componentes_y_patrones.md (Tema Analiza).
+ */
+
+/* Filtros */
+.tareas-catalogo .tc-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem 1.5rem;
+}
+
+.tareas-catalogo .tc-filtro-grupo { display: flex; flex-direction: column; gap: .35rem; }
+.tareas-catalogo .tc-filtro-titulo { color: var(--tv-muted); font-size: .78rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.tareas-catalogo .tc-filtro-tipo { min-width: 200px; margin-left: auto; }
+
+/* Tabla */
+.tareas-catalogo .tc-tabla-card { padding: 0; overflow: hidden; }
+.tareas-catalogo .tc-tabla { min-width: 900px; }
+.tareas-catalogo .tc-tabla th:first-child,
+.tareas-catalogo .tc-tabla td:first-child { padding-left: 1.1rem; }
+.tareas-catalogo .tc-num { font-variant-numeric: tabular-nums; text-align: right; }
+.tareas-catalogo .tc-pie { margin: 0; padding: .7rem 1.1rem; border-top: 1px solid var(--tv-border); color: var(--tv-subtle); font-size: .82rem; }
+
+/* Selector de recurrencia compartido (RecurrenceSelector) con el aspecto del kit, en todas las páginas con .tema-analiza (catálogo y detalle de plantilla). */
+.tema-analiza .recurrence-fields { gap: .9rem; }
+.tema-analiza .recurrence-fields .form-group { gap: .35rem; }
+.tema-analiza .recurrence-fields .form-group > label { color: var(--tv-fg); font-size: .85rem; font-weight: 600; }
+
+.tema-analiza .recurrence-fields select,
+.tema-analiza .recurrence-dropdown summary,
+.tema-analiza .recurrence-readonly {
+  min-height: var(--tv-target);
+  border: 1.5px solid var(--tv-border);
+  border-radius: var(--tv-radius-sm);
+  background: var(--tv-surface);
+  color: var(--tv-fg);
+  font: inherit;
+  font-size: .9rem;
+  transition: border-color var(--tv-dur-fast) var(--tv-ease), box-shadow var(--tv-dur-fast) var(--tv-ease);
+}
+
+.tema-analiza .recurrence-fields select { padding: .55rem .8rem; }
+.tema-analiza .recurrence-fields select:hover,
+.tema-analiza .recurrence-dropdown summary:hover { border-color: var(--tv-border-strong); }
+
+.tema-analiza .recurrence-fields select:focus-visible,
+.tema-analiza .recurrence-dropdown summary:focus-visible {
+  outline: none;
+  border-color: var(--tv-primary-accent);
+  box-shadow: 0 0 0 3px var(--tv-ring);
+}
+
+.tema-analiza .recurrence-dropdown[open] summary { border-color: var(--tv-primary-accent); }
+
+/* Dentro del modal, las opciones de días se despliegan en línea para no quedar recortadas. */
+.tema-analiza .recurrence-options {
+  position: static;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: .25rem;
+  margin-top: .4rem;
+  padding: .5rem;
+  border: 1px solid var(--tv-border);
+  border-radius: var(--tv-radius-sm);
+  background: var(--tv-surface);
+  box-shadow: none;
+}
+
+.tema-analiza .recurrence-option { min-height: 36px; border-radius: 6px; cursor: pointer; }
+.tema-analiza .recurrence-option:hover { background: var(--tv-primary-softer); }
+.tema-analiza .recurrence-option input { width: 18px; height: 18px; accent-color: var(--tv-primary); }
+.tema-analiza .recurrence-help { color: var(--tv-subtle); font-size: .8rem; }
+
+.tema-analiza .tc-recurrencia { display: grid; gap: .4rem; }
+.tema-analiza .tc-recurrencia.has-error .recurrence-dropdown summary { border-color: var(--tv-danger); }
+
+/* Subtareas */
+.tareas-catalogo .tc-subtareas { display: grid; gap: .5rem; margin: 0; padding: 0; list-style: none; }
+
+.tareas-catalogo .tc-subtarea {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .75rem;
+  padding: .6rem .8rem;
+  border: 1px solid var(--tv-border);
+  border-radius: var(--tv-radius);
+  background: var(--tv-surface);
+}
+
+.tareas-catalogo .tc-subtarea-orden {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--tv-primary-soft);
+  color: var(--tv-primary-text);
+  font-size: .8rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.tareas-catalogo .tc-subtarea-nombre { flex: 1; min-width: 160px; color: var(--tv-fg); font-weight: 600; }
+.tareas-catalogo .tc-subtarea-edicion { flex: 1; }
+
+@media (max-width: 640px) {
+  .tareas-catalogo .tc-filtro-tipo { width: 100%; margin-left: 0; }
+}

@@ -33,6 +33,17 @@ import AdminMasterAssignmentsPage from './features/adminMasterAssignments/pages/
 import Layout from "./components/Layout/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { getProfileCapabilities } from './features/auth/profilePolicies'
+import SelectorEmpresaPage from './features/empresas/pages/SelectorEmpresaPage'
+import TuvetLayout from './features/tuvet/components/TuvetLayout'
+import { AnalizaModuleRoute, TuvetCapabilityRoute, TuvetHome, TuvetModuleRoute } from './features/tuvet/TuvetRoutes'
+import TuvetMisTareasPage from './features/tuvet/pages/TuvetMisTareasPage'
+import TuvetRevisionesPage from './features/tuvet/pages/TuvetRevisionesPage'
+import TuvetTareasPage from './features/tuvet/pages/TuvetTareasPage'
+import TuvetPlantillasPage from './features/tuvet/pages/TuvetPlantillasPage'
+import TuvetEquipoPage from './features/tuvet/pages/TuvetEquipoPage'
+import TuvetRendimientoPage from './features/tuvet/pages/TuvetRendimientoPage'
+import TuvetSeguimientoPage from './features/tuvet/pages/TuvetSeguimientoPage'
+import TuvetAsignarPage from './features/tuvet/pages/TuvetAsignarPage'
 
 export function RendimientoRoute({ children }) {
   const { perfil } = useAuth()
@@ -41,7 +52,7 @@ export function RendimientoRoute({ children }) {
   return children
 }
 
-function PendientesRoute({ children }) {
+export function PendientesRoute({ children }) {
   const { perfil } = useAuth()
   const { canAccessPendingRequests } = getProfileCapabilities(perfil)
   if (perfil && !canAccessPendingRequests) {
@@ -125,9 +136,11 @@ export function AlmuerzosRoute({ children }) {
   return children
 }
 
-function HomeRoute() {
+export function HomeRoute() {
   const { perfil } = useAuth()
-  const { isBranchManager, canAccessMyTasks } = getProfileCapabilities(perfil)
+  const { isBranchManager, canAccessMyTasks, isSystemsAccount } = getProfileCapabilities(perfil)
+  // Sistemas administra varias empresas: primero elige a cuál entrar.
+  if (isSystemsAccount) return <Navigate to="/empresas" replace />
   if (isBranchManager && canAccessMyTasks) return <Navigate to="/mis-tareas" replace />
   return <CalendarPage />
 }
@@ -148,13 +161,47 @@ function App() {
           }
         />
         <Route
+          path="/empresas"
           element={
             <ProtectedRoute>
-              <Layout />
+              <SystemsOnlyRoute>
+                <SelectorEmpresaPage />
+              </SystemsOnlyRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tuvet"
+          element={
+            <ProtectedRoute>
+              <TuvetModuleRoute>
+                <TuvetLayout />
+              </TuvetModuleRoute>
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<TuvetHome />} />
+          <Route path="seguimiento" element={<TuvetCapabilityRoute capability="canManageTasks"><TuvetSeguimientoPage /></TuvetCapabilityRoute>} />
+          <Route path="asignar" element={<TuvetCapabilityRoute capability="canManageTasks"><TuvetAsignarPage /></TuvetCapabilityRoute>} />
+          <Route path="mis-tareas" element={<TuvetCapabilityRoute capability="canAccessMyTasks"><TuvetMisTareasPage /></TuvetCapabilityRoute>} />
+          <Route path="revisiones" element={<TuvetCapabilityRoute capability="canReview"><TuvetRevisionesPage /></TuvetCapabilityRoute>} />
+          <Route path="tareas" element={<TuvetCapabilityRoute capability="canManageTasks"><TuvetTareasPage /></TuvetCapabilityRoute>} />
+          <Route path="plantillas" element={<TuvetCapabilityRoute capability="canManageTasks"><TuvetPlantillasPage /></TuvetCapabilityRoute>} />
+          <Route path="equipo" element={<TuvetCapabilityRoute capability="canAccessTeam"><TuvetEquipoPage /></TuvetCapabilityRoute>} />
+          <Route path="rendimiento" element={<TuvetCapabilityRoute capability="canAccessPerformance"><TuvetRendimientoPage /></TuvetCapabilityRoute>} />
+          <Route path="*" element={<TuvetHome />} />
+        </Route>
+        <Route
+          element={
+            <ProtectedRoute>
+              <AnalizaModuleRoute>
+                <Layout />
+              </AnalizaModuleRoute>
             </ProtectedRoute>
           }
         >
           <Route path="/" element={<HomeRoute />} />
+          <Route path="/calendario" element={<CalendarPage />} />
           <Route path="/tareas" element={<TareasPage />} />
           <Route path="/inventario-demo" element={<CapabilityRoute capability="canManageBranches"><InventarioDemoPage /></CapabilityRoute>} />
           <Route path="/sucursales" element={<CapabilityRoute capability="canManageBranches"><SucursalesPage /></CapabilityRoute>} />

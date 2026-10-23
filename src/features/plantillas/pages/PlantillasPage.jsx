@@ -1,229 +1,242 @@
-﻿import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+﻿import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { getPlantillas, createPlantilla, desactivarPlantilla } from '../services/plantillasService'
+// Kit de componentes compartido con Tuvet; los colores de Analiza llegan con la clase .tema-analiza.
+import { Aviso, EstadoCarga, Field, Icono, Modal, PageHeader } from '../../tuvet/components/TuvetUi'
+import { useConfirmacion } from '../../tuvet/components/useConfirmacion'
+import { enfocarPrimerError, erroresDelServidor } from '../../tuvet/utils/formularios'
+import '../../tuvet/tuvet.css'
+// Se conserva: otras páginas podrían depender de sus clases genéricas (todos los CSS son globales).
 import './PlantillasPage.css'
+import './PlantillasKit.css'
+
+const ESTADOS = { todas: 'Todas', activa: 'Activas', inactiva: 'Inactivas' }
+
+const normalizar = (texto) => String(texto ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+
+function formatFecha(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+}
 
 export default function PlantillasPage() {
   const [plantillas, setPlantillas] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [modal, setModal] = useState(null)
+  const [aviso, setAviso] = useState('')
+  const [busqueda, setBusqueda] = useState('')
+  const [filtroEstado, setFiltroEstado] = useState('todas')
+  const [creando, setCreando] = useState(false)
+  const [confirmar, dialogo] = useConfirmacion()
   const navigate = useNavigate()
 
-  useEffect(() => { loadData() }, [])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const data = await getPlantillas()
-      setPlantillas(data)
+      setPlantillas(await getPlantillas())
     } catch (requestError) {
       setError(requestError.message || 'No se pudieron cargar las plantillas.')
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadData()
+  }, [loadData])
 
   async function handleCreate(form) {
     await createPlantilla(form)
+    setCreando(false)
+    setAviso(`Plantilla “${form.nombre}” creada. Ábrela para agregarle tareas.`)
     await loadData()
-    setModal(null)
   }
 
-  async function handleDesactivar(id) {
-    await desactivarPlantilla(id)
+  async function desactivar(plantilla) {
+    setAviso('')
+    const ok = await confirmar({
+      title: 'Desactivar plantilla',
+      message: `¿Desactivar la plantilla “${plantilla.nombre}”?`,
+      confirmLabel: 'Desactivar',
+      accion: () => desactivarPlantilla(plantilla.id_plantilla),
+    })
+    if (!ok) return
+    setAviso(`Plantilla “${plantilla.nombre}” desactivada.`)
     await loadData()
-    setModal(null)
   }
 
-  function formatFecha(iso) {
-    return new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+  function nueva() {
+    setAviso('')
+    setCreando(true)
   }
+
+  const termino = normalizar(busqueda.trim())
+  const cumple = (p, estado = filtroEstado) => (
+    (!termino || normalizar(`${p.nombre} ${p.descripcion ?? ''}`).includes(termino))
+    && (estado === 'todas' || (estado === 'activa' ? p.activa : !p.activa))
+  )
+  const filtradas = plantillas.filter((p) => cumple(p))
+  const activas = plantillas.filter((p) => p.activa).length
+  const hayFiltros = Boolean(termino) || filtroEstado !== 'todas'
 
   return (
-    <div className="plantillas-page">
-      <div className="page-header">
-        <div>
-          <h1>Plantillas</h1>
-          <p>{plantillas.length} plantilla{plantillas.length !== 1 ? 's' : ''} registrada{plantillas.length !== 1 ? 's' : ''}</p>
+    <div className="tema-analiza tuvet-page plantillas-kit">
+      <PageHeader
+        title="Plantillas"
+        description={`${activas} activa${activas !== 1 ? 's' : ''} de ${plantillas.length} en total. Agrupan tareas para asignarlas a las sucursales.`}
+      >
+        <button type="button" className="tuvet-btn" onClick={nueva}>Nueva plantilla</button>
+      </PageHeader>
+
+      <div className="pk-barra">
+        <div className="tuvet-search-bar" role="search">
+          <Icono nombre="buscar" className="tuvet-search-icon" />
+          <input
+            type="search"
+            value={busqueda}
+            onChange={(event) => setBusqueda(event.target.value)}
+            placeholder="Buscar plantilla por nombre o descripción"
+            aria-label="Buscar plantilla por nombre o descripción"
+          />
+          {busqueda && <button type="button" className="tuvet-btn tuvet-btn-ghost" onClick={() => setBusqueda('')}>Limpiar</button>}
         </div>
-        <button className="btn-primary" onClick={() => setModal({ type: 'crear' })}>
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Nueva plantilla
-        </button>
+        <div className="tuvet-filtros" role="group" aria-label="Filtrar por estado">
+          {Object.entries(ESTADOS).map(([clave, etiqueta]) => (
+            <button
+              key={clave}
+              type="button"
+              className={`tuvet-chip ${filtroEstado === clave ? 'active' : ''}`}
+              aria-pressed={filtroEstado === clave}
+              onClick={() => setFiltroEstado(clave)}
+            >
+              {etiqueta} ({plantillas.filter((p) => cumple(p, clave)).length})
+            </button>
+          ))}
+        </div>
       </div>
 
-      {loading ? (
-        <div className="loading-state">Cargando plantillas...</div>
-      ) : error ? (
-        <div className="empty-state" role="alert">{error} <button className="btn-secondary" onClick={loadData}>Reintentar</button></div>
-      ) : plantillas.length === 0 ? (
-        <div className="empty-state">No hay plantillas registradas.</div>
-      ) : (
-        <div className="table-card">
-          <table className="plantillas-table">
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Descripción</th>
-                <th>Tareas</th>
-                <th>Creada por</th>
-                <th>Fecha</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {plantillas.map((p) => (
-                <tr key={p.id_plantilla} className="clickable-row" onClick={() => navigate(`/plantillas/${p.id_plantilla}`)}>
-                  <td className="td-nombre">{p.nombre}</td>
-                  <td className="td-desc">{p.descripcion || <span className="td-empty">—</span>}</td>
-                  <td><span className="tareas-count">{p.total_tareas}</span></td>
-                  <td>{p.creada_por?.nombre ?? <span className="td-empty">—</span>}</td>
-                  <td className="td-fecha">{formatFecha(p.created_at)}</td>
-                  <td>
-                    <span className={`badge ${p.activa ? 'badge-green' : 'badge-red'}`}>
-                      {p.activa ? 'Activa' : 'Inactiva'}
-                    </span>
-                  </td>
-                  <td onClick={(e) => e.stopPropagation()}>
-                    <div className="row-actions">
-                      <button
-                        className="action-btn"
-                        title="Ver detalle"
-                        onClick={() => navigate(`/plantillas/${p.id_plantilla}`)}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
-                        </svg>
+      <Aviso tipo="success">{aviso}</Aviso>
+
+      <EstadoCarga
+        loading={loading}
+        error={error}
+        onRetry={loadData}
+        empty={!filtradas.length}
+        emptyText={hayFiltros ? 'Ninguna plantilla coincide con la búsqueda o el filtro.' : 'No hay plantillas registradas.'}
+        emptyAction={hayFiltros
+          ? <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => { setBusqueda(''); setFiltroEstado('todas') }}>Quitar filtros</button>
+          : <button type="button" className="tuvet-btn" onClick={nueva}>Crear plantilla</button>}
+      >
+        <div className="tuvet-card pk-tabla-card">
+          <div className="tuvet-table-wrap">
+            <table className="tuvet-table pk-tabla">
+              <thead>
+                <tr>
+                  <th scope="col">Plantilla</th>
+                  <th scope="col" className="pk-num">Tareas</th>
+                  <th scope="col">Creada por</th>
+                  <th scope="col">Fecha</th>
+                  <th scope="col">Estado</th>
+                  <th scope="col"><span className="tuvet-visually-hidden">Acciones</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtradas.map((p) => (
+                  <tr key={p.id_plantilla} className={p.activa ? '' : 'tuvet-row-inactiva'}>
+                    <td className="pk-plantilla">
+                      <Link to={`/plantillas/${p.id_plantilla}`} className="pk-enlace">{p.nombre}</Link>
+                      {p.descripcion && <span className="pk-descripcion" title={p.descripcion}>{p.descripcion}</span>}
+                    </td>
+                    <td className="pk-num">{p.total_tareas ?? 0}</td>
+                    <td className="pk-nowrap">{p.creada_por?.nombre ?? <span className="tuvet-hint">—</span>}</td>
+                    <td className="pk-nowrap">{formatFecha(p.created_at)}</td>
+                    <td>
+                      <span className={`tuvet-badge ${p.activa ? 'tuvet-badge-aprobada' : 'tuvet-badge-cancelada'}`}>
+                        <Icono nombre={p.activa ? 'check' : 'cerrar'} className="tuvet-badge-icon" />
+                        {p.activa ? 'Activa' : 'Inactiva'}
+                      </span>
+                    </td>
+                    <td className="tuvet-cell-acciones">
+                      <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => navigate(`/plantillas/${p.id_plantilla}`)} aria-label={`Ver detalle de ${p.nombre}`}>
+                        Ver detalle
                       </button>
                       {p.activa && (
-                        <button
-                          className="action-btn action-btn-danger"
-                          title="Desactivar"
-                          onClick={() => setModal({ type: 'desactivar', plantilla: p })}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                          </svg>
+                        <button type="button" className="tuvet-btn tuvet-btn-danger" onClick={() => desactivar(p)} aria-label={`Desactivar ${p.nombre}`}>
+                          Desactivar
                         </button>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="pk-pie" aria-live="polite">Mostrando {filtradas.length} de {plantillas.length} plantillas</p>
         </div>
-      )}
+      </EstadoCarga>
 
-      {modal?.type === 'crear' && (
-        <CrearModal onSubmit={handleCreate} onClose={() => setModal(null)} />
-      )}
-
-      {modal?.type === 'desactivar' && (
-        <DesactivarModal
-          plantilla={modal.plantilla}
-          onConfirm={() => handleDesactivar(modal.plantilla.id_plantilla)}
-          onClose={() => setModal(null)}
-        />
-      )}
-    </div>
-  )
-}
-
-function ModalWrapper({ title, onClose, children }) {
-  return (
-    <div className="modal-overlay">
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>{title}</h2>
-          <button className="modal-close" onClick={onClose}>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-        {children}
-      </div>
+      {creando && <CrearModal onSubmit={handleCreate} onClose={() => setCreando(false)} />}
+      {dialogo}
     </div>
   )
 }
 
 function CrearModal({ onSubmit, onClose }) {
   const [form, setForm] = useState({ nombre: '', descripcion: '' })
-  const [error, setError] = useState('')
+  const [errores, setErrores] = useState({})
+  const [errorGeneral, setErrorGeneral] = useState('')
   const [loading, setLoading] = useState(false)
+  const formRef = useRef(null)
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+  const set = (k) => (e) => {
+    setForm((f) => ({ ...f, [k]: e.target.value }))
+    setErrores((actual) => ({ ...actual, [k]: undefined }))
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setError('')
+    setErrorGeneral('')
+    if (!form.nombre.trim()) {
+      setErrores({ nombre: 'Escribe un nombre para identificar la plantilla, por ejemplo “Apertura de sucursal”.' })
+      enfocarPrimerError(formRef.current)
+      return
+    }
     setLoading(true)
     try {
-      await onSubmit(form)
+      await onSubmit({ nombre: form.nombre.trim(), descripcion: form.descripcion.trim() })
     } catch (err) {
-      setError(err.message)
-    } finally {
+      const { porCampo, general } = erroresDelServidor(err, ['nombre', 'descripcion'])
+      setErrores(porCampo)
+      setErrorGeneral(general)
       setLoading(false)
+      enfocarPrimerError(formRef.current)
     }
   }
 
   return (
-    <ModalWrapper title="Nueva plantilla" onClose={onClose}>
-      <form className="modal-form" onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Nombre</label>
-          <input type="text" value={form.nombre} onChange={set('nombre')} required />
-        </div>
-        <div className="form-group">
-          <label>Descripción <span className="label-optional">(opcional)</span></label>
-          <textarea rows={3} value={form.descripcion} onChange={set('descripcion')} />
-        </div>
-        {error && <p className="modal-error">{error}</p>}
-        <div className="modal-footer">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Creando...' : 'Crear plantilla'}
-          </button>
-        </div>
+    <Modal
+      title="Nueva plantilla"
+      subtitle="Después podrás agregarle tareas y asignarla a sucursales."
+      icon="plantilla"
+      onClose={loading ? () => {} : onClose}
+      footer={(
+        <>
+          <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={onClose} disabled={loading}>Cancelar</button>
+          <button type="submit" form="pk-crear-form" className="tuvet-btn" disabled={loading} aria-busy={loading}>{loading ? 'Creando...' : 'Crear plantilla'}</button>
+        </>
+      )}
+    >
+      <form id="pk-crear-form" ref={formRef} className="tuvet-form" onSubmit={handleSubmit} noValidate>
+        <Aviso tipo="error">{errorGeneral}</Aviso>
+        <Field label="Nombre" required error={errores.nombre}>
+          <input type="text" value={form.nombre} onChange={set('nombre')} placeholder="Ej. Apertura de sucursal" />
+        </Field>
+        <Field label="Descripción" hint="Opcional." error={errores.descripcion}>
+          <textarea rows={3} value={form.descripcion} onChange={set('descripcion')} placeholder="¿Para qué sirve esta plantilla?" />
+        </Field>
       </form>
-    </ModalWrapper>
-  )
-}
-
-function DesactivarModal({ plantilla, onConfirm, onClose }) {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  async function handleConfirm() {
-    setLoading(true)
-    try {
-      await onConfirm()
-    } catch (err) {
-      setError(err.message)
-      setLoading(false)
-    }
-  }
-
-  return (
-    <ModalWrapper title="Desactivar plantilla" onClose={onClose}>
-      <div className="modal-form">
-        <p className="modal-confirm-text">
-          ¿Estás seguro que deseas desactivar <strong>{plantilla.nombre}</strong>?
-        </p>
-        {error && <p className="modal-error">{error}</p>}
-        <div className="modal-footer">
-          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-danger" onClick={handleConfirm} disabled={loading}>
-            {loading ? 'Desactivando...' : 'Desactivar'}
-          </button>
-        </div>
-      </div>
-    </ModalWrapper>
+    </Modal>
   )
 }

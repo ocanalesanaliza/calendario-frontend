@@ -1,0 +1,89 @@
+/*
+ * Sucursales (Analiza) con el diseño del kit compartido (TuvetUi + tema .tema-analiza).
+ * Todo va limitado a .sucursales-kit para no afectar a otras páginas.
+ * La tabla se ajusta al ancho disponible: sin ancho mínimo fijo, para ver las acciones sin desplazar.
+ */
+
+.sucursales-kit .sk-barra { display: flex; flex-direction: column; gap: .75rem; }
+
+.sucursales-kit .sk-tabla-card { padding: 0; overflow: hidden; }
+.sucursales-kit .sk-tabla { table-layout: auto; }
+.sucursales-kit .sk-tabla th,
+.sucursales-kit .sk-tabla td { padding-left: .6rem; padding-right: .6rem; }
+.sucursales-kit .sk-tabla th:first-child,
+.sucursales-kit .sk-tabla td:first-child { padding-left: 1rem; }
+.sucursales-kit .sk-tabla th:last-child,
+.sucursales-kit .sk-tabla td:last-child { padding-right: 1rem; }
+.sucursales-kit .sk-num { width: 1%; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+
+/* Código en su propia columna, con la tipografía del sistema de diseño: discreto y alineado. */
+.sucursales-kit .sk-col-codigo { width: 1%; }
+
+.sucursales-kit td.sk-codigo {
+  color: var(--tv-muted);
+  font-size: .82rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* El nombre de la sucursal puede ocupar dos líneas. */
+.sucursales-kit td.sk-nombre { min-width: 160px; line-height: 1.35; }
+
+/* Gerentes: avatar y nombre en una línea; los nombres largos se recortan (completo en el title). */
+.sucursales-kit .sk-persona { display: inline-flex; flex-wrap: nowrap; max-width: 100%; }
+
+.sucursales-kit .sk-persona-nombre {
+  display: block;
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sucursales-kit .sk-tabla .tuvet-badge { white-space: nowrap; }
+
+/* Acciones compactas: 34 px con 8 px de separación. */
+.sucursales-kit .sk-tabla td.tuvet-cell-acciones > * + * { margin-left: .5rem; }
+.sucursales-kit .sk-tabla .tuvet-icon-action { width: 34px; height: 34px; }
+
+.sucursales-kit .sk-pie { margin: 0; padding: .7rem 1rem; border-top: 1px solid var(--tv-border); color: var(--tv-subtle); font-size: .82rem; }
+
+/* En anchos medios se ocultan los avatares para ganar espacio; el nombre sigue visible. */
+@media (max-width: 1280px) {
+  .sucursales-kit .sk-tabla .sk-persona .tuvet-avatar { display: none; }
+  .sucursales-kit .sk-persona-nombre { max-width: 150px; }
+}
+
+.sucursales-kit .sk-gerente-asignado {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  padding: .7rem .85rem;
+  border: 1px solid var(--tv-primary-border);
+  border-radius: var(--tv-radius);
+  background: var(--tv-primary-softer);
+}
+
+/* Horarios */
+.sucursales-kit .sk-horarios { min-width: 520px; }
+.sucursales-kit .sk-abre { display: inline-flex; align-items: center; gap: .5rem; cursor: pointer; }
+.sucursales-kit .sk-abre input { width: 18px; height: 18px; accent-color: var(--tv-primary); }
+.sucursales-kit .sk-hora { width: 130px; min-height: 36px; padding: .3rem .55rem; }
+.sucursales-kit .sk-hora:disabled { opacity: .45; cursor: not-allowed; }
+.sucursales-kit .sk-guardado { display: inline-flex; align-items: center; gap: .25rem; color: var(--tv-success-text); font-size: .8rem; font-weight: 600; }
+
+/* Tareas de la sucursal */
+.sucursales-kit .sk-tareas { display: grid; gap: .5rem; margin: 0; padding: 0; list-style: none; }
+
+.sucursales-kit .sk-tarea {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem .75rem;
+  padding: .6rem .8rem;
+  border: 1px solid var(--tv-border);
+  border-radius: var(--tv-radius);
+  background: var(--tv-surface);
+}
