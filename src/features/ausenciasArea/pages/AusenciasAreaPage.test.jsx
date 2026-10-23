@@ -147,7 +147,9 @@ describe('AusenciasAreaPage', () => {
   it('lets GO approve and reject with a reason and shows special situation controls', async () => {
     setup(manager)
     expect(await screen.findByRole('button', { name: 'Nueva situación' })).toHaveClass('ausencias-area-admin-new-situation')
-    expect(screen.getAllByRole('table')).toHaveLength(2)
+    expect(screen.getByRole('tab', { name: /Vacaciones/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: /Situaciones especiales/ })).toHaveAttribute('aria-selected', 'false')
+    expect(screen.getAllByRole('table')).toHaveLength(1)
     expect(screen.getByText('Pendiente')).toHaveClass('ausencias-area-admin-badge')
     fireEvent.click(screen.getByRole('button', { name: 'Aprobar' }))
     const approveDialog = screen.getByRole('dialog', { name: 'Aprobar vacaciones' })
@@ -319,6 +321,8 @@ describe('AusenciasAreaPage', () => {
   it('deactivates a situation', async () => {
     setup(manager)
     await screen.findByRole('button', { name: 'Nueva situación' })
+    fireEvent.click(screen.getByRole('tab', { name: /Situaciones especiales/ }))
+    expect(screen.getByRole('cell', { name: 'Capacitación' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Desactivar' }))
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar desactivación' }))
     await waitFor(() => expect(deactivateGASpecialSituation).toHaveBeenCalledWith(7, 'command-key'))

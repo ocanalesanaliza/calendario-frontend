@@ -214,7 +214,7 @@ describe('SucursalesPage: número de guardias', () => {
     render(<SucursalesPage />)
     expect(await screen.findByRole('cell', { name: /GS Ana/ })).toBeInTheDocument()
     fireEvent.click(screen.getByTitle('Quitar GS'))
-    const dialog = screen.getByRole('dialog', { name: 'Quitar GS de la sucursal' })
+    const dialog = screen.getByRole('alertdialog', { name: 'Quitar GS de la sucursal' })
     expect(within(dialog).getByText(/La cuenta del GS permanecerá activa/)).toBeInTheDocument()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Quitar GS' }))
 

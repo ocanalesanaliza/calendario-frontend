@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Layout from './Layout'
@@ -43,15 +43,15 @@ describe('Layout Mis tareas navigation', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.queryByTitle('Mis tareas')).not.toBeInTheDocument()
-    expect(screen.queryByTitle('Depósitos pendientes')).not.toBeInTheDocument()
-    expect(screen.queryByTitle('Calendario del área')).not.toBeInTheDocument()
-    expect(screen.queryByTitle('Mi almuerzo')).not.toBeInTheDocument()
-    expect(screen.getByTitle('Áreas')).toBeInTheDocument()
-    expect(screen.getByTitle('Gerentes de área')).toBeInTheDocument()
-    expect(screen.getByTitle('Gerentes de operaciones')).toBeInTheDocument()
-    expect(screen.getByTitle('Organización')).toHaveAttribute('href', '/organizacion')
-    expect(screen.getByTitle('Admin Masters')).toHaveAttribute('href', '/admin-master-asignaciones')
+    expect(screen.queryByRole('link', { name: 'Mis tareas' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Depósitos pendientes' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Calendario del área' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Mi almuerzo' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Áreas' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Gerentes de área' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Gerentes de operaciones' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Organización' })).toHaveAttribute('href', '/organizacion')
+    expect(screen.getByRole('link', { name: 'Admin Masters' })).toHaveAttribute('href', '/admin-master-asignaciones')
   })
 
   it.each([
@@ -65,7 +65,7 @@ describe('Layout Mis tareas navigation', () => {
     useAuth.mockReturnValue({ perfil, logout: vi.fn() })
     render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
 
-    expect(screen.queryByTitle('Admin Masters')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Admin Masters' })).not.toBeInTheDocument()
   })
 
   it('shows the six capability-controlled modules to a Systems master admin with granted capabilities', () => {
@@ -94,7 +94,7 @@ describe('Layout Mis tareas navigation', () => {
     )
 
     capabilityModuleLabels.forEach((label) => {
-      expect(screen.getByTitle(label)).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: label })).toBeInTheDocument()
     })
   })
 
@@ -110,9 +110,9 @@ describe('Layout Mis tareas navigation', () => {
     )
 
     capabilityModuleLabels.forEach((label) => {
-      expect(screen.queryByTitle(label)).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: label })).not.toBeInTheDocument()
     })
-    expect(screen.queryByTitle('Organización')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Organización' })).not.toBeInTheDocument()
   })
 
   it('hides the restricted navigation entries for an area manager', () => {
@@ -133,12 +133,12 @@ describe('Layout Mis tareas navigation', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.queryByTitle('Mis tareas')).not.toBeInTheDocument()
-    expect(screen.queryByTitle('Depósitos pendientes')).not.toBeInTheDocument()
-    expect(screen.queryByTitle('Conteo de inventario')).not.toBeInTheDocument()
-    expect(screen.queryByTitle('Tareas')).not.toBeInTheDocument()
-    expect(screen.getByTitle('Calendario del área')).toBeInTheDocument()
-    expect(screen.getByTitle('Mi almuerzo')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Mis tareas' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Depósitos pendientes' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Conteo de inventario' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Tareas' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Calendario del área' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Mi almuerzo' })).toBeInTheDocument()
   })
 
   it('keeps the navigation entries available to a non-area-manager profile with the same capabilities', () => {
@@ -159,10 +159,10 @@ describe('Layout Mis tareas navigation', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByTitle('Mis tareas')).toBeInTheDocument()
-    expect(screen.getByTitle('Solicitudes pendientes')).toBeInTheDocument()
-    expect(screen.getByTitle('Conteo de inventario')).toBeInTheDocument()
-    expect(screen.getByTitle('Tareas')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Mis tareas' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Solicitudes pendientes' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Conteo de inventario' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Tareas' })).toBeInTheDocument()
   })
 
   it('hides Mis tareas and Solicitudes pendientes for an operations manager while preserving Áreas', () => {
@@ -184,9 +184,9 @@ describe('Layout Mis tareas navigation', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.queryByTitle('Mis tareas')).not.toBeInTheDocument()
-    expect(screen.queryByTitle('Solicitudes pendientes')).not.toBeInTheDocument()
-    expect(screen.getByTitle('Áreas')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Mis tareas' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Solicitudes pendientes' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Áreas' })).toBeInTheDocument()
   })
 
   it.each([
@@ -195,13 +195,57 @@ describe('Layout Mis tareas navigation', () => {
   ])('oculta Revisiones de guardia para %s', (_nombre, perfil) => {
     useAuth.mockReturnValue({ perfil, logout: vi.fn() })
     render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
-    expect(screen.queryByTitle('Revisiones de guardia')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Revisiones de guardia' })).not.toBeInTheDocument()
   })
 
   it('muestra Revisiones de guardia únicamente al administrador maestro', () => {
     useAuth.mockReturnValue({ perfil: { es_admin_maestro: true }, logout: vi.fn() })
     render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
-    expect(screen.getByTitle('Revisiones de guardia')).toHaveAttribute('href', '/analitica/revisiones-guardia')
+    expect(screen.getByRole('link', { name: 'Revisiones de guardia' })).toHaveAttribute('href', '/analitica/revisiones-guardia')
+  })
+
+  it('inicia siempre con el menú contraído, aunque antes se haya dejado expandido', () => {
+    globalThis.localStorage.getItem.mockReturnValue('0')
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', nombre: 'Gerente' }, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+
+    expect(screen.getByRole('button', { name: 'Expandir menú' })).toHaveAttribute('aria-expanded', 'false')
+    expect(document.getElementById('menu-lateral')).toHaveClass('sidebar-collapsed')
+    expect(screen.getByTitle('Calendario del área')).toHaveAttribute('href', '/calendario-area')
+  })
+
+  it('expande y vuelve a contraer el menú lateral desde el botón de menú de la barra superior', () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', nombre: 'Gerente' }, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+
+    const boton = screen.getByRole('button', { name: 'Expandir menú' })
+    expect(boton.closest('header')).toHaveClass('topbar')
+    fireEvent.click(boton)
+
+    expect(screen.getByRole('button', { name: 'Contraer menú' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Calendario del área')).toHaveClass('nav-item-label')
+    expect(document.getElementById('menu-lateral')).not.toHaveClass('sidebar-collapsed')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Contraer menú' }))
+    expect(document.getElementById('menu-lateral')).toHaveClass('sidebar-collapsed')
+    expect(document.querySelector('.sidebar-toggle')).toBeNull()
+  })
+
+  it('no muestra Calendario Tuvet en el menú y ofrece Cambiar de empresa a Sistemas', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true, nombre: 'Sistemas' }, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+
+    expect(screen.queryByRole('link', { name: 'Calendario Tuvet' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Menú de Sistemas' }))
+    expect(screen.getByRole('menuitem', { name: 'Cambiar de empresa' })).toBeInTheDocument()
+  })
+
+  it('no ofrece Cambiar de empresa a perfiles que no son de Sistemas', () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', nombre: 'Gerente' }, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Menú de Gerente' }))
+    expect(screen.queryByRole('menuitem', { name: 'Cambiar de empresa' })).not.toBeInTheDocument()
   })
 
   it.each([
@@ -211,6 +255,6 @@ describe('Layout Mis tareas navigation', () => {
     useAuth.mockReturnValue({ perfil, logout: vi.fn() })
     render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
 
-    expect(screen.queryByTitle('Organización')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Organización' })).not.toBeInTheDocument()
   })
 })

@@ -8,6 +8,7 @@ import { getProfileCapabilities } from '../../features/auth/profilePolicies'
 import './Layout.css'
 
 const NAV_CATEGORY_KEYS = ['dia-a-dia', 'gestion', 'personas', 'analitica', 'administracion']
+const MOBILE_QUERY = '(max-width: 900px)'
 
 function Layout() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -43,20 +44,33 @@ function Layout() {
   const notificacionesVisibles = puedeVerNotificaciones ? notificaciones : []
   const notifRef = useRef(null)
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    const stored = localStorage.getItem('sidebarCollapsed')
-    return stored === null ? true : stored === '1'
-  })
+  // Siempre inicia contraído (solo iconos); el botón de menú lo expande durante la sesión.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
+  // En pantallas pequeñas el menú lateral es un panel que se abre desde la barra superior.
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  // El botón de menú contrae el lateral en escritorio y abre el panel en móvil (mismo punto de corte que Layout.css).
+  const [esMovil, setEsMovil] = useState(() => window.matchMedia?.(MOBILE_QUERY).matches ?? false)
+  useEffect(() => {
+    const media = window.matchMedia?.(MOBILE_QUERY)
+    if (!media) return undefined
+    const actualizar = (evento) => {
+      setEsMovil(evento.matches)
+      if (!evento.matches) setMobileNavOpen(false)
+    }
+    media.addEventListener('change', actualizar)
+    return () => media.removeEventListener('change', actualizar)
+  }, [])
+  const [navLocation, setNavLocation] = useState(location.pathname)
+  if (navLocation !== location.pathname) {
+    setNavLocation(location.pathname)
+    setMobileNavOpen(false)
+  }
   const [openCategories, setOpenCategories] = useState(
     () => new Set(NAV_CATEGORY_KEYS)
   )
 
   function toggleSidebar() {
-    setSidebarCollapsed((prev) => {
-      const next = !prev
-      localStorage.setItem('sidebarCollapsed', next ? '1' : '0')
-      return next
-    })
+    setSidebarCollapsed((prev) => !prev)
   }
 
   function toggleCategory(key) {
@@ -77,8 +91,19 @@ function Layout() {
         setNotifOpen(false)
       }
     }
+    // Escape cierra menús desplegables y el panel móvil.
+    function handleEscape(e) {
+      if (e.key !== 'Escape') return
+      setDropdownOpen(false)
+      setNotifOpen(false)
+      setMobileNavOpen(false)
+    }
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
   }, [])
 
   useEffect(() => {
@@ -137,10 +162,12 @@ function Layout() {
           to: '/mis-tareas',
           label: 'Mis tareas',
           visible: !hideRestrictedNavigation && !esGerenteOperaciones && puedeAccederMisTareas,
+          // Portapapeles con check: las tareas propias del día.
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 11l3 3L22 4" />
-              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+              <rect x="8" y="2" width="8" height="4" rx="1" />
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+              <path d="M9 14l2 2 4-4" />
             </svg>
           ),
         },
@@ -150,8 +177,10 @@ function Layout() {
           visible: !hideRestrictedNavigation && esGerenteArea,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="5" width="18" height="14" rx="2" />
-              <path d="M7 10h10M7 14h6" />
+              {/* Billete: depósitos de dinero. */}
+              <rect x="2" y="6" width="20" height="12" rx="2" />
+              <circle cx="12" cy="12" r="2" />
+              <path d="M6 12h.01M18 12h.01" />
             </svg>
           ),
         },
@@ -161,10 +190,12 @@ function Layout() {
           visible: esGerenteArea,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {/* Calendario con días marcados. */}
               <rect x="3" y="4" width="18" height="17" rx="2" />
               <line x1="8" y1="2" x2="8" y2="6" />
               <line x1="16" y1="2" x2="16" y2="6" />
               <line x1="3" y1="10" x2="21" y2="10" />
+              <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01" />
             </svg>
           ),
         },
@@ -174,11 +205,10 @@ function Layout() {
           visible: canAccessLunch,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 8h1a4 4 0 0 1 0 8h-1" />
-              <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" />
-              <line x1="6" y1="1" x2="6" y2="4" />
-              <line x1="10" y1="1" x2="10" y2="4" />
-              <line x1="14" y1="1" x2="14" y2="4" />
+              {/* Tenedor y cuchillo: almuerzo. */}
+              <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" />
+              <path d="M7 2v20" />
+              <path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7" />
             </svg>
           ),
         },
@@ -186,11 +216,11 @@ function Layout() {
           to: '/rendimiento',
           label: 'Rendimiento',
           visible: esSucursal,
+          // Tendencia al alza: rendimiento.
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="20" x2="18" y2="10" />
-              <line x1="12" y1="20" x2="12" y2="4" />
-              <line x1="6" y1="20" x2="6" y2="14" />
+              <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+              <polyline points="16 7 22 7 22 13" />
             </svg>
           ),
         },
@@ -199,10 +229,11 @@ function Layout() {
           label: 'Solicitudes pendientes',
           visible: esSucursal || esGerenteArea,
           badge: notificacionesVisibles.length,
+          // Bandeja de entrada: solicitudes que esperan respuesta.
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              <polyline points="9 22 9 12 15 12 15 22" />
+              <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+              <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
             </svg>
           ),
         },
@@ -216,10 +247,13 @@ function Layout() {
           to: '/tareas',
           label: 'Tareas',
           visible: !hideRestrictedNavigation && canManageBranches,
+          // Lista con checks: catálogo de tareas.
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 11l3 3L22 4" />
-              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+              <path d="M3 6l1.5 1.5L7 5" />
+              <path d="M3 12l1.5 1.5L7 11" />
+              <path d="M3 18l1.5 1.5L7 17" />
+              <path d="M11 6h10M11 12h10M11 18h10" />
             </svg>
           ),
         },
@@ -229,9 +263,11 @@ function Layout() {
           visible: !hideRestrictedNavigation && canManageBranches,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 7l9-4 9 4-9 4-9-4z" />
-              <path d="M3 7v10l9 4 9-4V7" />
-              <path d="M12 11v10" />
+              {/* Caja con lista: inventario que se cuenta. */}
+              <path d="M21 8V6a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 6v10a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 1 .27" />
+              <path d="M3.3 6.5L12 11.5l8.7-5" />
+              <path d="M12 22V11.5" />
+              <path d="M16 15h6M16 18.5h6M16 22h4" />
             </svg>
           ),
         },
@@ -239,10 +275,13 @@ function Layout() {
           to: '/sucursales',
           label: 'Sucursales',
           visible: canManageBranches,
+          // Fachada de tienda con toldo: sucursal.
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              <polyline points="9 22 9 12 15 12 15 22" />
+              <path d="M3 9l1.5-5h15L21 9" />
+              <path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0" />
+              <path d="M5 11.5V21h14v-9.5" />
+              <path d="M10 21v-5h4v5" />
             </svg>
           ),
         },
@@ -252,7 +291,10 @@ function Layout() {
           visible: canManageAreaManagers,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" />
+              {/* Mapa plegado: zonas o áreas geográficas. */}
+              <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21" />
+              <line x1="9" y1="3" x2="9" y2="18" />
+              <line x1="15" y1="6" x2="15" y2="21" />
             </svg>
           ),
         },
@@ -262,10 +304,11 @@ function Layout() {
           visible: canManageOrganization,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="8.5" y="14" width="7" height="7" rx="1" />
-              <path d="M6.5 10v2h11v-2M12 12v2" />
+              {/* Organigrama: un nodo superior con dos dependientes. */}
+              <rect x="9" y="2" width="6" height="6" rx="1" />
+              <rect x="2" y="16" width="6" height="6" rx="1" />
+              <rect x="16" y="16" width="6" height="6" rx="1" />
+              <path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3M12 12V8" />
             </svg>
           ),
         },
@@ -275,10 +318,11 @@ function Layout() {
           visible: canManageTemplates,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="7" height="7" />
-              <rect x="14" y="3" width="7" height="7" />
-              <rect x="14" y="14" width="7" height="7" />
-              <rect x="3" y="14" width="7" height="7" />
+              {/* Hojas apiladas: plantillas reutilizables. */}
+              <path d="M15 2H8a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" />
+              <path d="M15 2v5h5" />
+              <path d="M4 7v13a2 2 0 0 0 2 2h10" />
+              <path d="M10 11h6M10 14h4" />
             </svg>
           ),
         },
@@ -288,7 +332,8 @@ function Layout() {
           visible: canAccessAreaAbsences,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="17" rx="2" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+              {/* Avión: vacaciones y ausencias. */}
+              <path d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" />
             </svg>
           ),
         },
@@ -298,8 +343,11 @@ function Layout() {
           visible: isSystemsAccount || esAdmin,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="4" y="3" width="16" height="18" rx="2" />
-              <path d="M8 8h8M8 12h8M8 16h5" />
+              {/* Plantilla con bloques (encabezado y columnas): plantillas de área. */}
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <rect x="7" y="7" width="10" height="3" rx=".5" />
+              <rect x="7" y="13" width="4" height="4" rx=".5" />
+              <path d="M14 13h3M14 17h3" />
             </svg>
           ),
         },
@@ -309,9 +357,10 @@ function Layout() {
           visible: canManageSpecialSituations,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
+              {/* Triángulo de advertencia: permisos, incapacidades e imprevistos. */}
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
             </svg>
           ),
         },
@@ -321,8 +370,11 @@ function Layout() {
           visible: canManageUsers,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="16 18 22 12 16 6" />
-              <polyline points="8 6 2 12 8 18" />
+              {/* Flechas de ida y vuelta: traslado temporal entre sucursales. */}
+              <path d="M8 3L4 7l4 4" />
+              <path d="M4 7h16" />
+              <path d="M16 21l4-4-4-4" />
+              <path d="M20 17H4" />
             </svg>
           ),
         },
@@ -351,8 +403,11 @@ function Layout() {
           visible: canManageAreaManagers || esAdmin,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
+              {/* Persona con marcador de ubicación: gerente a cargo de un área. */}
+              <path d="M15 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="8.5" cy="7" r="4" />
+              <path d="M19 15.5s3-2.6 3-5a3 3 0 0 0-6 0c0 2.4 3 5 3 5z" />
+              <circle cx="19" cy="10.5" r=".8" />
             </svg>
           ),
         },
@@ -362,10 +417,10 @@ function Layout() {
           visible: canManageOperationsManagers,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-              <path d="M12 11v4" />
-              <path d="M10 13h4" />
+              {/* Maletín: gerencia de operaciones. */}
+              <rect x="2" y="7" width="20" height="14" rx="2" />
+              <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+              <path d="M2 13h20M12 12v2" />
             </svg>
           ),
         },
@@ -375,7 +430,10 @@ function Layout() {
           visible: isSystemsAccount,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="8.5" cy="7" r="4" /><path d="M17 11l2 2 4-4" />
+              {/* Escudo con llave: administradores con acceso total. */}
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <circle cx="12" cy="10" r="2" />
+              <path d="M12 12v4M12 14.5h1.5" />
             </svg>
           ),
         },
@@ -403,11 +461,10 @@ function Layout() {
           visible: canAccessPerformanceReports,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {/* Documento con gráfico de barras: reporte. */}
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-              <polyline points="10 9 9 9 8 9" />
+              <path d="M8 18v-2M12 18v-5M16 18v-3" />
             </svg>
           ),
         },
@@ -443,11 +500,33 @@ function Layout() {
     },
   ]
 
+  // En móvil el panel abierto siempre muestra etiquetas, aunque en escritorio esté contraído.
+  const compacto = sidebarCollapsed && !mobileNavOpen
+  const totalNotificaciones = notificacionesVisibles.length
+  const rolUsuario = esAdmin ? 'Admin maestro' : esGerenteOperaciones ? 'Gerente de operaciones' : esGerenteArea ? 'Gerente de área' : 'Gerente de sucursal'
+
   return (
-    <div className="layout">
+    <div className={`layout layout-responsive ${mobileNavOpen ? 'layout-nav-open' : ''}`}>
+      <a className="skip-link" href="#contenido-principal">Saltar al contenido</a>
+
       {/* Topbar */}
       <header className="topbar">
-        <Link to="/" className="topbar-brand">
+        <button
+          type="button"
+          className="icon-btn topbar-menu-btn"
+          onClick={() => (esMovil ? setMobileNavOpen((abierto) => !abierto) : toggleSidebar())}
+          aria-label={esMovil ? (mobileNavOpen ? 'Cerrar menú' : 'Abrir menú') : (sidebarCollapsed ? 'Expandir menú' : 'Contraer menú')}
+          title={esMovil ? undefined : (sidebarCollapsed ? 'Expandir menú' : 'Contraer menú')}
+          aria-expanded={esMovil ? mobileNavOpen : !sidebarCollapsed}
+          aria-controls="menu-lateral"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            {esMovil && mobileNavOpen
+              ? <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>
+              : <><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></>}
+          </svg>
+        </button>
+        <Link to={isSystemsAccount ? '/calendario' : '/'} className="topbar-brand">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
             <line x1="16" y1="2" x2="16" y2="6" />
@@ -464,26 +543,31 @@ function Layout() {
           {/* Notificaciones */}
           <div className="notif-menu" ref={notifRef}>
             <button
+              type="button"
               className="icon-btn"
-              aria-label="Notificaciones"
+              aria-label={totalNotificaciones > 0 ? `Notificaciones: ${totalNotificaciones} pendientes` : 'Notificaciones'}
+              aria-expanded={notifOpen}
+              aria-haspopup="true"
               onClick={() => setNotifOpen(!notifOpen)}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                 <path d="M13.73 21a2 2 0 0 1-3.46 0" />
               </svg>
-              {notificacionesVisibles.length > 0 && (
-                <span className="notif-badge">{notificaciones.length}</span>
+              {totalNotificaciones > 0 && (
+                <span className="notif-badge" aria-hidden="true">{totalNotificaciones > 99 ? '99+' : totalNotificaciones}</span>
               )}
             </button>
 
             {notifOpen && (
               <div className="dropdown-menu notif-dropdown">
+                <p className="dropdown-title">Notificaciones</p>
                 {notificacionesVisibles.length === 0 ? (
                   <p className="notif-empty">No tienes notificaciones.</p>
                 ) : (
                   notificacionesVisibles.map((item) => (
                     <button
+                      type="button"
                       key={`${item.tipo}-${item.id}`}
                       className="notif-item"
                       onClick={() => handleNotifClick(item)}
@@ -500,15 +584,19 @@ function Layout() {
           {/* Usuario dropdown */}
           <div className="user-menu" ref={dropdownRef}>
             <button
+              type="button"
               className="user-btn"
               onClick={() => setDropdownOpen(!dropdownOpen)}
               aria-expanded={dropdownOpen}
+              aria-haspopup="menu"
+              aria-label={`Menú de ${perfil?.nombre || 'usuario'}`}
             >
-              <div className="user-avatar">
+              <span className="user-avatar" aria-hidden="true">
                 {perfil?.nombre ? perfil.nombre.charAt(0).toUpperCase() : 'U'}
-              </div>
+              </span>
               <span className="user-name">{perfil?.nombre || 'Usuario'}</span>
               <svg
+                aria-hidden="true"
                 className={`chevron ${dropdownOpen ? 'open' : ''}`}
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
@@ -523,16 +611,32 @@ function Layout() {
             </button>
 
             {dropdownOpen && (
-              <div className="dropdown-menu">
-                <button className="dropdown-item" onClick={() => setDropdownOpen(false)}>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <div className="dropdown-menu" role="menu">
+                <div className="dropdown-header" aria-hidden="true">
+                  <span className="dropdown-header-name">{perfil?.nombre || 'Usuario'}</span>
+                  <span className="dropdown-header-role">{rolUsuario}</span>
+                </div>
+                <button type="button" role="menuitem" className="dropdown-item" onClick={() => setDropdownOpen(false)}>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                     <circle cx="12" cy="7" r="4" />
                   </svg>
                   Perfil
                 </button>
-                <button className="dropdown-item danger" onClick={handleLogout}>
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {isSystemsAccount && (
+                  <button type="button" role="menuitem" className="dropdown-item" onClick={() => { setDropdownOpen(false); navigate('/empresas') }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <polyline points="17 1 21 5 17 9" />
+                      <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                      <polyline points="7 23 3 19 7 15" />
+                      <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                    </svg>
+                    Cambiar de empresa
+                  </button>
+                )}
+                <div className="dropdown-separator" role="separator" />
+                <button type="button" role="menuitem" className="dropdown-item danger" onClick={handleLogout}>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                     <polyline points="16 17 21 12 16 7" />
                     <line x1="21" y1="12" x2="9" y2="12" />
@@ -546,41 +650,38 @@ function Layout() {
       </header>
 
       <div className="layout-body">
-        {/* Sidebar */}
-        <aside className={`sidebar ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-          <button
-            type="button"
-            className="sidebar-toggle"
-            onClick={toggleSidebar}
-            aria-label={sidebarCollapsed ? 'Expandir menú' : 'Contraer menú'}
-            title={sidebarCollapsed ? 'Expandir menú' : 'Contraer menú'}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="11 17 6 12 11 7" />
-              <polyline points="18 17 13 12 18 7" />
-            </svg>
-          </button>
+        {/* Fondo del panel móvil: un clic fuera lo cierra */}
+        <div className="sidebar-backdrop" onClick={() => setMobileNavOpen(false)} aria-hidden="true" />
 
-          <nav className="sidebar-nav">
+        {/* Sidebar */}
+        <aside
+          id="menu-lateral"
+          className={`sidebar ${compacto ? 'sidebar-collapsed' : ''} ${mobileNavOpen ? 'sidebar-mobile-open' : ''}`}
+          aria-label="Menú principal"
+        >
+          <nav className="sidebar-nav" aria-label="Secciones">
             {categorias.map((categoria, index) => {
               const items = categoria.items.filter((item) => item.visible)
               if (items.length === 0) return null
 
               const isOpen = openCategories.has(categoria.key)
+              const groupId = `nav-grupo-${categoria.key}`
 
               return (
                 <div className="nav-group" key={categoria.key}>
-                  {sidebarCollapsed ? (
-                    index > 0 && <div className="nav-group-divider" />
+                  {compacto ? (
+                    index > 0 && <div className="nav-group-divider" role="separator" />
                   ) : (
                     <button
                       type="button"
                       className="nav-group-header"
                       onClick={() => toggleCategory(categoria.key)}
                       aria-expanded={isOpen}
+                      aria-controls={groupId}
                     >
                       <span>{categoria.label}</span>
                       <svg
+                        aria-hidden="true"
                         className={`nav-group-chevron ${isOpen ? 'open' : ''}`}
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 24 24"
@@ -595,21 +696,23 @@ function Layout() {
                     </button>
                   )}
 
-                  {(sidebarCollapsed || isOpen) && (
-                    <div className="nav-group-items">
+                  {(compacto || isOpen) && (
+                    <div className="nav-group-items" id={groupId}>
                       {items.map((item) => (
                         <NavLink
                           key={item.to}
                           to={item.to}
-                          title={sidebarCollapsed ? item.label : undefined}
+                          title={compacto ? item.label : undefined}
                           className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
                         >
-                          {item.icon}
-                          {!sidebarCollapsed && <span className="nav-item-label">{item.label}</span>}
+                          <span className="nav-item-icon" aria-hidden="true">{item.icon}</span>
+                          {!compacto && <span className="nav-item-label">{item.label}</span>}
+                          {/* En modo compacto el nombre también aparece al enfocar con teclado, no solo con el ratón. */}
+                          {compacto && <span className="nav-tooltip" aria-hidden="true">{item.label}</span>}
                           {item.badge > 0 && (
-                            sidebarCollapsed
-                              ? <span className="nav-item-dot" />
-                              : <span className="tab-count">{item.badge}</span>
+                            compacto
+                              ? <span className="nav-item-dot"><span className="visually-hidden">{item.badge} pendientes</span></span>
+                              : <span className="tab-count">{item.badge}<span className="visually-hidden"> pendientes</span></span>
                           )}
                         </NavLink>
                       ))}
@@ -621,22 +724,20 @@ function Layout() {
           </nav>
 
           <div className="sidebar-footer">
-            <div className="sidebar-user-avatar">
+            <div className="sidebar-user-avatar" aria-hidden="true">
               {perfil?.nombre ? perfil.nombre.charAt(0).toUpperCase() : 'U'}
             </div>
-            {!sidebarCollapsed && (
+            {!compacto && (
               <div className="sidebar-user-info">
                 <span className="sidebar-user-name">{perfil?.nombre || 'Usuario'}</span>
-                <span className="sidebar-user-role">
-                  {esAdmin ? 'Admin maestro' : esGerenteOperaciones ? 'Gerente de operaciones' : esGerenteArea ? 'Gerente de área' : 'Gerente de sucursal'}
-                </span>
+                <span className="sidebar-user-role">{rolUsuario}</span>
               </div>
             )}
           </div>
         </aside>
 
         {/* Contenido principal */}
-        <main className="main-content">
+        <main id="contenido-principal" className="main-content" tabIndex={-1}>
           <Outlet />
         </main>
       </div>

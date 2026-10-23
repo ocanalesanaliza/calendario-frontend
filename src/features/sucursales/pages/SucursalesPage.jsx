@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+﻿import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   getSucursales, createSucursal, getAreasElegibles, updateSucursal, desactivarSucursal,
   quitarGsSucursal,
@@ -9,10 +9,30 @@ import { getGerentes } from '../../gerentes/services/gerentesService'
 import { getPlantillas, asignarSucursales } from '../../plantillas/services/plantillasService'
 import { useAuth } from '../../auth/context/AuthContext'
 import { getProfileCapabilities } from '../../auth/profilePolicies'
+// Kit de componentes compartido con Tuvet; los colores de Analiza llegan con la clase .tema-analiza.
+import { Avatar, Aviso, EstadoCarga, Field, FormSection, Icono, Modal, PageHeader } from '../../tuvet/components/TuvetUi'
+import { useConfirmacion } from '../../tuvet/components/useConfirmacion'
+import { enfocarPrimerError, erroresDelServidor } from '../../tuvet/utils/formularios'
+import '../../tuvet/tuvet.css'
+// Se conserva: otras páginas podrían depender de sus clases genéricas (todos los CSS son globales).
 import './SucursalesPage.css'
+import './SucursalesKit.css'
 
 const DIAS = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 const JORNADA_LABEL = { manana: 'Mañana', tarde: 'Tarde' }
+const ESTADOS = { todas: 'Todas', activa: 'Activas', inactiva: 'Inactivas' }
+
+const normalizar = (texto) => String(texto ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+
+function PersonaCelda({ persona, vacio }) {
+  if (!persona) return <span className="tuvet-hint">{vacio}</span>
+  return (
+    <span className="tuvet-persona-cell sk-persona" title={persona.nombre}>
+      <Avatar nombre={persona.nombre} size="sm" />
+      <span className="sk-persona-nombre">{persona.nombre}</span>
+    </span>
+  )
+}
 
 export default function SucursalesPage() {
   const { perfil } = useAuth()
@@ -20,23 +40,28 @@ export default function SucursalesPage() {
   const [sucursales, setSucursales] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [aviso, setAviso] = useState('')
   const [busqueda, setBusqueda] = useState('')
+  const [filtroEstado, setFiltroEstado] = useState('todas')
   const [modal, setModal] = useState(null)
+  const [confirmar, dialogo] = useConfirmacion()
 
-  useEffect(() => { loadData() }, [])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const data = await getSucursales()
-      setSucursales(data)
+      setSucursales(await getSucursales())
     } catch (requestError) {
       setError(requestError.message || 'No se pudieron cargar las sucursales.')
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadData()
+  }, [loadData])
 
   async function handleCreate(form, idPlantilla, fechaPlantilla) {
     const resp = await createSucursal(form)
@@ -52,6 +77,7 @@ export default function SucursalesPage() {
       }
     }
     setModal(null)
+    setAviso(`Sucursal “${form.nombre}” creada.`)
   }
 
   async function assignTemplate({ idSucursal, idPlantilla, fechaPlantilla }) {
@@ -66,6 +92,7 @@ export default function SucursalesPage() {
     try {
       await assignTemplate(assignment)
       setModal(null)
+      setAviso('Plantilla asignada correctamente.')
     } catch (requestError) {
       setModal({ type: 'template-assignment-failed', assignment, error: requestError.message })
     }
@@ -75,153 +102,162 @@ export default function SucursalesPage() {
     await updateSucursal(id, form)
     await loadData()
     setModal(null)
+    setAviso(`Sucursal “${form.nombre}” actualizada.`)
   }
 
-  async function handleDesactivar(id) {
-    await desactivarSucursal(id)
+  async function desactivar(sucursal) {
+    setAviso('')
+    const ok = await confirmar({
+      title: 'Desactivar sucursal',
+      message: `¿Desactivar la sucursal “${sucursal.nombre}”?`,
+      confirmLabel: 'Desactivar',
+      accion: () => desactivarSucursal(sucursal.id_sucursal),
+    })
+    if (!ok) return
+    setAviso(`Sucursal “${sucursal.nombre}” desactivada.`)
     await loadData()
-    setModal(null)
   }
 
-  async function handleQuitarGs(id) {
-    await quitarGsSucursal(id)
+  async function quitarGs(sucursal) {
+    setAviso('')
+    const ok = await confirmar({
+      title: 'Quitar GS de la sucursal',
+      message: `¿Quitar a ${sucursal.usuario_titular.nombre} de la sucursal ${sucursal.nombre}?`,
+      detail: 'La cuenta del GS permanecerá activa y podrás asignarla nuevamente.',
+      confirmLabel: 'Quitar GS',
+      accion: () => quitarGsSucursal(sucursal.id_sucursal),
+    })
+    if (!ok) return
+    setAviso(`${sucursal.usuario_titular.nombre} ya no está asignado a ${sucursal.nombre}.`)
     await loadData()
-    setModal(null)
   }
 
-  const filtradas = sucursales.filter((s) =>
-    s.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-    s.codigo.toLowerCase().includes(busqueda.toLowerCase())
+  function abrir(type, sucursal = null) {
+    setAviso('')
+    setModal({ type, sucursal })
+  }
+
+  const termino = normalizar(busqueda.trim())
+  const cumple = (s, estado = filtroEstado) => (
+    (!termino || normalizar(`${s.nombre} ${s.codigo}`).includes(termino))
+    && (estado === 'todas' || (estado === 'activa' ? s.activa : !s.activa))
   )
-
+  const filtradas = sucursales.filter((s) => cumple(s))
   const activas = sucursales.filter((s) => s.activa).length
+  const sinGs = sucursales.filter((s) => s.activa && !s.usuario_titular).length
+  const hayFiltros = Boolean(termino) || filtroEstado !== 'todas'
 
   return (
-    <div className="sucursales-page">
-      <div className="page-header">
-        <div>
-          <h1>Sucursales</h1>
-          <p>{activas} activa{activas !== 1 ? 's' : ''} de {sucursales.length} en total</p>
-        </div>
-        <button className="btn-primary" onClick={() => setModal({ type: 'crear' })}>
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Nueva sucursal
-        </button>
-      </div>
+    <div className="tema-analiza tuvet-page sucursales-kit">
+      <PageHeader
+        title="Sucursales"
+        description={`${activas} activa${activas !== 1 ? 's' : ''} de ${sucursales.length} en total${sinGs ? ` · ${sinGs} sin gerente de sucursal asignado` : ''}.`}
+      >
+        <button type="button" className="tuvet-btn" onClick={() => abrir('crear')}>Nueva sucursal</button>
+      </PageHeader>
 
-      <div className="toolbar">
-        <div className="search-wrapper">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
+      <div className="sk-barra">
+        <div className="tuvet-search-bar" role="search">
+          <Icono nombre="buscar" className="tuvet-search-icon" />
           <input
-            type="text"
-            placeholder="Buscar por nombre o código..."
+            type="search"
             value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
+            onChange={(event) => setBusqueda(event.target.value)}
+            placeholder="Buscar por nombre o código"
+            aria-label="Buscar por nombre o código"
           />
+          {busqueda && <button type="button" className="tuvet-btn tuvet-btn-ghost" onClick={() => setBusqueda('')}>Limpiar</button>}
+        </div>
+        <div className="tuvet-filtros" role="group" aria-label="Filtrar por estado">
+          {Object.entries(ESTADOS).map(([clave, etiqueta]) => (
+            <button
+              key={clave}
+              type="button"
+              className={`tuvet-chip ${filtroEstado === clave ? 'active' : ''}`}
+              aria-pressed={filtroEstado === clave}
+              onClick={() => setFiltroEstado(clave)}
+            >
+              {etiqueta} ({sucursales.filter((s) => cumple(s, clave)).length})
+            </button>
+          ))}
         </div>
       </div>
 
-      {loading ? (
-        <div className="loading-state">Cargando sucursales...</div>
-      ) : error ? (
-        <div className="empty-state" role="alert">{error} <button className="btn-secondary" onClick={loadData}>Reintentar</button></div>
-      ) : filtradas.length === 0 ? (
-        <div className="empty-state">
-          {busqueda ? 'Sin resultados para tu búsqueda.' : 'No hay sucursales registradas.'}
-        </div>
-      ) : (
-        <div className="table-card">
-          <table className="sucursales-table">
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Código</th>
-                <th>Gerente de área</th>
-                <th>GS asignado</th>
-                {esAdmin && <th>Guardias</th>}
-                <th>Estado</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtradas.map((s) => (
-                <tr key={s.id_sucursal}>
-                  <td className="td-nombre">{s.nombre}</td>
-                  <td><span className="codigo">{s.codigo}</span></td>
-                  <td>
-                    {s.gerente_area ? (
-                      <div className="gerente-cell">
-                        <div className="gerente-avatar">{s.gerente_area.nombre.charAt(0).toUpperCase()}</div>
-                        <span>{s.gerente_area.nombre}</span>
-                      </div>
-                    ) : <span className="td-empty">—</span>}
-                  </td>
-                  <td>
-                    {s.usuario_titular ? (
-                      <div className="gerente-cell">
-                        <div className="gerente-avatar gs-avatar">{s.usuario_titular.nombre.charAt(0).toUpperCase()}</div>
-                        <span>{s.usuario_titular.nombre}</span>
-                      </div>
-                    ) : <span className="td-empty">Sin GS</span>}
-                  </td>
-                  {esAdmin && <td>{s.numero_guardias ?? 0}</td>}
-                  <td>
-                    <span className={`badge ${s.activa ? 'badge-green' : 'badge-red'}`}>
-                      {s.activa ? 'Activa' : 'Inactiva'}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="row-actions">
-                      <button className="action-btn" title="Horarios" onClick={() => setModal({ type: 'horarios', sucursal: s })}>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                        </svg>
+      <Aviso tipo="success">{aviso}</Aviso>
+
+      <EstadoCarga
+        loading={loading}
+        error={error}
+        onRetry={loadData}
+        empty={!filtradas.length}
+        emptyText={hayFiltros ? 'Ninguna sucursal coincide con la búsqueda o el filtro.' : 'No hay sucursales registradas.'}
+        emptyAction={hayFiltros
+          ? <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => { setBusqueda(''); setFiltroEstado('todas') }}>Quitar filtros</button>
+          : <button type="button" className="tuvet-btn" onClick={() => abrir('crear')}>Crear sucursal</button>}
+      >
+        <div className="tuvet-card sk-tabla-card">
+          <div className="tuvet-table-wrap">
+            <table className="tuvet-table sk-tabla">
+              <thead>
+                <tr>
+                  <th scope="col" className="sk-col-codigo">Código</th>
+                  <th scope="col">Sucursal</th>
+                  <th scope="col">Gerente de área</th>
+                  <th scope="col">GS asignado</th>
+                  {esAdmin && <th scope="col" className="sk-num">Guardias</th>}
+                  <th scope="col">Estado</th>
+                  <th scope="col"><span className="tuvet-visually-hidden">Acciones</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtradas.map((s) => (
+                  <tr key={s.id_sucursal} className={s.activa ? '' : 'tuvet-row-inactiva'}>
+                    <td className="sk-codigo">{s.codigo}</td>
+                    <td className="sk-nombre"><strong>{s.nombre}</strong></td>
+                    <td><PersonaCelda persona={s.gerente_area} vacio="—" /></td>
+                    <td><PersonaCelda persona={s.usuario_titular} vacio="Sin GS" /></td>
+                    {esAdmin && <td className="sk-num">{s.numero_guardias ?? 0}</td>}
+                    <td>
+                      <span className={`tuvet-badge ${s.activa ? 'tuvet-badge-aprobada' : 'tuvet-badge-cancelada'}`}>
+                        <Icono nombre={s.activa ? 'check' : 'cerrar'} className="tuvet-badge-icon" />
+                        {s.activa ? 'Activa' : 'Inactiva'}
+                      </span>
+                    </td>
+                    <td className="tuvet-cell-acciones">
+                      <button type="button" className="tuvet-icon-action" title="Horarios" aria-label={`Horarios de ${s.nombre}`} onClick={() => abrir('horarios', s)}>
+                        <Icono nombre="reloj" />
                       </button>
-                      <button className="action-btn" title="Asignar plantilla" onClick={() => setModal({ type: 'plantilla', sucursal: s })}>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
-                          <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
-                        </svg>
+                      <button type="button" className="tuvet-icon-action" title="Asignar plantilla" aria-label={`Asignar plantilla a ${s.nombre}`} onClick={() => abrir('plantilla', s)}>
+                        <Icono nombre="plantilla" />
                       </button>
-                      <button className="action-btn" title="Editar" onClick={() => setModal({ type: 'editar', sucursal: s })}>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                        </svg>
+                      <button type="button" className="tuvet-icon-action" title="Editar" aria-label={`Editar ${s.nombre}`} onClick={() => abrir('editar', s)}>
+                        <Icono nombre="editar" />
                       </button>
                       {s.usuario_titular && (
                         <button
-                          className="action-btn action-btn-danger"
+                          type="button"
+                          className="tuvet-icon-action tuvet-icon-action-danger"
                           title="Quitar GS"
                           aria-label={`Quitar a ${s.usuario_titular.nombre} de ${s.nombre}`}
-                          onClick={() => setModal({ type: 'quitar-gs', sucursal: s })}
+                          onClick={() => quitarGs(s)}
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                            <circle cx="9" cy="7" r="4" />
-                            <line x1="17" y1="11" x2="23" y2="11" />
-                          </svg>
+                          <Icono nombre="quitar-persona" />
                         </button>
                       )}
                       {s.activa && (
-                        <button className="action-btn action-btn-danger" title="Desactivar" onClick={() => setModal({ type: 'desactivar', sucursal: s })}>
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                          </svg>
+                        <button type="button" className="tuvet-icon-action tuvet-icon-action-danger" title="Desactivar" aria-label={`Desactivar ${s.nombre}`} onClick={() => desactivar(s)}>
+                          <Icono nombre="prohibido" />
                         </button>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="sk-pie" aria-live="polite">Mostrando {filtradas.length} de {sucursales.length} sucursales</p>
         </div>
-      )}
+      </EstadoCarga>
 
       {modal?.type === 'crear' && (
         <SucursalModal esAdmin={esAdmin} conPlantilla onSubmit={handleCreate} onClose={() => setModal(null)} />
@@ -231,20 +267,6 @@ export default function SucursalesPage() {
           esAdmin={esAdmin}
           inicial={modal.sucursal}
           onSubmit={(form) => handleEdit(modal.sucursal.id_sucursal, form)}
-          onClose={() => setModal(null)}
-        />
-      )}
-      {modal?.type === 'desactivar' && (
-        <DesactivarModal
-          nombre={modal.sucursal.nombre}
-          onConfirm={() => handleDesactivar(modal.sucursal.id_sucursal)}
-          onClose={() => setModal(null)}
-        />
-      )}
-      {modal?.type === 'quitar-gs' && (
-        <QuitarGsModal
-          sucursal={modal.sucursal}
-          onConfirm={() => handleQuitarGs(modal.sucursal.id_sucursal)}
           onClose={() => setModal(null)}
         />
       )}
@@ -262,29 +284,12 @@ export default function SucursalesPage() {
           onClose={() => setModal(null)}
         />
       )}
+      {dialogo}
     </div>
   )
 }
 
-/* ── Modales ── */
-
-function ModalWrapper({ title, onClose, children, wide, xl }) {
-  return (
-    <div className="modal-overlay">
-      <div className={`modal${wide ? ' modal-wide' : ''}${xl ? ' modal-xl' : ''}`} role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>{title}</h2>
-          <button className="modal-close" aria-label="Cerrar" onClick={onClose}>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
-}
+/* ── Crear / editar sucursal ── */
 
 function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
   const isCreating = !inicial
@@ -300,11 +305,12 @@ function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
   })
   const [idPlantilla, setIdPlantilla]   = useState('')
   const [fechaPlantilla, setFechaPlantilla] = useState('')
-  const [error, setError]   = useState('')
+  const [errorGeneral, setErrorGeneral] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [loadingAreas, setLoadingAreas] = useState(isCreating)
   const [areasError, setAreasError] = useState('')
+  const formRef = useRef(null)
 
   useEffect(() => {
     let active = true
@@ -314,8 +320,8 @@ function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
         .catch((requestError) => { if (active) setAreasError(requestError.message || 'No se pudieron cargar las áreas elegibles.') })
         .finally(() => { if (active) setLoadingAreas(false) })
     }
-    if (esAdmin && !isCreating) getGerentes().then(setGerentes).catch(() => {})
-    if (conPlantilla) getPlantillas().then((p) => setPlantillas(p.filter((x) => x.activa))).catch(() => {})
+    if (esAdmin && !isCreating) getGerentes().then((data) => { if (active) setGerentes(data) }).catch(() => {})
+    if (conPlantilla) getPlantillas().then((p) => { if (active) setPlantillas(p.filter((x) => x.activa)) }).catch(() => {})
     return () => { active = false }
   }, [esAdmin, conPlantilla, isCreating])
 
@@ -325,21 +331,22 @@ function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
   }
 
   const selectedArea = areas.find((area) => String(area.id) === form.calendar_area_id)
-  const areaError = Array.isArray(fieldErrors.calendar_area_id)
-    ? fieldErrors.calendar_area_id.join(' ')
-    : fieldErrors.calendar_area_id
+  const sinAreas = isCreating && !loadingAreas && !areasError && areas.length === 0
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setError('')
-    setFieldErrors({})
-    if (isCreating && !form.calendar_area_id) {
-      setFieldErrors({ calendar_area_id: 'Selecciona un área.' })
-      return
-    }
+    setErrorGeneral('')
+    const encontrados = {}
+    if (!form.nombre.trim()) encontrados.nombre = 'Escribe el nombre de la sucursal.'
+    if (!form.codigo.trim()) encontrados.codigo = 'Escribe un código único, por ejemplo CENTRO-001.'
+    if (isCreating && !form.calendar_area_id) encontrados.calendar_area_id = 'Selecciona el área a la que pertenece la sucursal.'
     const numeroGuardias = Number(form.numero_guardias)
     if (esAdmin && (!Number.isInteger(numeroGuardias) || numeroGuardias < 0 || numeroGuardias > 4)) {
-      setError('El número de guardias debe ser un entero entre 0 y 4.')
+      encontrados.numero_guardias = 'El número de guardias debe ser un entero entre 0 y 4.'
+    }
+    setFieldErrors(encontrados)
+    if (Object.keys(encontrados).length) {
+      enfocarPrimerError(formRef.current)
       return
     }
     setLoading(true)
@@ -350,208 +357,154 @@ function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
       if (esAdmin) body.numero_guardias = numeroGuardias
       await onSubmit(body, idPlantilla ? Number(idPlantilla) : null, fechaPlantilla || null)
     } catch (err) {
-      if (err.fields && typeof err.fields === 'object') setFieldErrors(err.fields)
-      else setError(err.message)
+      const { porCampo, general } = erroresDelServidor(err, ['nombre', 'codigo', 'calendar_area_id', 'id_gerente_area', 'numero_guardias'])
+      setFieldErrors(porCampo)
+      setErrorGeneral(general)
+      enfocarPrimerError(formRef.current)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <ModalWrapper title={inicial ? 'Editar sucursal' : 'Nueva sucursal'} onClose={onClose}>
-      <form className="modal-form" onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Nombre</label>
-          <input type="text" value={form.nombre} onChange={set('nombre')} required />
-        </div>
-        <div className="form-group">
-          <label>Código</label>
-          <input type="text" value={form.codigo} onChange={set('codigo')} required placeholder="ej. CENTRO-001" />
-        </div>
+    <Modal
+      title={inicial ? 'Editar sucursal' : 'Nueva sucursal'}
+      subtitle={inicial ? `${inicial.nombre} · ${inicial.codigo}` : 'Registra la sucursal y, si quieres, su plantilla inicial.'}
+      icon="edificio"
+      wide
+      onClose={loading ? () => {} : onClose}
+      footer={(
+        <>
+          <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={onClose} disabled={loading}>Cancelar</button>
+          <button type="submit" form="sk-sucursal-form" className="tuvet-btn" disabled={loading || (isCreating && (loadingAreas || areas.length === 0 || !form.calendar_area_id))} aria-busy={loading}>
+            {loading ? 'Guardando...' : inicial ? 'Guardar cambios' : 'Crear sucursal'}
+          </button>
+        </>
+      )}
+    >
+      <form id="sk-sucursal-form" ref={formRef} className="tuvet-form" onSubmit={handleSubmit} noValidate>
+        <Aviso tipo="error">{errorGeneral}</Aviso>
+
+        <FormSection title="Datos de la sucursal">
+          <div className="tuvet-form-grid">
+            <Field label="Nombre" required error={fieldErrors.nombre}>
+              <input type="text" value={form.nombre} onChange={set('nombre')} placeholder="Ej. Sucursal Centro" />
+            </Field>
+            <Field label="Código" required error={fieldErrors.codigo} hint="Identificador único de la sucursal.">
+              <input type="text" value={form.codigo} onChange={set('codigo')} placeholder="Ej. CENTRO-001" />
+            </Field>
+          </div>
+        </FormSection>
+
         {isCreating && (
-            <>
-              <div className="form-group">
-                <label htmlFor="calendar-area">Área <span className="label-required">*</span></label>
-                <select
-                  id="calendar-area"
-                  value={form.calendar_area_id}
-                  onChange={set('calendar_area_id')}
-                  required
-                  disabled={loadingAreas || areas.length === 0}
-                  aria-describedby={areaError ? 'calendar-area-error' : undefined}
-                >
-                  <option value="">{loadingAreas ? 'Cargando áreas...' : 'Seleccionar área'}</option>
-                  {areas.map((area) => (
-                    <option key={area.id} value={area.id}>{area.codigo} — {area.nombre}</option>
-                  ))}
-                </select>
-                {areaError && <span id="calendar-area-error" className="modal-error" role="alert">{areaError}</span>}
-                {areasError && <p className="modal-error" role="alert">{areasError}</p>}
-                {!loadingAreas && !areasError && areas.length === 0 && (
-                  <p className="modal-error" role="alert">No hay áreas elegibles disponibles para crear una sucursal.</p>
-                )}
-              </div>
-              {selectedArea?.gerente_area && (
-                <div className="form-group">
-                  <p className="form-section-label">Gerente de área asignado</p>
-                  <p>{selectedArea.gerente_area.nombre}</p>
-                </div>
-              )}
-            </>
-        )}
-        {esAdmin && (
-          <>
-            {!isCreating && (
-            <>
-              <div className="form-group">
-                <label>Gerente de área</label>
-                <select value={form.id_gerente_area} onChange={set('id_gerente_area')}>
-                  <option value="">Seleccionar gerente</option>
-                  {gerentes.filter((g) => g.activo).map((g) => (
-                    <option key={g.id_gerente_area} value={g.id_gerente_area}>{g.nombre}</option>
-                  ))}
-                </select>
-              </div>
-            </>
-            )}
-            <div className="form-group">
-              <label htmlFor="numero-guardias">Número de guardias</label>
-              <input
-                id="numero-guardias"
-                type="number"
-                min="0"
-                max="4"
-                step="1"
-                value={form.numero_guardias}
-                onChange={set('numero_guardias')}
+          <FormSection title="Área">
+            <Field label="Área" required error={fieldErrors.calendar_area_id}>
+              <select
+                value={form.calendar_area_id}
+                onChange={set('calendar_area_id')}
                 required
-              />
-              <span className="label-optional">De 0 a 4. Con 0 no se programa la Revisión de Guardia.</span>
-            </div>
-          </>
+                disabled={loadingAreas || areas.length === 0}
+              >
+                <option value="">{loadingAreas ? 'Cargando áreas...' : 'Seleccionar área'}</option>
+                {areas.map((area) => (
+                  <option key={area.id} value={area.id}>{area.codigo} — {area.nombre}</option>
+                ))}
+              </select>
+            </Field>
+            {areasError && <Aviso tipo="error">{areasError}</Aviso>}
+            {sinAreas && <Aviso tipo="warning">No hay áreas elegibles disponibles para crear una sucursal.</Aviso>}
+            {selectedArea?.gerente_area && (
+              <div className="sk-gerente-asignado">
+                <Avatar nombre={selectedArea.gerente_area.nombre} />
+                <span className="tv-persona">
+                  <span className="tuvet-hint">Gerente de área asignado</span>
+                  <strong>{selectedArea.gerente_area.nombre}</strong>
+                </span>
+              </div>
+            )}
+          </FormSection>
         )}
+
+        {esAdmin && (
+          <FormSection title="Administración">
+            <div className="tuvet-form-grid">
+              {!isCreating && (
+                <Field label="Gerente de área" error={fieldErrors.id_gerente_area}>
+                  <select value={form.id_gerente_area} onChange={set('id_gerente_area')}>
+                    <option value="">Seleccionar gerente</option>
+                    {gerentes.filter((g) => g.activo).map((g) => (
+                      <option key={g.id_gerente_area} value={g.id_gerente_area}>{g.nombre}</option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+              <Field label="Número de guardias" error={fieldErrors.numero_guardias} hint="De 0 a 4. Con 0 no se programa la Revisión de Guardia.">
+                <input type="number" min="0" max="4" step="1" inputMode="numeric" value={form.numero_guardias} onChange={set('numero_guardias')} />
+              </Field>
+            </div>
+          </FormSection>
+        )}
+
         {conPlantilla && plantillas.length > 0 && (
-          <>
-            <hr className="modal-divider" />
-            <p className="form-section-label">Plantilla inicial <span className="label-optional">(opc.)</span></p>
-            <div className="form-row">
-              <div className="form-group" style={{ flex: 2 }}>
-                <label>Plantilla</label>
+          <FormSection title="Plantilla inicial" description="Opcional. Puedes asignarla ahora o más tarde desde la tabla.">
+            <div className="tuvet-form-grid">
+              <Field label="Plantilla">
                 <select value={idPlantilla} onChange={(e) => setIdPlantilla(e.target.value)}>
                   <option value="">Sin plantilla</option>
                   {plantillas.map((p) => (
                     <option key={p.id_plantilla} value={p.id_plantilla}>{p.nombre}</option>
                   ))}
                 </select>
-              </div>
+              </Field>
               {idPlantilla && (
-                <div className="form-group">
-                  <label>Fecha inicio</label>
+                <Field label="Fecha de inicio" hint="Si la dejas vacía, empieza de inmediato.">
                   <input type="date" value={fechaPlantilla} onChange={(e) => setFechaPlantilla(e.target.value)} />
-                </div>
+                </Field>
               )}
             </div>
-          </>
+          </FormSection>
         )}
-        {error && <p className="modal-error">{error}</p>}
-        <div className="modal-footer">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button type="submit" className="btn-primary" disabled={loading || (isCreating && (loadingAreas || areas.length === 0 || !form.calendar_area_id))}>
-            {loading ? 'Guardando...' : inicial ? 'Guardar cambios' : 'Crear sucursal'}
-          </button>
-        </div>
       </form>
-    </ModalWrapper>
+    </Modal>
   )
 }
 
 function TemplateAssignmentFailureModal({ error, retrying, onRetry, onClose }) {
   return (
-    <ModalWrapper title="No se pudo asignar la plantilla" onClose={onClose}>
-      <div className="modal-form">
-        <p role="alert">La sucursal fue creada, pero no se pudo asignar la plantilla.</p>
-        {error && <p className="modal-error">{error}</p>}
-        <div className="modal-footer">
-          <button type="button" className="btn-secondary" onClick={onClose} disabled={retrying}>Cerrar</button>
-          <button type="button" className="btn-primary" onClick={onRetry} disabled={retrying}>
+    <Modal
+      title="No se pudo asignar la plantilla"
+      icon="alerta"
+      tone="danger"
+      onClose={retrying ? () => {} : onClose}
+      footer={(
+        <>
+          <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={onClose} disabled={retrying}>Cerrar</button>
+          <button type="button" className="tuvet-btn" onClick={onRetry} disabled={retrying} aria-busy={retrying}>
             {retrying ? 'Reintentando...' : 'Reintentar asignación'}
           </button>
-        </div>
-      </div>
-    </ModalWrapper>
+        </>
+      )}
+    >
+      <Aviso tipo="error">
+        La sucursal fue creada, pero no se pudo asignar la plantilla.{error ? ` ${error}` : ''}
+      </Aviso>
+    </Modal>
   )
 }
 
-function DesactivarModal({ nombre, onConfirm, onClose }) {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  async function handleConfirm() {
-    setLoading(true)
-    try { await onConfirm() }
-    catch (err) { setError(err.message); setLoading(false) }
-  }
-
-  return (
-    <ModalWrapper title="Desactivar sucursal" onClose={onClose}>
-      <div className="modal-form">
-        <p className="modal-confirm-text">¿Deseas desactivar la sucursal <strong>{nombre}</strong>?</p>
-        {error && <p className="modal-error">{error}</p>}
-        <div className="modal-footer">
-          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-danger" onClick={handleConfirm} disabled={loading}>
-            {loading ? 'Desactivando...' : 'Desactivar'}
-          </button>
-        </div>
-      </div>
-    </ModalWrapper>
-  )
-}
-
-function QuitarGsModal({ sucursal, onConfirm, onClose }) {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  async function handleConfirm() {
-    setLoading(true)
-    setError('')
-    try {
-      await onConfirm()
-    } catch (err) {
-      setError(err.message)
-      setLoading(false)
-    }
-  }
-
-  return (
-    <ModalWrapper title="Quitar GS de la sucursal" onClose={onClose}>
-      <div className="modal-form">
-        <p className="modal-confirm-text">
-          ¿Deseas quitar a <strong>{sucursal.usuario_titular.nombre}</strong> de la sucursal <strong>{sucursal.nombre}</strong>?
-        </p>
-        <p className="modal-confirm-help">La cuenta del GS permanecerá activa y podrás asignarla nuevamente.</p>
-        {error && <p className="modal-error" role="alert">{error}</p>}
-        <div className="modal-footer">
-          <button type="button" className="btn-secondary" onClick={onClose} disabled={loading}>Cancelar</button>
-          <button type="button" className="btn-danger" onClick={handleConfirm} disabled={loading}>
-            {loading ? 'Quitando...' : 'Quitar GS'}
-          </button>
-        </div>
-      </div>
-    </ModalWrapper>
-  )
-}
+/* ── Horarios ── */
 
 function HorariosModal({ sucursal, onClose }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
+  const [errorCarga, setErrorCarga] = useState('')
   const [savingIdx, setSavingIdx] = useState(null)
+  const [guardadoIdx, setGuardadoIdx] = useState(null)
   const [error, setError] = useState('')
 
-  useEffect(() => { loadHorarios() }, [])
-
-  async function loadHorarios() {
+  const loadHorarios = useCallback(async () => {
     setLoading(true)
+    setErrorCarga('')
     try {
       const data = await getHorarios(sucursal.id_sucursal)
       setRows(data.map((h) => ({
@@ -562,17 +515,29 @@ function HorariosModal({ sucursal, onClose }) {
         hora_apertura: h.hora_apertura ?? '',
         hora_cierre:   h.hora_cierre ?? '',
       })))
+    } catch (err) {
+      setErrorCarga(err.message)
     } finally {
       setLoading(false)
     }
-  }
+  }, [sucursal.id_sucursal])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadHorarios()
+  }, [loadHorarios])
 
   function updateRow(idx, key, value) {
+    setGuardadoIdx(null)
     setRows((prev) => prev.map((r, i) => i === idx ? { ...r, [key]: value } : r))
   }
 
   async function handleSave(idx) {
     const row = rows[idx]
+    if (row.abre && (!row.hora_apertura || !row.hora_cierre)) {
+      setError(`Indica la hora de apertura y de cierre del ${DIAS[row.dia_semana].toLowerCase()}.`)
+      return
+    }
     setSavingIdx(idx)
     setError('')
     try {
@@ -587,6 +552,7 @@ function HorariosModal({ sucursal, onClose }) {
         await saveHorarios(sucursal.id_sucursal, body)
       }
       await loadHorarios()
+      setGuardadoIdx(idx)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -595,64 +561,49 @@ function HorariosModal({ sucursal, onClose }) {
   }
 
   return (
-    <ModalWrapper title={`Horarios — ${sucursal.nombre}`} onClose={onClose} xl>
-      <div className="modal-form">
-        {loading ? (
-          <p className="empty-state-sm">Cargando horarios...</p>
-        ) : (
-          <>
-            <div className="horarios-table-wrap">
-              <table className="horarios-table">
+    <Modal
+      title="Horarios"
+      subtitle={sucursal.nombre}
+      icon="reloj"
+      wide
+      onClose={onClose}
+      footer={<button type="button" className="tuvet-btn" onClick={onClose}>Cerrar</button>}
+    >
+      <div className="tuvet-form">
+        <Aviso tipo="error">{error}</Aviso>
+        <EstadoCarga loading={loading} error={errorCarga} onRetry={loadHorarios}>
+          <div className="tuvet-card sk-tabla-card">
+            <div className="tuvet-table-wrap">
+              <table className="tuvet-table sk-horarios">
                 <thead>
                   <tr>
-                    <th>Día</th>
-                    <th>¿Abre?</th>
-                    <th>Apertura</th>
-                    <th>Cierre</th>
-                    <th></th>
+                    <th scope="col">Día</th>
+                    <th scope="col">¿Abre?</th>
+                    <th scope="col">Apertura</th>
+                    <th scope="col">Cierre</th>
+                    <th scope="col"><span className="tuvet-visually-hidden">Guardar</span></th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((row, idx) => (
                     <tr key={row.dia_semana}>
-                      <td className="td-dia">{DIAS[row.dia_semana]}</td>
+                      <td><strong>{DIAS[row.dia_semana]}</strong></td>
                       <td>
-                        <label className="toggle-label">
-                          <input
-                            type="checkbox"
-                            checked={row.abre}
-                            onChange={(e) => updateRow(idx, 'abre', e.target.checked)}
-                          />
-                          <span className={`badge ${row.abre ? 'badge-green' : 'badge-red'}`}>
-                            {row.abre ? 'Abre' : 'Cierra'}
-                          </span>
+                        <label className="sk-abre">
+                          <input type="checkbox" checked={row.abre} onChange={(e) => updateRow(idx, 'abre', e.target.checked)} aria-label={`¿Abre el ${DIAS[row.dia_semana].toLowerCase()}?`} />
+                          <span className={`tuvet-badge ${row.abre ? 'tuvet-badge-aprobada' : 'tuvet-badge-cancelada'}`}>{row.abre ? 'Abre' : 'Cerrado'}</span>
                         </label>
                       </td>
                       <td>
-                        <input
-                          type="time"
-                          className="time-input"
-                          value={row.hora_apertura}
-                          disabled={!row.abre}
-                          onChange={(e) => updateRow(idx, 'hora_apertura', e.target.value)}
-                        />
+                        <input type="time" className="tuvet-input sk-hora" value={row.hora_apertura} disabled={!row.abre} aria-label={`Apertura del ${DIAS[row.dia_semana].toLowerCase()}`} onChange={(e) => updateRow(idx, 'hora_apertura', e.target.value)} />
                       </td>
                       <td>
-                        <input
-                          type="time"
-                          className="time-input"
-                          value={row.hora_cierre}
-                          disabled={!row.abre}
-                          onChange={(e) => updateRow(idx, 'hora_cierre', e.target.value)}
-                        />
+                        <input type="time" className="tuvet-input sk-hora" value={row.hora_cierre} disabled={!row.abre} aria-label={`Cierre del ${DIAS[row.dia_semana].toLowerCase()}`} onChange={(e) => updateRow(idx, 'hora_cierre', e.target.value)} />
                       </td>
-                      <td>
-                        <button
-                          className="btn-save-horario"
-                          onClick={() => handleSave(idx)}
-                          disabled={savingIdx === idx}
-                        >
-                          {savingIdx === idx ? '...' : 'Guardar'}
+                      <td className="tuvet-cell-acciones">
+                        {guardadoIdx === idx && <span className="sk-guardado"><Icono nombre="check" className="tuvet-badge-icon" />Guardado</span>}
+                        <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => handleSave(idx)} disabled={savingIdx === idx} aria-busy={savingIdx === idx}>
+                          {savingIdx === idx ? 'Guardando...' : 'Guardar'}
                         </button>
                       </td>
                     </tr>
@@ -660,46 +611,54 @@ function HorariosModal({ sucursal, onClose }) {
                 </tbody>
               </table>
             </div>
-            {error && <p className="modal-error">{error}</p>}
-          </>
-        )}
-        <div className="modal-footer">
-          <button className="btn-primary" onClick={onClose}>Cerrar</button>
-        </div>
+          </div>
+        </EstadoCarga>
       </div>
-    </ModalWrapper>
+    </Modal>
   )
 }
+
+/* ── Plantilla de la sucursal ── */
 
 function PlantillaModal({ sucursal, onClose }) {
   const [plantillas, setPlantillas]     = useState([])
   const [tareas, setTareas]             = useState([])
   const [loading, setLoading]           = useState(true)
+  const [errorCarga, setErrorCarga]     = useState('')
   const [idPlantilla, setIdPlantilla]   = useState('')
   const [fechaInicio, setFechaInicio]   = useState('')
   const [saving, setSaving]             = useState(false)
   const [error, setError]               = useState('')
   const [success, setSuccess]           = useState('')
 
-  useEffect(() => { loadData() }, [])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true)
+    setErrorCarga('')
     try {
       const [p, t] = await Promise.all([
         getPlantillas(),
         getTareasSucursal(sucursal.id_sucursal),
       ])
-      setPlantillas(p.filter((p) => p.activa))
+      setPlantillas(p.filter((item) => item.activa))
       setTareas(t)
+    } catch (err) {
+      setErrorCarga(err.message)
     } finally {
       setLoading(false)
     }
-  }
+  }, [sucursal.id_sucursal])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadData()
+  }, [loadData])
 
   async function handleAsignar(e) {
     e.preventDefault()
-    if (!idPlantilla) return
+    if (!idPlantilla) {
+      setError('Selecciona la plantilla que quieres asignar.')
+      return
+    }
     setSaving(true)
     setError('')
     setSuccess('')
@@ -721,63 +680,54 @@ function PlantillaModal({ sucursal, onClose }) {
   const tareasActivas = tareas.filter((t) => t.activa)
 
   return (
-    <ModalWrapper title={`Plantilla — ${sucursal.nombre}`} onClose={onClose} wide>
-      <div className="modal-form">
+    <Modal
+      title="Asignar plantilla"
+      subtitle={sucursal.nombre}
+      icon="plantilla"
+      wide
+      onClose={saving ? () => {} : onClose}
+      footer={<button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={onClose} disabled={saving}>Cerrar</button>}
+    >
+      <div className="tuvet-form">
+        <Aviso tipo="success">{success}</Aviso>
 
-        <form onSubmit={handleAsignar}>
-          <p className="form-section-title">Asignar plantilla</p>
-          <div className="form-row">
-            <div className="form-group" style={{ flex: 2 }}>
-              <label>Plantilla</label>
-              <select value={idPlantilla} onChange={(e) => setIdPlantilla(e.target.value)} required>
+        <FormSection title="Nueva asignación">
+          <form className="tuvet-inline-form" onSubmit={handleAsignar} noValidate>
+            <Field label="Plantilla" required error={error}>
+              <select value={idPlantilla} onChange={(e) => { setIdPlantilla(e.target.value); setError('') }}>
                 <option value="">Seleccionar plantilla</option>
                 {plantillas.map((p) => (
-                  <option key={p.id_plantilla} value={p.id_plantilla}>
-                    {p.nombre}
-                  </option>
+                  <option key={p.id_plantilla} value={p.id_plantilla}>{p.nombre}</option>
                 ))}
               </select>
-            </div>
-            <div className="form-group">
-              <label>Fecha inicio <span className="label-optional">(opc.)</span></label>
+            </Field>
+            <Field label="Fecha de inicio" hint="Opcional.">
               <input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
-            </div>
-          </div>
-          {error   && <p className="modal-error">{error}</p>}
-          {success && <p className="modal-success">{success}</p>}
-          <div className="modal-footer" style={{ paddingTop: 0 }}>
-            <button type="button" className="btn-secondary" onClick={onClose}>Cerrar</button>
-            <button type="submit" className="btn-primary" disabled={saving || !idPlantilla}>
+            </Field>
+            <button type="submit" className="tuvet-btn" disabled={saving || !idPlantilla} aria-busy={saving}>
               {saving ? 'Asignando...' : 'Asignar plantilla'}
             </button>
-          </div>
-        </form>
+          </form>
+        </FormSection>
 
-        {loading ? (
-          <p className="empty-state-sm">Cargando tareas...</p>
-        ) : tareasActivas.length > 0 && (
-          <>
-            <p className="form-section-title">Tareas activas ({tareasActivas.length})</p>
-            <div className="tareas-suc-list">
+        <FormSection title={`Tareas activas de la sucursal${loading ? '' : ` (${tareasActivas.length})`}`}>
+          <EstadoCarga loading={loading} error={errorCarga} onRetry={loadData} empty={!tareasActivas.length} emptyText="Esta sucursal todavía no tiene tareas activas.">
+            <ul className="sk-tareas">
               {tareasActivas.map((ts) => (
-                <div key={ts.id_sucursal_tarea} className="tareas-suc-row">
-                  <div className="tareas-suc-info">
-                    <span className="tareas-suc-nombre">{ts.tarea?.nombre}</span>
-                    <div className="tareas-suc-meta">
-                      <span className="badge badge-tipo">{JORNADA_LABEL[ts.jornada] ?? ts.jornada}</span>
-                      <span className="tareas-suc-hora">{ts.hora}</span>
-                      <span className="tareas-suc-peso">Peso: {ts.tarea?.peso ?? '—'}</span>
-                      {ts.tarea?.recurrencia_label && (
-                        <span className="badge badge-tipo">{ts.tarea.recurrencia_label}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <li key={ts.id_sucursal_tarea} className="sk-tarea">
+                  <strong>{ts.tarea?.nombre}</strong>
+                  <span className="tuvet-tags">
+                    <span className="tuvet-badge tuvet-badge-en_revision">{JORNADA_LABEL[ts.jornada] ?? ts.jornada}</span>
+                    {ts.hora && <span className="tuvet-tag">{ts.hora}</span>}
+                    {ts.tarea?.recurrencia_label && <span className="tuvet-tag">{ts.tarea.recurrencia_label}</span>}
+                    <span className="tuvet-tag">Peso {ts.tarea?.peso ?? '—'}</span>
+                  </span>
+                </li>
               ))}
-            </div>
-          </>
-        )}
+            </ul>
+          </EstadoCarga>
+        </FormSection>
       </div>
-    </ModalWrapper>
+    </Modal>
   )
 }

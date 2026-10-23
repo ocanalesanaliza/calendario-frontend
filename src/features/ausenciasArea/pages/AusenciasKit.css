@@ -1,0 +1,181 @@
+/*
+ * Vacaciones y situaciones del área (Analiza) con el diseño del kit compartido (TuvetUi + tema .tema-analiza).
+ * Cada tipo de ausencia tiene su propio acento para distinguirlos de un vistazo:
+ *   vacaciones → índigo del tema (icono de calendario) · situaciones especiales → ámbar (icono de alerta).
+ * Todo va limitado a .ausencias-kit; AusenciasAreaPage.css ya no se importa (solo tenía clases de esta página).
+ */
+
+.ausencias-kit .ak-acento-vacaciones { --ak-acento: var(--tv-primary); --ak-acento-soft: var(--tv-primary-soft); --ak-acento-text: var(--tv-primary-text); }
+.ausencias-kit .ak-acento-situaciones { --ak-acento: #D97706; --ak-acento-soft: var(--tv-warning-soft); --ak-acento-text: var(--tv-warning-text); }
+
+/* Pestañas en forma de tarjeta: icono, título, para qué sirve y contador. */
+.ausencias-kit .ak-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .75rem;
+}
+
+.ausencias-kit .ak-tab {
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  min-height: 76px;
+  padding: .85rem 1rem;
+  border: 1.5px solid var(--tv-border);
+  border-radius: var(--tv-radius);
+  background: var(--tv-surface);
+  color: var(--tv-fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--tv-dur-fast) var(--tv-ease), box-shadow var(--tv-dur-fast) var(--tv-ease), background var(--tv-dur-fast) var(--tv-ease);
+}
+
+.ausencias-kit .ak-tab:hover { border-color: var(--ak-acento); }
+.ausencias-kit .ak-tab:focus-visible { outline: 2px solid var(--tv-primary-accent); outline-offset: 2px; }
+
+.ausencias-kit .ak-tab.is-active {
+  border-color: var(--ak-acento);
+  background: color-mix(in srgb, var(--ak-acento-soft) 45%, var(--tv-surface));
+  box-shadow: inset 0 -3px 0 var(--ak-acento);
+}
+
+.ausencias-kit .ak-tab-texto { display: grid; flex: 1; gap: .15rem; min-width: 0; }
+.ausencias-kit .ak-tab-titulo { font-size: 1rem; font-weight: 700; }
+.ausencias-kit .ak-tab-descripcion { color: var(--tv-muted); font-size: .82rem; line-height: 1.35; }
+
+.ausencias-kit .ak-tab-contador {
+  flex-shrink: 0;
+  padding: .25rem .6rem;
+  border-radius: 999px;
+  background: var(--ak-acento-soft);
+  color: var(--ak-acento-text);
+  font-size: .78rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Icono del tipo de ausencia (pestañas, encabezados y tarjetas). */
+.ausencias-kit .ak-panel-icono,
+.ausencias-kit .ak-solicitud-icono {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: var(--ak-acento-soft);
+  color: var(--ak-acento-text);
+}
+
+.ausencias-kit .ak-panel-icono .tuvet-icon,
+.ausencias-kit .ak-solicitud-icono .tuvet-icon { width: 21px; height: 21px; }
+
+.ausencias-kit .ak-panel { display: grid; gap: .9rem; }
+
+.ausencias-kit .ak-panel-header { display: flex; align-items: center; gap: .75rem; }
+.ausencias-kit .ak-panel-header h2 { margin: 0; color: var(--tv-fg); font-size: 1.1rem; }
+.ausencias-kit .ak-panel-header p { margin: .15rem 0 0; color: var(--tv-subtle); font-size: .85rem; }
+
+/* Tablas: franja superior con el color del tipo de ausencia. */
+.ausencias-kit .ak-tabla-card { padding: 0; overflow: hidden; border-top: 3px solid var(--ak-acento); }
+.ausencias-kit .ak-tabla th:first-child,
+.ausencias-kit .ak-tabla td:first-child { padding-left: 1rem; }
+.ausencias-kit .ak-tabla .tuvet-badge { white-space: nowrap; }
+.ausencias-kit .ak-periodo-cell { min-width: 220px; font-weight: 600; }
+.ausencias-kit .ak-motivo { max-width: 320px; color: var(--tv-muted); }
+.ausencias-kit .ak-nowrap { white-space: nowrap; }
+.ausencias-kit .ak-tipo { background: var(--tv-warning-soft); color: var(--tv-warning-text); }
+
+/* Tarjetas de solicitudes del GA: borde izquierdo con el color del estado. */
+.ausencias-kit .ak-solicitudes { display: grid; gap: .6rem; }
+
+.ausencias-kit .ak-solicitud {
+  --ak-acento: var(--tv-primary);
+  --ak-acento-soft: var(--tv-primary-soft);
+  --ak-acento-text: var(--tv-primary-text);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .75rem 1rem;
+  padding: .85rem 1rem;
+  border: 1px solid var(--tv-border);
+  border-left: 4px solid var(--ak-estado, var(--tv-border-strong));
+  border-radius: var(--tv-radius);
+  background: var(--tv-surface);
+}
+
+.ausencias-kit .ak-solicitud--pending { --ak-estado: #D97706; }
+.ausencias-kit .ak-solicitud--approved { --ak-estado: var(--tv-success-text); }
+.ausencias-kit .ak-solicitud--rejected { --ak-estado: var(--tv-danger); }
+.ausencias-kit .ak-solicitud--cancelled { --ak-estado: var(--tv-border-strong); }
+
+.ausencias-kit .ak-solicitud-cuerpo { display: grid; flex: 1; gap: .2rem; min-width: 200px; }
+.ausencias-kit .ak-solicitud-cuerpo p { margin: 0; }
+.ausencias-kit .ak-solicitud-titulo { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; }
+.ausencias-kit .ak-solicitud-titulo h3 { margin: 0; color: var(--tv-fg); font-size: .95rem; }
+.ausencias-kit .ak-solicitud-segmentos { color: var(--tv-fg); font-size: .88rem; font-weight: 600; }
+
+/* Formularios de los modales (etiqueta que envuelve al control). */
+.ausencias-kit .ak-form,
+.tuvet-modal .ak-form { display: grid; gap: .9rem; }
+
+.tuvet-modal .ak-label {
+  display: grid;
+  gap: .35rem;
+  color: var(--tv-fg);
+  font-size: .85rem;
+  font-weight: 600;
+}
+
+.tuvet-modal .ak-label .tuvet-hint { font-weight: 400; }
+.tuvet-modal .ak-label textarea { resize: vertical; }
+
+.tuvet-modal .ak-segmento {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: end;
+  gap: .6rem;
+  margin: 0;
+  padding: .75rem;
+  border: 1px solid var(--tv-border);
+  border-radius: var(--tv-radius);
+}
+
+.tuvet-modal .ak-segmento legend { padding: 0 .3rem; color: var(--tv-muted); font-size: .78rem; font-weight: 700; }
+.tuvet-modal .ak-modo { display: flex; flex-wrap: wrap; gap: .5rem; }
+.tuvet-modal .ak-link { justify-self: start; }
+
+.tuvet-modal .ak-resumen,
+.tuvet-modal .ak-periodo {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin: 0;
+  padding: .65rem .8rem;
+  border-radius: var(--tv-radius-sm);
+  background: var(--tv-primary-softer);
+  color: var(--tv-primary-text);
+  font-size: .88rem;
+}
+
+.tuvet-modal .ak-resumen-icon { flex-shrink: 0; width: 18px; height: 18px; }
+
+.tuvet-modal .ak-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: .5rem;
+  padding-top: .5rem;
+  border-top: 1px solid var(--tv-border);
+}
+
+.tuvet-modal-icon-warning { background: var(--tv-warning-soft); color: var(--tv-warning-text); }
+
+@media (max-width: 640px) {
+  .ausencias-kit .ak-tabs { grid-template-columns: 1fr; }
+  .ausencias-kit .ak-tab-descripcion { display: none; }
+  .tuvet-modal .ak-segmento { grid-template-columns: 1fr; }
+  .tuvet-modal .ak-footer > * { flex: 1; }
+}

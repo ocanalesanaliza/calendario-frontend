@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useAuth } from '../../auth/context/AuthContext'
 import { getProfileCapabilities } from '../../auth/profilePolicies'
 import { createIdempotencyKey } from '../../calendarArea/services/calendarAreaApi'
 import { actOnGAVacationRequest, createGAVacationRequest, getGAVacationRequests } from '../../calendarArea/services/gaVacationRequestsService'
 import { createGASpecialSituation, deactivateGASpecialSituation, getCatalog, getGASpecialSituations } from '../../calendarArea/services/gaSpecialSituationsService'
-import './AusenciasAreaPage.css'
+// Kit de componentes compartido con Tuvet; los colores de Analiza llegan con la clase .tema-analiza.
+import { Avatar, Aviso, EstadoCarga, Icono, PageHeader } from '../../tuvet/components/TuvetUi'
+import '../../tuvet/tuvet.css'
+import './AusenciasKit.css'
 
 const slots = [['full_day', 'Jornada completa'], ['morning', 'Mañana'], ['afternoon', 'Tarde']]
 const records = (data) => Array.isArray(data) ? data : data?.results ?? data?.items ?? []
@@ -17,15 +20,23 @@ const errorText = (error, fallback) => {
 }
 const invalidatesCommandKey = (error) => [400, 403, 409].includes(error?.status)
 const rawStatus = (item) => String(item?.state ?? item?.status ?? item?.estado ?? 'pending').trim().toLowerCase()
-const status = (item) => ({ accepted: 'approved', aceptada: 'approved', aceptado: 'approved', aprobada: 'approved', aprobado: 'approved' }[rawStatus(item)] ?? rawStatus(item))
+const status = (item) => ({ accepted: 'approved', aceptada: 'approved', aceptado: 'approved', aprobada: 'approved', aprobado: 'approved', pendiente: 'pending', rechazada: 'rejected', cancelada: 'cancelled' }[rawStatus(item)] ?? rawStatus(item))
 const dateOf = (item) => item?.date ?? item?.fecha ?? item?.created_at?.slice(0, 10) ?? '—'
 const reasonOf = (item) => item?.reason ?? item?.motivo ?? '—'
-const isPending = (item) => ['pending', 'pendiente'].includes(status(item))
-const statusLabel = (item) => ({ pending: 'Pendiente', pendiente: 'Pendiente', approved: 'Aprobada', rejected: 'Rechazada', rechazada: 'Rechazada', cancelled: 'Cancelada', cancelada: 'Cancelada' }[status(item)] ?? status(item))
+const isPending = (item) => status(item) === 'pending'
+const statusLabel = (item) => ({ pending: 'Pendiente', approved: 'Aprobada', rejected: 'Rechazada', cancelled: 'Cancelada' }[status(item)] ?? status(item))
+// Estado de la solicitud → insignia del kit (color + icono, nunca solo color).
+const STATUS_BADGE = {
+  pending: ['tuvet-badge-pendiente', 'reloj'],
+  approved: ['tuvet-badge-aprobada', 'check'],
+  rejected: ['tuvet-badge-vencida', 'rechazar'],
+  cancelled: ['tuvet-badge-cancelada', 'cerrar'],
+}
 const gaOf = (item) => item?.gerente_area ?? item?.area_manager ?? item?.ga
 const gaId = (item) => gaOf(item)?.id ?? gaOf(item)?.id_gerente_area ?? item?.gerente_area_id
 const gaName = (item) => gaOf(item)?.nombre ?? gaOf(item)?.name ?? item?.gerente_area_nombre ?? `GA #${gaId(item)}`
 const typeOf = (item) => item?.type ?? item?.tipo
+const isActive = (situation) => situation.active !== false && situation.activa !== false
 const slotLabel = (slot) => slots.find(([value]) => value === slot)?.[1] ?? slot ?? '—'
 const vacationSegmentsOf = (request) => request?.segments ?? request?.segmentos ?? []
 const segmentDateOf = (segment) => segment?.date ?? segment?.fecha
@@ -40,7 +51,7 @@ const localizedDateRange = (startDate, endDate) => {
   const end = String(endDate).match(/^(\d{4})-(\d{2})-(\d{2})/)
   if (!start || !end) return `Del ${localizedDate(startDate)} al ${localizedDate(endDate)}`
   const [, startYear, startMonth, startDay] = start
-  const [, endYear, endMonth, endDay] = end
+  const [, endYear, endMonth] = end
   if (startYear === endYear && startMonth === endMonth) return `Del ${Number(startDay)} al ${localizedDate(endDate)}`
   if (startYear === endYear) return `Del ${localizedDate(startDate).replace(` de ${startYear}`, '')} al ${localizedDate(endDate)}`
   return `Del ${localizedDate(startDate)} al ${localizedDate(endDate)}`
@@ -103,8 +114,21 @@ const specialSituationRangeError = (startDate, endDate) => {
   if (inclusiveRange(startDate, endDate).length > 31) return 'El rango no puede superar 31 días, incluidos ambos extremos.'
   return ''
 }
+const plural = (count, singular, pluralForm) => `${count} ${count === 1 ? singular : pluralForm}`
 
-function Modal({ title, children, onClose, className = '' }) {
+function StatusBadge({ item, className = '' }) {
+  const [badge, icon] = STATUS_BADGE[status(item)] ?? ['tuvet-badge-cancelada', 'info']
+  return (
+    <span className={`tuvet-badge ${badge} ${className}`.trim()}>
+      <Icono nombre={icon} className="tuvet-badge-icon" />
+      {statusLabel(item)}
+    </span>
+  )
+}
+
+// Modal propio de la página (enfoca [data-autofocus]); con el aspecto del kit.
+function Modal({ title, icon, tone = 'primary', children, onClose, className = '' }) {
+  const titleId = useId()
   const dialogRef = useRef(null)
   const previous = useRef(null)
 
@@ -136,13 +160,16 @@ function Modal({ title, children, onClose, className = '' }) {
   }
 
   return (
-    <div className="ausencias-modal-backdrop">
-      <section ref={dialogRef} className={`ausencias-modal ${className}`.trim()} role="dialog" aria-modal="true" aria-labelledby="ausencias-modal-title" tabIndex="-1" onKeyDown={keyDown}>
-        <header>
-          <h2 id="ausencias-modal-title">{title}</h2>
-          <button type="button" aria-label="Cerrar" onClick={onClose}>×</button>
+    <div className="tuvet-modal-backdrop">
+      <section ref={dialogRef} className={`tuvet-modal ${className}`.trim()} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex="-1" onKeyDown={keyDown}>
+        <header className="tuvet-modal-header">
+          <div className="tuvet-modal-heading">
+            {icon && <span className={`tuvet-modal-icon tuvet-modal-icon-${tone}`}><Icono nombre={icon} /></span>}
+            <h2 id={titleId}>{title}</h2>
+          </div>
+          <button type="button" className="tuvet-icon-btn" aria-label="Cerrar" onClick={onClose}><Icono nombre="cerrar" /></button>
         </header>
-        {children}
+        <div className="tuvet-modal-body">{children}</div>
       </section>
     </div>
   )
@@ -200,36 +227,38 @@ function VacationForm({ onClose, onConflict, onSubmit }) {
   }
 
   return (
-    <Modal title="Nueva solicitud de vacaciones" onClose={onClose} className="ausencias-vacation-modal">
-      <form className="ausencias-vacation-form" onSubmit={submit}>
+    <Modal title="Nueva solicitud de vacaciones" icon="calendario" onClose={onClose} className="ausencias-vacation-modal">
+      <form className="tuvet-form ak-form" onSubmit={submit}>
         {advanced ? (
           <>
-            <p className="ausencias-vacation-form__hint">Añade las fechas y jornadas que necesites, incluso si no son consecutivas.</p>
+            <p className="tuvet-hint">Añade las fechas y jornadas que necesites, incluso si no son consecutivas.</p>
             {segments.map((segment, index) => (
-              <fieldset key={index}>
+              <fieldset key={index} className="ak-segmento">
                 <legend>Segmento {index + 1}</legend>
-                <label>Fecha<input data-autofocus={index === 0 ? true : undefined} type="date" value={segment.date} onChange={(event) => update(index, 'date', event.target.value)} disabled={saving} required /></label>
-                <label>Jornada<select value={segment.slot} onChange={(event) => update(index, 'slot', event.target.value)} disabled={saving}>{slots.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-                {segments.length > 1 && <button type="button" onClick={() => setSegments((current) => current.filter((_, i) => i !== index))} disabled={saving}>Quitar segmento</button>}
+                <label className="ak-label">Fecha<input className="tuvet-input" data-autofocus={index === 0 ? true : undefined} type="date" value={segment.date} onChange={(event) => update(index, 'date', event.target.value)} disabled={saving} required /></label>
+                <label className="ak-label">Jornada<select className="tuvet-input" value={segment.slot} onChange={(event) => update(index, 'slot', event.target.value)} disabled={saving}>{slots.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+                {segments.length > 1 && <button type="button" className="tuvet-btn tuvet-btn-ghost" onClick={() => setSegments((current) => current.filter((_, i) => i !== index))} disabled={saving}>Quitar segmento</button>}
               </fieldset>
             ))}
-            <button className="ausencias-vacation-form__mode" type="button" onClick={() => setSegments((current) => [...current, { date: '', slot: 'full_day' }])} disabled={saving}>Agregar fecha</button>
-            <button className="ausencias-vacation-form__mode" type="button" onClick={() => setAdvanced(false)} disabled={saving}>Volver al formulario de rango</button>
+            <div className="ak-modo">
+              <button className="tuvet-btn tuvet-btn-secondary" type="button" onClick={() => setSegments((current) => [...current, { date: '', slot: 'full_day' }])} disabled={saving}>Agregar fecha</button>
+              <button className="tuvet-btn tuvet-btn-ghost" type="button" onClick={() => setAdvanced(false)} disabled={saving}>Volver al formulario de rango</button>
+            </div>
           </>
         ) : (
           <>
-            <div className="ausencias-vacation-form__range">
-              <label>Fecha de inicio<input data-autofocus type="date" value={range.startDate} onChange={(event) => setRange((current) => ({ ...current, startDate: event.target.value }))} disabled={saving} required /></label>
-              <label>Fecha de fin (opcional)<input type="date" value={range.endDate} onChange={(event) => setRange((current) => ({ ...current, endDate: event.target.value }))} disabled={saving} aria-describedby={isRange ? 'vacation-range-note' : undefined} /></label>
+            <div className="tuvet-form-grid">
+              <label className="ak-label">Fecha de inicio<input className="tuvet-input" data-autofocus type="date" value={range.startDate} onChange={(event) => setRange((current) => ({ ...current, startDate: event.target.value }))} disabled={saving} required /></label>
+              <label className="ak-label">Fecha de fin (opcional)<input className="tuvet-input" type="date" value={range.endDate} onChange={(event) => setRange((current) => ({ ...current, endDate: event.target.value }))} disabled={saving} aria-describedby={isRange ? 'vacation-range-note' : undefined} /></label>
             </div>
-            {isRange ? <p id="vacation-range-note" className="ausencias-vacation-form__hint">El rango se solicitará por jornadas completas.</p> : <label>Jornada<select value={range.slot} onChange={(event) => setRange((current) => ({ ...current, slot: event.target.value }))} disabled={saving}>{slots.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
-            <p className="ausencias-vacation-form__summary" aria-live="polite"><strong>Resumen:</strong> {summary}</p>
-            <button className="ausencias-vacation-form__mode" type="button" onClick={() => setAdvanced(true)} disabled={saving}>¿Necesitas fechas o jornadas no consecutivas?</button>
+            {isRange ? <p id="vacation-range-note" className="tuvet-hint">El rango se solicitará por jornadas completas.</p> : <label className="ak-label">Jornada<select className="tuvet-input" value={range.slot} onChange={(event) => setRange((current) => ({ ...current, slot: event.target.value }))} disabled={saving}>{slots.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
+            <p className="ak-resumen" aria-live="polite"><Icono nombre="calendario" className="ak-resumen-icon" /><span><strong>Resumen:</strong> {summary}</span></p>
+            <button className="tuvet-btn tuvet-btn-ghost ak-link" type="button" onClick={() => setAdvanced(true)} disabled={saving}>¿Necesitas fechas o jornadas no consecutivas?</button>
           </>
         )}
-        <label>Motivo <span>(opcional)</span><textarea value={reason} onChange={(event) => setReason(event.target.value)} disabled={saving} /></label>
-        {error && <p role="alert">{error}</p>}
-        <footer><button type="button" onClick={onClose} disabled={saving}>Cancelar</button><button type="submit" disabled={saving}>{saving ? 'Enviando...' : 'Solicitar vacaciones'}</button></footer>
+        <label className="ak-label">Motivo <span className="tuvet-hint">(opcional)</span><textarea className="tuvet-input" rows={3} value={reason} onChange={(event) => setReason(event.target.value)} disabled={saving} /></label>
+        <Aviso tipo="error">{error}</Aviso>
+        <footer className="ak-footer"><button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={onClose} disabled={saving}>Cancelar</button><button type="submit" className="tuvet-btn" disabled={saving} aria-busy={saving}>{saving ? 'Enviando...' : 'Solicitar vacaciones'}</button></footer>
       </form>
     </Modal>
   )
@@ -240,6 +269,7 @@ function ResolveForm({ request, action, onClose, onConflict, onSubmit }) {
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const approve = action === 'approve'
 
   async function submit(event) {
     event.preventDefault()
@@ -261,11 +291,12 @@ function ResolveForm({ request, action, onClose, onConflict, onSubmit }) {
   }
 
   return (
-    <Modal title={action === 'approve' ? 'Aprobar vacaciones' : 'Rechazar vacaciones'} onClose={onClose}>
-      <form onSubmit={submit}>
-        <label>Motivo<textarea data-autofocus value={reason} onChange={(event) => setReason(event.target.value)} disabled={saving} required={action === 'reject'} /></label>
-        {error && <p role="alert">{error}</p>}
-        <footer><button type="button" onClick={onClose} disabled={saving}>Cancelar</button><button type="submit" disabled={saving}>{saving ? 'Guardando...' : action === 'approve' ? 'Aprobar' : 'Rechazar'}</button></footer>
+    <Modal title={approve ? 'Aprobar vacaciones' : 'Rechazar vacaciones'} icon={approve ? 'check' : 'rechazar'} tone={approve ? 'success' : 'danger'} onClose={onClose}>
+      <form className="tuvet-form ak-form" onSubmit={submit}>
+        <p className="ak-periodo"><Icono nombre="calendario" className="ak-resumen-icon" />{vacationPeriodOf(request)}</p>
+        <label className="ak-label">Motivo<textarea className="tuvet-input" rows={3} data-autofocus value={reason} onChange={(event) => setReason(event.target.value)} disabled={saving} required={!approve} placeholder={approve ? 'Ej. Cobertura validada' : 'Explica por qué no se puede aprobar'} /></label>
+        <Aviso tipo="error">{error}</Aviso>
+        <footer className="ak-footer"><button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={onClose} disabled={saving}>Cancelar</button><button type="submit" className={`tuvet-btn ${approve ? '' : 'tuvet-btn-danger-solid'}`} disabled={saving} aria-busy={saving}>{saving ? 'Guardando...' : approve ? 'Aprobar' : 'Rechazar'}</button></footer>
       </form>
     </Modal>
   )
@@ -295,11 +326,15 @@ function Confirmation({ title, message, confirmLabel, onClose, onConflict, onCon
   }
 
   return (
-    <Modal title={title} onClose={onClose}>
-      <p>{message}</p>
-      {error && <p role="alert">{error}</p>}
-      <button data-autofocus disabled={saving} onClick={confirm}>{saving ? 'Guardando...' : confirmLabel}</button>
-      <button disabled={saving} onClick={onClose}>Volver</button>
+    <Modal title={title} icon="alerta" tone="danger" onClose={onClose}>
+      <div className="tuvet-form ak-form">
+        <p className="tuvet-confirm-message">{message}</p>
+        <Aviso tipo="error">{error}</Aviso>
+        <footer className="ak-footer">
+          <button type="button" className="tuvet-btn tuvet-btn-secondary" disabled={saving} onClick={onClose}>Volver</button>
+          <button type="button" className="tuvet-btn tuvet-btn-danger-solid" data-autofocus disabled={saving} aria-busy={saving} onClick={confirm}>{saving ? 'Guardando...' : confirmLabel}</button>
+        </footer>
+      </div>
     </Modal>
   )
 }
@@ -352,23 +387,29 @@ function SituationForm({ catalog, catalogError, catalogLoading, onCatalogDateCha
   }
 
   return (
-    <Modal title="Nueva situación especial de GA" onClose={onClose} className="ausencias-area-admin-situation-modal">
-      <form className="ausencias-area-admin-situation-form" onSubmit={submit}>
-        {catalogLoading && <p role="status">Cargando catálogo de situaciones...</p>}
-        {catalogError && <div role="alert"><p>{catalogError}</p><button type="button" onClick={() => onCatalogRetry(form.date || undefined, form.end_date || undefined)} disabled={saving}>Reintentar</button></div>}
-        {!catalogLoading && !catalogError && !ready && <p role="alert">No hay opciones disponibles para crear una situación en esta fecha.</p>}
-        <label>Gerente de área<select data-autofocus value={form.gerente_area_id} onChange={set('gerente_area_id')} disabled={saving || !ready} required><option value="">Seleccionar GA</option>{candidates.map((ga) => <option key={ga.id} value={ga.id}>{ga.display_name}</option>)}</select></label>
-        <label>Fecha<input type="date" value={form.date} onChange={setDate} disabled={saving} required /></label>
-        <label>Fecha fin <span>(opcional)</span><input type="date" value={form.end_date} onChange={setEndDate} disabled={saving} /></label>
-        <label>Tipo existente<select value={form.type} onChange={set('type')} disabled={saving || !ready} required><option value="">Seleccionar tipo</option>{types.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select></label>
-        <label>Razón<textarea value={form.reason} onChange={set('reason')} disabled={saving || !ready} required /></label>
-        <label>Jornada<select value={form.slot} onChange={set('slot')} disabled={saving || !ready}>{catalogSlots.map((slot) => <option key={slot.value} value={slot.value}>{slotLabel(slot.value)}</option>)}</select></label>
-        {error && <p role="alert">{error}</p>}
-        <footer><button type="button" onClick={onClose} disabled={saving}>Cancelar</button><button type="submit" disabled={saving || !ready}>{saving ? 'Creando...' : 'Crear situación'}</button></footer>
+    <Modal title="Nueva situación especial de GA" icon="alerta" tone="warning" onClose={onClose} className="ausencias-area-admin-situation-modal tuvet-modal-wide">
+      <form className="ausencias-area-admin-situation-form tuvet-form ak-form" onSubmit={submit}>
+        {catalogLoading && <p role="status" className="tuvet-state">Cargando catálogo de situaciones...</p>}
+        {catalogError && <div role="alert" className="tuvet-aviso tuvet-aviso-error"><Icono nombre="error" className="tuvet-aviso-icon" /><div><p>{catalogError}</p><button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => onCatalogRetry(form.date || undefined, form.end_date || undefined)} disabled={saving}>Reintentar</button></div></div>}
+        {!catalogLoading && !catalogError && !ready && <p role="alert" className="tuvet-aviso tuvet-aviso-warning">No hay opciones disponibles para crear una situación en esta fecha.</p>}
+        <div className="tuvet-form-grid">
+          <label className="ak-label">Fecha<input className="tuvet-input" type="date" value={form.date} onChange={setDate} disabled={saving} required /></label>
+          <label className="ak-label">Fecha fin <span className="tuvet-hint">(opcional)</span><input className="tuvet-input" type="date" value={form.end_date} onChange={setEndDate} disabled={saving} /></label>
+        </div>
+        <label className="ak-label">Gerente de área<select className="tuvet-input" data-autofocus value={form.gerente_area_id} onChange={set('gerente_area_id')} disabled={saving || !ready} required><option value="">Seleccionar GA</option>{candidates.map((ga) => <option key={ga.id} value={ga.id}>{ga.display_name}</option>)}</select></label>
+        <div className="tuvet-form-grid">
+          <label className="ak-label">Tipo existente<select className="tuvet-input" value={form.type} onChange={set('type')} disabled={saving || !ready} required><option value="">Seleccionar tipo</option>{types.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select></label>
+          <label className="ak-label">Jornada<select className="tuvet-input" value={form.slot} onChange={set('slot')} disabled={saving || !ready}>{catalogSlots.map((slot) => <option key={slot.value} value={slot.value}>{slotLabel(slot.value)}</option>)}</select></label>
+        </div>
+        <label className="ak-label">Razón<textarea className="tuvet-input" rows={3} value={form.reason} onChange={set('reason')} disabled={saving || !ready} required /></label>
+        <Aviso tipo="error">{error}</Aviso>
+        <footer className="ak-footer"><button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={onClose} disabled={saving}>Cancelar</button><button type="submit" className="tuvet-btn" disabled={saving || !ready} aria-busy={saving}>{saving ? 'Creando...' : 'Crear situación'}</button></footer>
       </form>
     </Modal>
   )
 }
+
+const VACATION_FILTERS = [['all', 'Todas'], ['pending', 'Pendientes'], ['approved', 'Aprobadas'], ['rejected', 'Rechazadas'], ['cancelled', 'Canceladas']]
 
 export default function AusenciasAreaPage() {
   const { perfil } = useAuth()
@@ -379,10 +420,13 @@ export default function AusenciasAreaPage() {
   const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
   const [modal, setModal] = useState(null)
+  const [tab, setTab] = useState('vacations')
+  const [vacationFilter, setVacationFilter] = useState('all')
   const [catalog, setCatalog] = useState(null)
   const [catalogLoading, setCatalogLoading] = useState(canManageAreaAbsences)
   const [catalogError, setCatalogError] = useState('')
   const catalogRequest = useRef(0)
+  const tabRefs = useRef({})
 
   async function loadCatalog(date, endDate) {
     if (!canManageAreaAbsences) return
@@ -430,86 +474,184 @@ export default function AusenciasAreaPage() {
     await Promise.all([load(), canManageAreaAbsences ? loadCatalog() : Promise.resolve()])
   }
 
-  function renderContent() {
-    if (error) return <div role="alert" className={canManageAreaAbsences ? 'ausencias-area-admin-state ausencias-area-admin-state--error' : undefined}><p>{error}</p><button className={canManageAreaAbsences ? 'ausencias-area-admin-state__retry' : undefined} onClick={() => setRetry((value) => value + 1)}>Reintentar</button></div>
-    if (loading) return <p role="status" className={canManageAreaAbsences ? 'ausencias-area-admin-state' : undefined}>Cargando ausencias...</p>
+  const pendingCount = vacations.filter(isPending).length
+  const activeSituations = situations.filter(isActive).length
+  const typeLabel = (situation) => catalog?.types?.find((type) => type.value === typeOf(situation))?.label ?? typeOf(situation) ?? '—'
+  const filteredVacations = vacationFilter === 'all' ? vacations : vacations.filter((request) => status(request) === vacationFilter)
 
+  const tabs = [
+    { key: 'vacations', icon: 'calendario', tone: 'vacaciones', title: 'Vacaciones', description: 'Solicitudes de los gerentes de área para ausentarse.', count: plural(pendingCount, 'pendiente', 'pendientes') },
+    { key: 'situations', icon: 'alerta', tone: 'situaciones', title: 'Situaciones especiales', description: 'Capacitaciones, permisos e imprevistos que ajustan el rendimiento.', count: plural(activeSituations, 'activa', 'activas') },
+  ]
+
+  function onTabKeyDown(event, index) {
+    if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return
+    event.preventDefault()
+    const next = tabs[(index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length].key
+    setTab(next)
+    tabRefs.current[next]?.focus()
+  }
+
+  function renderVacationsAdmin() {
     return (
       <>
-        <section className="ausencias-area-section">
-          <h2>{isAreaManager ? 'Mis solicitudes' : 'Solicitudes de vacaciones'}</h2>
-          {vacations.length === 0 ? <p className={canManageAreaAbsences ? 'ausencias-area-admin-state ausencias-area-admin-state--empty' : undefined}>No hay solicitudes de vacaciones.</p> : (
-            isAreaManager ? (
-              <div className="ausencias-area-request-list">
-                {vacations.map((request) => (
-                  <article key={idOf(request)} className="ausencias-area-request-card">
-                    <div className="ausencias-area-request-card__header">
-                      <div className="ausencias-area-request-card__summary">
-                        <div className="ausencias-area-request-card__title-row">
-                          <h3>Solicitud de vacaciones</h3>
-                          <span>{dateOf(request)}</span>
-                        </div>
-                        <p><span>{(request.segments ?? request.segmentos ?? []).map((segment) => `${segment.date ?? segment.fecha} · ${slotLabel(segment.slot ?? segment.jornada)}`).join(', ') || '—'}</span><span>{reasonOf(request)}</span></p>
-                      </div>
-                      <span className="ausencias-area-status-badge">{statusLabel(request)}</span>
-                      {isPending(request) && <button className="ausencias-area-request-card__cancel" type="button" aria-label="Cancelar solicitud" title="Cancelar solicitud" onClick={() => setModal({ type: 'cancel', request })}><span aria-hidden="true">×</span></button>}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <div className="ausencias-area-admin-table-card">
-              <table className="ausencias-area-admin-table ausencias-area-admin-table--vacations">
-                <thead><tr><th>Período solicitado</th><th>Motivo</th><th>Estado</th><th>Acciones</th></tr></thead>
-                <tbody>{vacations.map((request) => (
+        <div className="tuvet-filtros" role="group" aria-label="Filtrar solicitudes por estado">
+          {VACATION_FILTERS.map(([key, label]) => (
+            <button key={key} type="button" className={`tuvet-chip ${vacationFilter === key ? 'active' : ''}`} aria-pressed={vacationFilter === key} onClick={() => setVacationFilter(key)}>
+              {`${label} (${key === 'all' ? vacations.length : vacations.filter((request) => status(request) === key).length})`}
+            </button>
+          ))}
+        </div>
+        {filteredVacations.length === 0 ? (
+          <div className="tuvet-empty"><Icono nombre="calendario" className="tuvet-empty-icon" /><p>{vacations.length ? 'Ninguna solicitud con ese estado.' : 'No hay solicitudes de vacaciones.'}</p></div>
+        ) : (
+          <div className="tuvet-card ak-tabla-card ak-acento-vacaciones">
+            <div className="tuvet-table-wrap">
+              <table className="tuvet-table ak-tabla">
+                <thead><tr><th scope="col">Período solicitado</th><th scope="col">Motivo</th><th scope="col">Estado</th><th scope="col"><span className="tuvet-visually-hidden">Acciones</span></th></tr></thead>
+                <tbody>{filteredVacations.map((request) => (
                   <tr key={idOf(request)}>
-                    <td className="ausencias-area-admin-table__period">{vacationPeriodOf(request)}</td>
-                    <td className="ausencias-area-admin-table__reason">{vacationReasonOf(request)}</td><td><span className={`ausencias-area-admin-badge ausencias-area-admin-badge--${status(request)}`}>{statusLabel(request)}</span></td>
-                    <td>{isPending(request) ? <div className="ausencias-area-admin-actions"><button className="ausencias-area-admin-action ausencias-area-admin-action--approve" type="button" aria-label="Aprobar" title="Aprobar" onClick={() => setModal({ type: 'resolve', action: 'approve', request })}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg></button><button className="ausencias-area-admin-action ausencias-area-admin-action--reject" type="button" aria-label="Rechazar" title="Rechazar" onClick={() => setModal({ type: 'resolve', action: 'reject', request })}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg></button></div> : '—'}</td>
+                    <td className="ak-periodo-cell">{vacationPeriodOf(request)}</td>
+                    <td className="ak-motivo">{vacationReasonOf(request)}</td>
+                    <td><StatusBadge item={request} className={`ausencias-area-admin-badge ausencias-area-admin-badge--${status(request)}`} /></td>
+                    <td className="tuvet-cell-acciones">{isPending(request) ? (
+                      <>
+                        <button className="tuvet-btn" type="button" onClick={() => setModal({ type: 'resolve', action: 'approve', request })}>Aprobar</button>
+                        <button className="tuvet-btn tuvet-btn-danger" type="button" onClick={() => setModal({ type: 'resolve', action: 'reject', request })}>Rechazar</button>
+                      </>
+                    ) : <span className="tuvet-hint">—</span>}</td>
                   </tr>
                 ))}</tbody>
               </table>
-              </div>
-            )
-          )}
-        </section>
-        {canManageAreaAbsences && (
-          <section className="ausencias-area-section">
-
-            {situations.length === 0 ? <p className="ausencias-area-admin-state ausencias-area-admin-state--empty">No hay situaciones especiales registradas.</p> : (
-              <div className="ausencias-area-admin-table-card">
-              <table className="ausencias-area-admin-table">
-                <thead><tr><th>GA</th><th>Fecha</th><th>Tipo</th><th>Razón</th><th>Jornada</th><th>Estado</th><th>Acciones</th></tr></thead>
-                <tbody>{situations.map((situation) => (
-                  <tr key={idOf(situation)} className={situation.active === false || situation.activa === false ? 'ausencias-area-admin-table__row--inactive' : undefined}>
-                    <td className="ausencias-area-admin-table__name">{gaName(situation)}</td><td>{dateOf(situation)}</td><td><span className="ausencias-area-admin-badge ausencias-area-admin-badge--type">{typeOf(situation) ?? '—'}</span></td><td className="ausencias-area-admin-table__reason">{reasonOf(situation)}</td>
-                    <td>{slotLabel(situation.slot ?? situation.jornada)}</td>
-                    <td><span className={`ausencias-area-admin-badge ${situation.active === false || situation.activa === false ? 'ausencias-area-admin-badge--inactive' : 'ausencias-area-admin-badge--active'}`}>{situation.active === false || situation.activa === false ? 'Inactiva' : 'Activa'}</span></td>
-                    <td>{situation.active === false || situation.activa === false ? '—' : <div className="ausencias-area-admin-actions"><button className="ausencias-area-admin-action ausencias-area-admin-action--deactivate" type="button" aria-label="Desactivar" title="Desactivar" onClick={() => setModal({ type: 'deactivate', situation })}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" /></svg></button></div>}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
-              </div>
-            )}
-          </section>
+            </div>
+          </div>
         )}
       </>
     )
   }
 
+  function renderVacationsGA() {
+    if (vacations.length === 0) {
+      return <div className="tuvet-empty"><Icono nombre="calendario" className="tuvet-empty-icon" /><p>No hay solicitudes de vacaciones.</p><button type="button" className="tuvet-btn" onClick={() => setModal({ type: 'vacation' })}>Crear mi primera solicitud</button></div>
+    }
+    return (
+      <div className="ak-solicitudes">
+        {vacations.map((request) => (
+          <article key={idOf(request)} className={`ak-solicitud ak-solicitud--${status(request)}`}>
+            <span className="ak-solicitud-icono" aria-hidden="true"><Icono nombre="calendario" /></span>
+            <div className="ak-solicitud-cuerpo">
+              <div className="ak-solicitud-titulo">
+                <h3>Solicitud de vacaciones</h3>
+                <span className="tuvet-hint">{dateOf(request)}</span>
+              </div>
+              <p className="ak-solicitud-segmentos">{vacationSegmentsOf(request).map((segment) => `${segmentDateOf(segment)} · ${slotLabel(segment.slot ?? segment.jornada)}`).join(', ') || '—'}</p>
+              <p className="tuvet-hint">{reasonOf(request)}</p>
+            </div>
+            <StatusBadge item={request} className="ausencias-area-status-badge" />
+            {isPending(request) && <button className="tuvet-icon-action tuvet-icon-action-danger" type="button" aria-label="Cancelar solicitud" title="Cancelar solicitud" onClick={() => setModal({ type: 'cancel', request })}><Icono nombre="cerrar" /></button>}
+          </article>
+        ))}
+      </div>
+    )
+  }
+
+  function renderSituations() {
+    if (situations.length === 0) {
+      return <div className="tuvet-empty"><Icono nombre="alerta" className="tuvet-empty-icon" /><p>No hay situaciones especiales registradas.</p><button type="button" className="tuvet-btn" onClick={() => setModal({ type: 'situation' })}>Registrar situación</button></div>
+    }
+    return (
+      <div className="tuvet-card ak-tabla-card ak-acento-situaciones">
+        <div className="tuvet-table-wrap">
+          <table className="tuvet-table ak-tabla">
+            <thead><tr><th scope="col">Gerente de área</th><th scope="col">Fecha</th><th scope="col">Tipo</th><th scope="col">Razón</th><th scope="col">Jornada</th><th scope="col">Estado</th><th scope="col"><span className="tuvet-visually-hidden">Acciones</span></th></tr></thead>
+            <tbody>{situations.map((situation) => (
+              <tr key={idOf(situation)} className={isActive(situation) ? undefined : 'tuvet-row-inactiva'}>
+                <td><span className="tuvet-persona-cell"><Avatar nombre={gaName(situation)} size="sm" /><strong>{gaName(situation)}</strong></span></td>
+                <td className="ak-nowrap">{localizedDate(dateOf(situation))}</td>
+                <td><span className="tuvet-badge ak-tipo">{typeLabel(situation)}</span></td>
+                <td className="ak-motivo">{reasonOf(situation)}</td>
+                <td className="ak-nowrap">{slotLabel(situation.slot ?? situation.jornada)}</td>
+                <td>
+                  <span className={`tuvet-badge ${isActive(situation) ? 'tuvet-badge-aprobada' : 'tuvet-badge-cancelada'}`}>
+                    <Icono nombre={isActive(situation) ? 'check' : 'cerrar'} className="tuvet-badge-icon" />
+                    {isActive(situation) ? 'Activa' : 'Inactiva'}
+                  </span>
+                </td>
+                <td className="tuvet-cell-acciones">{isActive(situation)
+                  ? <button className="tuvet-btn tuvet-btn-danger" type="button" onClick={() => setModal({ type: 'deactivate', situation })}>Desactivar</button>
+                  : <span className="tuvet-hint">—</span>}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
+  function renderContent() {
+    if (!canManageAreaAbsences) {
+      return (
+        <section className="ak-panel" aria-labelledby="ak-mis-solicitudes">
+          <div className="ak-panel-header ak-acento-vacaciones">
+            <span className="ak-panel-icono"><Icono nombre="calendario" /></span>
+            <div><h2 id="ak-mis-solicitudes">{isAreaManager ? 'Mis solicitudes' : 'Solicitudes de vacaciones'}</h2><p>{plural(pendingCount, 'solicitud pendiente', 'solicitudes pendientes')} de respuesta.</p></div>
+          </div>
+          {isAreaManager ? renderVacationsGA() : renderVacationsAdmin()}
+        </section>
+      )
+    }
+
+    const current = tabs.find((item) => item.key === tab)
+    return (
+      <>
+        <div className="ak-tabs" role="tablist" aria-label="Tipo de ausencia">
+          {tabs.map((item, index) => (
+            <button
+              key={item.key}
+              ref={(node) => { tabRefs.current[item.key] = node }}
+              id={`ak-tab-${item.key}`}
+              type="button"
+              role="tab"
+              aria-selected={tab === item.key}
+              aria-controls="ak-tabpanel"
+              tabIndex={tab === item.key ? 0 : -1}
+              className={`ak-tab ak-acento-${item.tone} ${tab === item.key ? 'is-active' : ''}`}
+              onClick={() => setTab(item.key)}
+              onKeyDown={(event) => onTabKeyDown(event, index)}
+            >
+              <span className="ak-panel-icono"><Icono nombre={item.icon} /></span>
+              <span className="ak-tab-texto">
+                <span className="ak-tab-titulo">{item.title}</span>
+                <span className="ak-tab-descripcion">{item.description}</span>
+              </span>
+              <span className="ak-tab-contador">{item.count}</span>
+            </button>
+          ))}
+        </div>
+        <section id="ak-tabpanel" role="tabpanel" aria-labelledby={`ak-tab-${current.key}`} className="ak-panel">
+          {tab === 'vacations' ? renderVacationsAdmin() : renderSituations()}
+        </section>
+      </>
+    )
+  }
+
   return (
-    <section className="ausencias-area-page">
-      <header className="page-header ausencias-area-page__header">
-        <div><h1>Vacaciones y situaciones del área</h1><p>{isAreaManager ? 'Gestiona tus solicitudes de vacaciones.' : 'Resuelve vacaciones y administra situaciones especiales de gerentes de área.'}</p></div>
-        {isAreaManager && <button className="ausencias-area-page__new-request" type="button" onClick={() => setModal({ type: 'vacation' })}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>Nueva solicitud</button>}
-        {canManageAreaAbsences && <button className="ausencias-area-admin-new-situation" type="button" onClick={() => setModal({ type: 'situation' })}><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>Nueva situación</button>}
-      </header>
-      {renderContent()}
+    <div className="tema-analiza tuvet-page ausencias-kit">
+      <PageHeader
+        title="Vacaciones y situaciones del área"
+        description={isAreaManager ? 'Gestiona tus solicitudes de vacaciones.' : 'Resuelve vacaciones y administra situaciones especiales de gerentes de área.'}
+      >
+        {isAreaManager && <button className="tuvet-btn" type="button" onClick={() => setModal({ type: 'vacation' })}>Nueva solicitud</button>}
+        {canManageAreaAbsences && <button className="tuvet-btn ausencias-area-admin-new-situation" type="button" onClick={() => { setTab('situations'); setModal({ type: 'situation' }) }}>Nueva situación</button>}
+      </PageHeader>
+      <EstadoCarga loading={loading} error={error} onRetry={() => setRetry((value) => value + 1)}>
+        {renderContent()}
+      </EstadoCarga>
       {modal?.type === 'vacation' && <VacationForm onClose={() => setModal(null)} onConflict={refreshAfterConflict} onSubmit={(body, key) => command(createGAVacationRequest, body, key)} />}
       {modal?.type === 'resolve' && <ResolveForm request={modal.request} action={modal.action} onClose={() => setModal(null)} onConflict={refreshAfterConflict} onSubmit={(...args) => command(actOnGAVacationRequest, ...args)} />}
       {modal?.type === 'cancel' && <Confirmation title="Cancelar solicitud" message="¿Deseas cancelar esta solicitud pendiente?" confirmLabel="Confirmar cancelación" onClose={() => setModal(null)} onConflict={refreshAfterConflict} onConfirm={(key) => command(actOnGAVacationRequest, idOf(modal.request), 'cancel', { reason: '' }, key)} />}
       {modal?.type === 'situation' && <SituationForm catalog={catalog} catalogError={catalogError} catalogLoading={catalogLoading} onCatalogDateChange={loadCatalog} onCatalogRetry={loadCatalog} onClose={() => setModal(null)} onConflict={refreshAfterConflict} onSubmit={(body, key) => command(createGASpecialSituation, body, key)} />}
-      {modal?.type === 'deactivate' && <Confirmation title="Desactivar situación" message="¿Deseas desactivar esta situación especial?" confirmLabel="Confirmar desactivación" onClose={() => setModal(null)} onConflict={refreshAfterConflict} onConfirm={(key) => command(deactivateGASpecialSituation, idOf(modal.situation), key)} />}
-    </section>
+      {modal?.type === 'deactivate' && <Confirmation title="Desactivar situación" message={`¿Deseas desactivar la situación de ${gaName(modal.situation)} del ${localizedDate(dateOf(modal.situation))}?`} confirmLabel="Confirmar desactivación" onClose={() => setModal(null)} onConflict={refreshAfterConflict} onConfirm={(key) => command(deactivateGASpecialSituation, idOf(modal.situation), key)} />}
+    </div>
   )
 }

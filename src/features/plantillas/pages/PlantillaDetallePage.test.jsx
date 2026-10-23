@@ -68,7 +68,7 @@ describe('PlantillaDetallePage: recurrencia por tarea', () => {
     )
 
     expect(await screen.findByText(/Solo días seleccionados: lunes/)).toBeInTheDocument()
-    fireEvent.click(screen.getByTitle('Editar'))
+    fireEvent.click(screen.getByRole('button', { name: 'Editar Revisión semanal' }))
     expect(screen.getByLabelText('Tipo de recurrencia')).toHaveValue('semanal')
     fireEvent.click(screen.getByRole('checkbox', { name: 'Sábado' }))
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
@@ -154,7 +154,9 @@ describe('PlantillaDetallePage: duplicar plantilla', () => {
     expect(screen.getByText(/sin asignaciones de sucursales/)).toBeInTheDocument()
     expect(screen.getByText(/tareas activas y las reglas de recurrencia activas/)).toBeInTheDocument()
     expect(screen.getByText(/plantilla original no se modificará/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Confirmar' })).toHaveClass('btn-primary')
+    const confirmButton = screen.getByRole('button', { name: 'Confirmar' })
+    expect(confirmButton).toHaveClass('tuvet-btn')
+    expect(confirmButton).not.toHaveClass('tuvet-btn-danger-solid')
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
     expect(duplicarPlantilla).not.toHaveBeenCalled()
@@ -162,11 +164,9 @@ describe('PlantillaDetallePage: duplicar plantilla', () => {
 
   it('mantiene destructiva la confirmación de desactivar', async () => {
     renderDetail()
-    const deactivateTemplateButton = (await screen.findAllByRole('button', { name: 'Desactivar' }))
-      .find((button) => button.classList.contains('btn-outline-danger'))
-    fireEvent.click(deactivateTemplateButton)
+    fireEvent.click(await screen.findByRole('button', { name: 'Desactivar' }))
 
-    expect(screen.getByRole('button', { name: 'Confirmar' })).toHaveClass('btn-danger')
+    expect(screen.getByRole('button', { name: 'Confirmar' })).toHaveClass('tuvet-btn-danger-solid')
   })
 
   it('muestra una vez el mensaje en el destino y consume el estado del router', async () => {
