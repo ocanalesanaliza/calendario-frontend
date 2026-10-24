@@ -1,0 +1,94 @@
+/*
+ * Revisiones de guardia (Analiza) con el diseño del kit compartido (TuvetUi + tema .tema-analiza).
+ * Todo va limitado a .revisiones-kit. El DataGrid de MUI conserva su lógica y toma los tokens por `sx`
+ * (mismo enfoque que Conteo de inventario).
+ */
+
+/* Filtros en una tarjeta: atajos de rango, campos en rejilla y acciones a la derecha. */
+.revisiones-kit .rk-filtros { display: grid; gap: .9rem; padding: 1rem 1.1rem; }
+.revisiones-kit .rk-rangos { display: flex; flex-wrap: wrap; gap: .5rem; }
+
+.revisiones-kit .rk-campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: .75rem 1rem;
+}
+
+.revisiones-kit .rk-buscar { grid-column: span 2; }
+.revisiones-kit .rk-acciones { display: flex; justify-content: flex-end; gap: .5rem; }
+
+/* Barra sobre la tabla: página, alerta de "sin guardia" y exportar. */
+.revisiones-kit .rk-barra { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; }
+.revisiones-kit .rk-pagina { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .6rem; color: var(--tv-muted); font-size: .88rem; }
+.revisiones-kit .rk-exportar { display: inline-flex; align-items: center; gap: .4rem; }
+.revisiones-kit .rk-exportar .tuvet-icon { width: 17px; height: 17px; }
+
+/* Tabla compacta: 6 columnas, datos secundarios en una segunda línea. */
+.revisiones-kit .rk-tabla-card { padding: 0; overflow: hidden; }
+.revisiones-kit .rk-tabla th,
+.revisiones-kit .rk-tabla td { padding: .65rem .7rem; vertical-align: middle; }
+.revisiones-kit .rk-tabla th:first-child,
+.revisiones-kit .rk-tabla td:first-child { padding-left: 1rem; }
+.revisiones-kit .rk-tabla th:last-child,
+.revisiones-kit .rk-tabla td:last-child { padding-right: 1rem; }
+.revisiones-kit .rk-tabla .tuvet-badge { white-space: nowrap; }
+
+.revisiones-kit .rk-fecha,
+.revisiones-kit .rk-doble { line-height: 1.3; }
+.revisiones-kit .rk-fecha { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.revisiones-kit .rk-fecha strong,
+.revisiones-kit .rk-doble strong { display: block; color: var(--tv-fg); font-weight: 600; }
+.revisiones-kit .rk-fecha span,
+.revisiones-kit .rk-doble span { display: block; color: var(--tv-subtle); font-size: .8rem; }
+.revisiones-kit .rk-doble { min-width: 150px; }
+
+.revisiones-kit .rk-num { width: 1%; text-align: center; white-space: nowrap; }
+.revisiones-kit .rk-guardias { display: inline-flex; align-items: center; gap: .3rem; color: var(--tv-muted); font-variant-numeric: tabular-nums; }
+.revisiones-kit .rk-guardias-icono { width: 15px; height: 15px; }
+
+.revisiones-kit .rk-nota {
+  max-width: 280px;
+  overflow: hidden;
+  color: var(--tv-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Revisión sin guardia: franja roja a la izquierda de la fila. */
+.revisiones-kit .rk-tabla tr.rk-sin-guardia td:first-child { box-shadow: inset 3px 0 0 var(--tv-danger); }
+
+.revisiones-kit .rk-ver { min-height: 32px; padding: .25rem .7rem; font-size: .82rem; white-space: nowrap; }
+
+/* Paginación propia (sustituye a la del DataGrid). */
+.revisiones-kit .rk-pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .6rem;
+  padding: .65rem 1rem;
+  border-top: 1px solid var(--tv-border);
+  color: var(--tv-muted);
+  font-size: .82rem;
+}
+
+.revisiones-kit .rk-paginas { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; }
+.revisiones-kit .rk-por-pagina { display: inline-flex; align-items: center; gap: .4rem; margin-right: .5rem; }
+
+.revisiones-kit .rk-por-pagina select {
+  min-height: 32px;
+  padding: .2rem .45rem;
+  border: 1.5px solid var(--tv-border);
+  border-radius: var(--tv-radius-sm);
+  background: var(--tv-surface);
+  color: var(--tv-fg);
+  font: inherit;
+}
+
+.revisiones-kit .rk-pag { min-width: 34px; min-height: 32px; padding: .2rem .5rem; justify-content: center; font-variant-numeric: tabular-nums; }
+.revisiones-kit .rk-salto { padding: 0 .2rem; color: var(--tv-subtle); }
+
+@media (max-width: 640px) {
+  .revisiones-kit .rk-buscar { grid-column: auto; }
+  .revisiones-kit .rk-acciones > * { flex: 1; }
+}

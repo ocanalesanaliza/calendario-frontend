@@ -44,6 +44,8 @@ import TuvetEquipoPage from './features/tuvet/pages/TuvetEquipoPage'
 import TuvetRendimientoPage from './features/tuvet/pages/TuvetRendimientoPage'
 import TuvetSeguimientoPage from './features/tuvet/pages/TuvetSeguimientoPage'
 import TuvetAsignarPage from './features/tuvet/pages/TuvetAsignarPage'
+import AparienciaPage from './features/apariencia/pages/AparienciaPage'
+import { AparienciaProvider } from './features/apariencia/AparienciaContext'
 
 export function RendimientoRoute({ children }) {
   const { perfil } = useAuth()
@@ -64,6 +66,14 @@ export function PendientesRoute({ children }) {
 export function AdminMaestroRoute({ children }) {
   const { perfil } = useAuth()
   if (perfil && !getProfileCapabilities(perfil).isMasterAdmin) return <Navigate to="/" replace />
+  return children
+}
+
+// Apariencia por empresa y país: admin maestro (heredado o territorial) y sistemas; el backend acota el alcance.
+export function AparienciaRoute({ children }) {
+  const { perfil } = useAuth()
+  const { isMasterAdmin, isAdminMaster, isSystemsAccount } = getProfileCapabilities(perfil)
+  if (perfil && !isMasterAdmin && !isAdminMaster && !isSystemsAccount) return <Navigate to="/" replace />
   return children
 }
 
@@ -148,6 +158,7 @@ export function HomeRoute() {
 function App() {
   return (
     <AuthProvider>
+    <AparienciaProvider>
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -189,6 +200,7 @@ function App() {
           <Route path="plantillas" element={<TuvetCapabilityRoute capability="canManageTasks"><TuvetPlantillasPage /></TuvetCapabilityRoute>} />
           <Route path="equipo" element={<TuvetCapabilityRoute capability="canAccessTeam"><TuvetEquipoPage /></TuvetCapabilityRoute>} />
           <Route path="rendimiento" element={<TuvetCapabilityRoute capability="canAccessPerformance"><TuvetRendimientoPage /></TuvetCapabilityRoute>} />
+          <Route path="apariencia" element={<TuvetCapabilityRoute capability="canManageStructure"><AparienciaPage tema="tuvet" /></TuvetCapabilityRoute>} />
           <Route path="*" element={<TuvetHome />} />
         </Route>
         <Route
@@ -229,9 +241,11 @@ function App() {
           <Route path="/reportes" element={<CapabilityRoute capability="canAccessPerformanceReports"><ReportesPage /></CapabilityRoute>} />
           <Route path="/analitica/revisiones-guardia" element={<AdminMaestroRoute><RevisionesGuardiaPage /></AdminMaestroRoute>} />
           <Route path="/configuracion" element={<AdminMaestroRoute><ConfiguracionPage /></AdminMaestroRoute>} />
+          <Route path="/apariencia" element={<AparienciaRoute><AparienciaPage /></AparienciaRoute>} />
         </Route>
       </Routes>
     </BrowserRouter>
+    </AparienciaProvider>
     </AuthProvider>
   )
 }

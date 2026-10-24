@@ -5,6 +5,7 @@ import { getTrabajosCampo } from '../../features/trabajosCampo/services/trabajos
 import { getCoberturas } from '../../features/coberturas/services/coberturasService'
 import { getSolicitudesVacacion } from '../../features/vacacionesProgramadas/services/vacacionesProgramadasService'
 import { getProfileCapabilities } from '../../features/auth/profilePolicies'
+import { useApariencia } from '../../features/apariencia/AparienciaContext'
 import './Layout.css'
 
 const NAV_CATEGORY_KEYS = ['dia-a-dia', 'gestion', 'personas', 'analitica', 'administracion']
@@ -16,6 +17,7 @@ function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
   const { perfil, logout } = useAuth()
+  const { logo, empresa } = useApariencia('tareas')
 
   const {
     isAreaManager: esGerenteArea,
@@ -488,6 +490,20 @@ function Layout() {
       label: 'Administración',
       items: [
         {
+          to: '/apariencia',
+          label: 'Apariencia',
+          visible: esAdmin || isAdminMaster || isSystemsAccount,
+          // Paleta de pintor: colores, fuente y logo de la empresa.
+          icon: (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4 4h-1.8a1.7 1.7 0 0 0-1.3 2.8c.6.7.4 3.2-2.9 3.2z" />
+              <circle cx="7.5" cy="11.5" r="1.2" fill="currentColor" stroke="none" />
+              <circle cx="10.5" cy="7.5" r="1.2" fill="currentColor" stroke="none" />
+              <circle cx="15.5" cy="7.5" r="1.2" fill="currentColor" stroke="none" />
+            </svg>
+          ),
+        },
+        {
           to: '/configuracion',
           label: 'Configuración',
           visible: esAdmin,
@@ -505,7 +521,13 @@ function Layout() {
   // En móvil el panel abierto siempre muestra etiquetas, aunque en escritorio esté contraído.
   const compacto = sidebarCollapsed && !mobileNavOpen
   const totalNotificaciones = notificacionesVisibles.length
-  const rolUsuario = esAdmin ? 'Admin maestro' : esGerenteOperaciones ? 'Gerente de operaciones' : esGerenteArea ? 'Gerente de área' : 'Gerente de sucursal'
+  // Sin los casos de sistemas y admin maestro de país, ambos caían en "Gerente de sucursal".
+  const rolUsuario = isSystemsAccount ? 'Sistemas'
+    : esAdmin ? 'Admin maestro'
+      : isAdminMaster ? 'Admin Master'
+        : esGerenteOperaciones ? 'Gerente de operaciones'
+          : esGerenteArea ? 'Gerente de área'
+            : 'Gerente de sucursal'
 
   return (
     <div className={`layout layout-responsive ${mobileNavOpen ? 'layout-nav-open' : ''}`}>
@@ -529,16 +551,22 @@ function Layout() {
           </svg>
         </button>
         <Link to={isSystemsAccount ? '/calendario' : '/'} className="topbar-brand">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-            <line x1="16" y1="2" x2="16" y2="6" />
-            <line x1="8"  y1="2" x2="8"  y2="6" />
-            <line x1="3"  y1="10" x2="21" y2="10" />
-            <circle cx="8"  cy="15" r="1" fill="currentColor" stroke="none" />
-            <circle cx="12" cy="15" r="1" fill="currentColor" stroke="none" />
-            <circle cx="16" cy="15" r="1" fill="currentColor" stroke="none" />
-          </svg>
-          <span>CRONOS</span>
+          {/* Logo de la empresa y país (Apariencia); sin logo se mantiene el icono del calendario. */}
+          {logo ? (
+            <img className="topbar-logo" src={logo} alt={empresa?.nombre ? `Logo de ${empresa.nombre}` : 'Logo de la empresa'} />
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8"  y1="2" x2="8"  y2="6" />
+              <line x1="3"  y1="10" x2="21" y2="10" />
+              <circle cx="8"  cy="15" r="1" fill="currentColor" stroke="none" />
+              <circle cx="12" cy="15" r="1" fill="currentColor" stroke="none" />
+              <circle cx="16" cy="15" r="1" fill="currentColor" stroke="none" />
+            </svg>
+          )}
+          {/* Con logo propio el nombre sobra: el logo ya identifica a la empresa. */}
+          {!logo && <span>CRONOS</span>}
         </Link>
 
         <div className="topbar-actions">

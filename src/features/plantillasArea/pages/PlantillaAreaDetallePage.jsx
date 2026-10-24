@@ -1,11 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { archiveAreaTemplate, getAreaTemplateDetail, getAreaTemplateVersionHistory, publishAreaTemplateVersion } from '../../calendarArea/services/areaTemplatesService'
 import { getTareas } from '../../tareas/services/tareasService'
 import './PlantillaAreaDetallePage.css'
 
 const items = (data) => Array.isArray(data) ? data : data?.results || []
-const idOf = (value) => value?.id_area_template ?? value?.id
 const taskIdOf = (value) => value?.task_id ?? value?.id_tarea ?? value?.id
 const taskName = (value) => value?.task_name ?? value?.tarea?.nombre ?? value?.nombre ?? value?.name ?? `Tarea ${taskIdOf(value)}`
 const versionOf = (value) => value?.version ?? value?.numero
@@ -82,8 +81,9 @@ function ArchiveModal({ template, onClose, onArchive }) {
 
 export default function PlantillaAreaDetallePage() {
   const { id } = useParams(); const [template, setTemplate] = useState(null); const [versions, setVersions] = useState([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [modal, setModal] = useState(null)
-  async function load() { setLoading(true); setError(''); try { const [detail, history] = await Promise.all([getAreaTemplateDetail(id), getAreaTemplateVersionHistory(id)]); setTemplate(detail); setVersions(items(history)) } catch (requestError) { setError(message(requestError, 'No se pudo cargar el detalle de la plantilla.')) } finally { setLoading(false) } }
-  useEffect(() => { void load() }, [id])
+  const load = useCallback(async () => { setLoading(true); setError(''); try { const [detail, history] = await Promise.all([getAreaTemplateDetail(id), getAreaTemplateVersionHistory(id)]); setTemplate(detail); setVersions(items(history)) } catch (requestError) { setError(message(requestError, 'No se pudo cargar el detalle de la plantilla.')) } finally { setLoading(false) } }, [id])
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void load() }, [load])
   async function published(body) { await publishAreaTemplateVersion(id, body); setModal(null); await load() }
   async function archived() { await archiveAreaTemplate(id); setModal(null); await load() }
   if (loading) return <div className="plantilla-area-detail-page"><p role="status">Cargando detalle de plantilla de área...</p></div>

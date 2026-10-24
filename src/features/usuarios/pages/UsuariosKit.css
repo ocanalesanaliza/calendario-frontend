@@ -1,0 +1,57 @@
+/*
+ * Usuarios (Analiza) con el diseño del kit compartido (TuvetUi + tema .tema-analiza).
+ * Todo va limitado a .usuarios-kit para no afectar a otras páginas.
+ * Misma estructura que Sucursales: buscador + chips, tabla sin ancho mínimo y acciones con icono (más de tres).
+ */
+
+.usuarios-kit .uk-barra { display: flex; flex-direction: column; gap: .75rem; }
+
+.usuarios-kit .uk-tabla-card { padding: 0; overflow: hidden; }
+.usuarios-kit .uk-tabla th,
+.usuarios-kit .uk-tabla td { padding-left: .6rem; padding-right: .6rem; }
+.usuarios-kit .uk-tabla th:first-child,
+.usuarios-kit .uk-tabla td:first-child { padding-left: 1rem; }
+.usuarios-kit .uk-tabla th:last-child,
+.usuarios-kit .uk-tabla td:last-child { padding-right: 1rem; }
+.usuarios-kit .uk-tabla .tuvet-badge { white-space: nowrap; }
+
+/* Persona: iniciales, nombre y correo debajo, recortado si es largo. */
+.usuarios-kit .uk-persona { display: inline-flex; align-items: center; gap: .6rem; max-width: 100%; }
+.usuarios-kit .uk-persona-texto { display: grid; min-width: 0; line-height: 1.3; }
+.usuarios-kit .uk-nombre { color: var(--tv-fg); font-weight: 600; }
+
+.usuarios-kit .uk-email {
+  max-width: 260px;
+  overflow: hidden;
+  color: var(--tv-subtle);
+  font-size: .82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Acciones compactas: 34 px con 8 px de separación. */
+.usuarios-kit .uk-tabla td.tuvet-cell-acciones { white-space: nowrap; }
+.usuarios-kit .uk-tabla td.tuvet-cell-acciones > * + * { margin-left: .5rem; }
+.usuarios-kit .uk-tabla .tuvet-icon-action { width: 34px; height: 34px; }
+
+.usuarios-kit .uk-pie { margin: 0; padding: .7rem 1rem; border-top: 1px solid var(--tv-border); color: var(--tv-subtle); font-size: .82rem; }
+
+/* Sucursal actual en el modal de cambio. */
+.tuvet-modal .uk-actual {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  margin: 0;
+  padding: .6rem .8rem;
+  border-radius: var(--tv-radius-sm);
+  background: var(--tv-primary-softer);
+  color: var(--tv-primary-text);
+  font-size: .88rem;
+}
+
+.tuvet-modal .uk-actual-icono { width: 16px; height: 16px; }
+
+@media (max-width: 1280px) {
+  .usuarios-kit .uk-tabla .uk-persona .tuvet-avatar { display: none; }
+  .usuarios-kit .uk-email { max-width: 200px; }
+}

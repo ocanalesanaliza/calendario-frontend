@@ -1,11 +1,17 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import './Toast.css'
 
 export default function Toast({ message, type = 'error', onClose, duration = 4000 }) {
+  // Se guarda el último onClose: si fuera dependencia, cada render del padre reiniciaría el temporizador.
+  const onCloseRef = useRef(onClose)
   useEffect(() => {
-    const t = setTimeout(onClose, duration)
+    onCloseRef.current = onClose
+  })
+
+  useEffect(() => {
+    const t = setTimeout(() => onCloseRef.current?.(), duration)
     return () => clearTimeout(t)
-  }, [message])
+  }, [message, duration])
 
   return (
     <div className={`toast toast-${type}`}>

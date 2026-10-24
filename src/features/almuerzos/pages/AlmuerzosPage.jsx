@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { getMiAlmuerzo, activarAlmuerzo, cerrarAlmuerzo, getDashboardAlmuerzos } from '../services/almuerzosService'
 import { useAuth } from '../../auth/context/AuthContext'
 import './AlmuerzosPage.css'
@@ -195,9 +195,7 @@ function DashboardAlmuerzos({ refreshKey }) {
   const [filtroEstado, setFiltroEstado] = useState('')
   const [fecha, setFecha]         = useState('')
 
-  useEffect(() => { loadDashboard() }, [filtroEstado, fecha, refreshKey])
-
-  async function loadDashboard() {
+  const loadDashboard = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -212,7 +210,13 @@ function DashboardAlmuerzos({ refreshKey }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filtroEstado, fecha])
+
+  // refreshKey cambia cuando el padre registra un almuerzo: obliga a recargar con los mismos filtros.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadDashboard()
+  }, [loadDashboard, refreshKey])
 
   return (
     <section className="almuerzo-dashboard">

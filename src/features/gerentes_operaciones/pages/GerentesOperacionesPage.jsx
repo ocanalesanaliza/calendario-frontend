@@ -8,15 +8,19 @@ import {
   resetGerenteOperacionesPassword,
   updateGerenteOperaciones,
 } from '../services/gerentesOperacionesService'
+// Kit de componentes compartido con Tuvet; los colores de Analiza llegan con la clase .tema-analiza.
+import { Avatar, Aviso, EstadoCarga, Field, FormSection, Icono, Modal, PageHeader, SelectableList } from '../../tuvet/components/TuvetUi'
+import { useConfirmacion } from '../../tuvet/components/useConfirmacion'
+import '../../tuvet/tuvet.css'
+// Se conserva: otras páginas podrían depender de sus clases genéricas (todos los CSS son globales).
 import './GerentesOperacionesPage.css'
+import './GerentesOperacionesKit.css'
 
 const identityFields = ['nombre', 'apellido', 'email']
+const ESTADOS = { todos: 'Todos', activos: 'Activos', inactivos: 'Inactivos' }
 
-function areasText(areas) {
-  if (!areas?.length) return 'Sin áreas asignadas'
-
-  return areas.map((area) => area.codigo || area.nombre).join(', ')
-}
+const normalizar = (texto) => String(texto ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+const etiquetaCampo = (field) => (field === 'email' ? 'Correo electrónico' : field[0].toUpperCase() + field.slice(1))
 
 function fieldError(errors, field) {
   return Array.isArray(errors[field]) ? errors[field].join(' ') : errors[field]
@@ -49,17 +53,35 @@ function passwordRecipientName(result, fallbackName) {
     || fallbackName
 }
 
-function Modal({ title, children, onClose }) {
+function IdentityFields({ prefix, form, setForm, errors }) {
   return (
-    <div className="go-modal-backdrop">
-      <section className="go-modal" role="dialog" aria-modal="true" aria-label={title}>
-        <div className="go-modal-header">
-          <h2>{title}</h2>
-          <button type="button" className="go-icon-button" onClick={onClose} aria-label="Cerrar">×</button>
-        </div>
-        {children}
-      </section>
-    </div>
+    <>
+      <div className="tuvet-form-grid">
+        {identityFields.filter((field) => field !== 'email').map((field) => (
+          <Field key={field} label={etiquetaCampo(field)} required error={fieldError(errors, field)}>
+            <input
+              id={`${prefix}-${field}`}
+              type="text"
+              value={form[field]}
+              onChange={(event) => setForm({ ...form, [field]: event.target.value })}
+              required
+              autoComplete="off"
+            />
+          </Field>
+        ))}
+      </div>
+      <Field label={etiquetaCampo('email')} required error={fieldError(errors, 'email')}>
+        <input
+          id={`${prefix}-email`}
+          type="email"
+          value={form.email}
+          onChange={(event) => setForm({ ...form, email: event.target.value })}
+          required
+          autoComplete="off"
+          placeholder="nombre@empresa.com"
+        />
+      </Field>
+    </>
   )
 }
 
@@ -75,6 +97,7 @@ function IdentityModal({ gerente, onClose, onSubmit }) {
   async function submit(event) {
     event.preventDefault()
 
+    // Solo se envían los campos que cambiaron.
     const body = Object.fromEntries(
       Object.entries(form).filter(([key, value]) => value.trim() !== (gerente[key] || '').trim()),
     )
@@ -99,36 +122,21 @@ function IdentityModal({ gerente, onClose, onSubmit }) {
   }
 
   return (
-    <Modal title="Editar gerente de operaciones" onClose={onClose}>
-      <form className="go-modal-form" onSubmit={submit}>
-        {identityFields.map((field) => {
-          const error = fieldError(errors, field)
-          const label = field === 'email' ? 'Correo electrónico' : field[0].toUpperCase() + field.slice(1)
-
-          return (
-            <div className="go-form-group" key={field}>
-              <label htmlFor={`go-${field}`}>{label}</label>
-              <input
-                id={`go-${field}`}
-                type={field === 'email' ? 'email' : 'text'}
-                value={form[field]}
-                onChange={(event) => setForm({ ...form, [field]: event.target.value })}
-                required
-                aria-describedby={error ? `${field}-error` : undefined}
-              />
-              {error && <span id={`${field}-error`} className="go-form-error" role="alert">{error}</span>}
-            </div>
-          )
-        })}
-
-        {errors.detail && !hasFieldErrors(errors, identityFields) && (
-          <p className="go-form-error" role="alert">{errors.detail}</p>
-        )}
-
-        <div className="go-modal-actions">
-          <button type="button" className="go-btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="go-btn-primary" disabled={saving}>{saving ? 'Guardando...' : 'Guardar cambios'}</button>
-        </div>
+    <Modal
+      title="Editar gerente de operaciones"
+      subtitle={`${gerente.nombre} ${gerente.apellido || ''}`.trim()}
+      icon="editar"
+      onClose={saving ? () => {} : onClose}
+      footer={(
+        <>
+          <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={onClose} disabled={saving}>Cancelar</button>
+          <button type="submit" form="gok-editar-form" className="tuvet-btn" disabled={saving} aria-busy={saving}>{saving ? 'Guardando...' : 'Guardar cambios'}</button>
+        </>
+      )}
+    >
+      <form id="gok-editar-form" className="tuvet-form" onSubmit={submit}>
+        {errors.detail && !hasFieldErrors(errors, identityFields) && <Aviso tipo="error">{errors.detail}</Aviso>}
+        <IdentityFields prefix="go" form={form} setForm={setForm} errors={errors} />
       </form>
     </Modal>
   )
@@ -162,75 +170,52 @@ function AreaModal({ gerente, availableAreas, onClose, onAssign, onReassign }) {
     }
   }
 
-  const areaError = fieldError(errors, 'area_id')
-
   return (
-    <Modal title={`Gestionar áreas — ${gerente.nombre}`} onClose={onClose}>
-      <div className="go-modal-form">
+    <Modal
+      title="Gestionar áreas"
+      subtitle={`${gerente.nombre} ${gerente.apellido || ''}`.trim()}
+      icon="edificio"
+      wide
+      onClose={saving ? () => {} : onClose}
+      footer={<button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={onClose} disabled={saving}>Cancelar</button>}
+    >
+      <div className="tuvet-form">
+        <div className="gok-areas-actuales">
+          <span className="tuvet-hint">Áreas actuales</span>
+          <AreasTags areas={gerente.areas} />
+        </div>
 
-        <div className="go-form-group">
-          <label htmlFor="go-area">Área</label>
-          <select
-            id="go-area"
-            value={areaId}
-            onChange={(event) => setAreaId(event.target.value)}
-            required
-            aria-describedby={areaError ? 'area_id-error' : undefined}
-          >
+        <Field label="Área" error={fieldError(errors, 'area_id')}>
+          <select id="go-area" value={areaId} onChange={(event) => setAreaId(event.target.value)} required>
             <option value="">Seleccionar área</option>
             {availableAreas.map((area) => (
               <option value={area.id} key={area.id}>{area.codigo} — {area.nombre}</option>
             ))}
           </select>
-          {areaError && <span id="area_id-error" className="go-form-error" role="alert">{areaError}</span>}
+        </Field>
+
+        <div className="gok-operaciones" role="group" aria-label="Operación">
+          <div className="gok-operacion">
+            <div>
+              <strong>Asignar ahora</strong>
+              <p className="tuvet-hint">Si el área está libre, queda a su cargo desde hoy.</p>
+            </div>
+            <button type="button" className="tuvet-btn tuvet-btn-secondary" disabled={saving || !areaId} onClick={() => submit('assign')}>
+              {saving ? 'Procesando...' : 'Asignar área disponible'}
+            </button>
+          </div>
+          <div className="gok-operacion">
+            <div>
+              <strong>Programar reasignación</strong>
+              <p className="tuvet-hint">Si el área ya tiene otro gerente, se la pasa a este.</p>
+            </div>
+            <button type="button" className="tuvet-btn" disabled={saving || !areaId} onClick={() => submit('reassign')}>
+              {saving ? 'Procesando...' : 'Reasignar área ocupada'}
+            </button>
+          </div>
         </div>
 
-        <fieldset className="go-area-selector">
-          <legend>Operación</legend>
-
-          <button type="button" className="go-btn-secondary" disabled={saving || !areaId} onClick={() => submit('assign')}>
-            {saving ? 'Procesando...' : 'Asignar área disponible'}
-          </button>
-
-          <button type="button" className="go-btn-primary" disabled={saving || !areaId} onClick={() => submit('reassign')}>
-            {saving ? 'Procesando...' : 'Reasignar área ocupada'}
-          </button>
-        </fieldset>
-
-        {errors.detail && <p className="go-form-error" role="alert">{errors.detail}</p>}
-
-        <div className="go-modal-actions">
-          <button type="button" className="go-btn-secondary" onClick={onClose}>Cancelar</button>
-        </div>
-      </div>
-    </Modal>
-  )
-}
-
-function ConfirmModal({ title, children, confirm, onClose, onConfirm }) {
-  const [error, setError] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  async function submit() {
-    setSaving(true)
-
-    try {
-      await onConfirm()
-    } catch (requestError) {
-      setError(messageFor(requestError, 'No se pudo completar la acción.'))
-      setSaving(false)
-    }
-  }
-
-  return (
-    <Modal title={title} onClose={onClose}>
-      <div className="go-modal-form">
-        <p>{children}</p>
-        {error && <p className="go-form-error" role="alert">{error}</p>}
-        <div className="go-modal-actions">
-          <button className="go-btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="go-btn-primary" onClick={submit} disabled={saving}>{saving ? 'Procesando...' : confirm}</button>
-        </div>
+        <Aviso tipo="error">{errors.detail}</Aviso>
       </div>
     </Modal>
   )
@@ -239,6 +224,7 @@ function ConfirmModal({ title, children, confirm, onClose, onConfirm }) {
 function PasswordModal({ result, recipientName, onClose }) {
   const [status, setStatus] = useState('')
   const deliveryPending = result.notification_delivery_status === 'notification_delivery_pending_retry'
+  const nombre = passwordRecipientName(result, recipientName)
 
   async function copy() {
     try {
@@ -251,21 +237,28 @@ function PasswordModal({ result, recipientName, onClose }) {
     }
   }
 
+  // La contraseña temporal solo vive en el estado del modal; se descarta al cerrarlo.
   return (
-    <Modal title="Contraseña temporal" onClose={onClose}>
-      <div className="go-modal-form">
-        <p>Contraseña temporal para {passwordRecipientName(result, recipientName)}. No se volverá a mostrar.</p>
-        <p className="go-password">{result.password_temporal}</p>
-        <button className="go-copy-btn" onClick={copy}>Copiar contraseña</button>
-        {status && <p role="status">{status}</p>}
-        {deliveryPending && (
-          <p className="go-delivery-warning" role="status">
-            La cuenta se creó, pero el correo se entregará en un reintento. Comparte la contraseña temporal por un canal seguro si fuera necesario.
-          </p>
-        )}
-        <div className="go-modal-actions">
-          <button className="go-btn-primary" onClick={onClose}>Entendido</button>
+    <Modal
+      title="Contraseña temporal"
+      subtitle={nombre}
+      icon="llave"
+      tone="success"
+      onClose={onClose}
+      footer={<button type="button" className="tuvet-btn" onClick={onClose}>Entendido</button>}
+    >
+      <div className="tuvet-form">
+        <p>Contraseña temporal para {nombre}. No se volverá a mostrar.</p>
+        <div className="tuvet-password-box">
+          <span className="tuvet-password" aria-label="Contraseña temporal">{result.password_temporal}</span>
+          <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={copy}>Copiar contraseña</button>
         </div>
+        {status && <p className="tuvet-hint" role="status">{status}</p>}
+        {deliveryPending && (
+          <Aviso tipo="warning">
+            La cuenta se creó, pero el correo se entregará en un reintento. Comparte la contraseña temporal por un canal seguro si fuera necesario.
+          </Aviso>
+        )}
       </div>
     </Modal>
   )
@@ -275,15 +268,6 @@ function CreateModal({ areas, onClose, onSubmit }) {
   const [form, setForm] = useState({ nombre: '', apellido: '', email: '', area_ids: [] })
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
-
-  function toggleArea(areaId) {
-    setForm((current) => ({
-      ...current,
-      area_ids: current.area_ids.includes(areaId)
-        ? current.area_ids.filter((id) => id !== areaId)
-        : [...current.area_ids, areaId],
-    }))
-  }
 
   async function submit(event) {
     event.preventDefault()
@@ -309,49 +293,51 @@ function CreateModal({ areas, onClose, onSubmit }) {
   }
 
   return (
-    <Modal title="Nuevo gerente de operaciones" onClose={onClose}>
-      <form className="go-modal-form" onSubmit={submit}>
-        {identityFields.map((field) => {
-          const error = fieldError(errors, field)
-          const label = field === 'email' ? 'Correo electrónico' : field[0].toUpperCase() + field.slice(1)
-
-          return (
-            <div className="go-form-group" key={field}>
-              <label htmlFor={`create-go-${field}`}>{label}</label>
-              <input
-                id={`create-go-${field}`}
-                type={field === 'email' ? 'email' : 'text'}
-                value={form[field]}
-                onChange={(event) => setForm({ ...form, [field]: event.target.value })}
-                required
-                aria-describedby={error ? `${field}-error` : undefined}
-              />
-              {error && <span id={`${field}-error`} className="go-form-error" role="alert">{error}</span>}
-            </div>
-          )
-        })}
-
-        <fieldset className="go-area-selector">
-          <legend>Áreas (opcional)</legend>
-          {areas.length ? areas.map((area) => (
-            <label key={area.id} className="go-area-option">
-              <input type="checkbox" checked={form.area_ids.includes(area.id)} onChange={() => toggleArea(area.id)} />
-              {area.codigo} — {area.nombre}
-            </label>
-          )) : <p>No hay áreas disponibles.</p>}
+    <Modal
+      title="Nuevo gerente de operaciones"
+      subtitle="Recibirá una contraseña temporal por correo."
+      icon="persona"
+      wide
+      onClose={saving ? () => {} : onClose}
+      footer={(
+        <>
+          <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={onClose} disabled={saving}>Cancelar</button>
+          <button type="submit" form="gok-crear-form" className="tuvet-btn" disabled={saving} aria-busy={saving}>{saving ? 'Creando...' : 'Crear gerente'}</button>
+        </>
+      )}
+    >
+      <form id="gok-crear-form" className="tuvet-form" onSubmit={submit}>
+        {errors.detail && !hasFieldErrors(errors, identityFields) && <Aviso tipo="error">{errors.detail}</Aviso>}
+        <FormSection title="Datos de la persona">
+          <IdentityFields prefix="create-go" form={form} setForm={setForm} errors={errors} />
+        </FormSection>
+        <FormSection title="Áreas" description="Opcional. Puedes asignarlas después desde la tabla.">
+          <SelectableList
+            items={areas}
+            selected={form.area_ids}
+            onChange={(ids) => setForm((current) => ({ ...current, area_ids: ids }))}
+            getLabel={(area) => `${area.codigo} — ${area.nombre}`}
+            searchPlaceholder="Buscar área"
+            emptyText="No hay áreas disponibles."
+            disabled={saving}
+          />
           {fieldError(errors, 'area_ids') && (
-            <span className="go-form-error" role="alert">{fieldError(errors, 'area_ids')}</span>
+            <span className="tuvet-field-error" role="alert"><Icono nombre="error" className="tuvet-field-error-icon" />{fieldError(errors, 'area_ids')}</span>
           )}
-        </fieldset>
-
-        {errors.detail && <p className="go-form-error" role="alert">{errors.detail}</p>}
-
-        <div className="go-modal-actions">
-          <button className="go-btn-secondary" type="button" onClick={onClose}>Cancelar</button>
-          <button className="go-btn-primary" disabled={saving}>{saving ? 'Creando...' : 'Crear gerente'}</button>
-        </div>
+        </FormSection>
       </form>
     </Modal>
+  )
+}
+
+function AreasTags({ areas }) {
+  if (!areas?.length) return <span className="tuvet-hint">Sin áreas asignadas</span>
+  return (
+    <span className="gok-areas">
+      {areas.map((area) => (
+        <span key={area.id ?? area.codigo ?? area.nombre} className="tuvet-tag" title={area.nombre}>{area.codigo || area.nombre}</span>
+      ))}
+    </span>
   )
 }
 
@@ -360,6 +346,10 @@ export default function GerentesOperacionesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [modal, setModal] = useState(null)
+  const [aviso, setAviso] = useState('')
+  const [busqueda, setBusqueda] = useState('')
+  const [estado, setEstado] = useState('todos')
+  const [confirmar, dialogo] = useConfirmacion()
 
   async function loadData() {
     setLoading(true)
@@ -375,6 +365,7 @@ export default function GerentesOperacionesPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadData()
   }, [])
 
@@ -385,96 +376,178 @@ export default function GerentesOperacionesPage() {
     close()
     return result
   }
+
+  function abrir(type, gerente = null) {
+    setAviso('')
+    setModal({ type, gerente })
+  }
+
+  async function desactivar(gerente) {
+    setAviso('')
+    const ok = await confirmar({
+      title: 'Desactivar gerente',
+      message: `¿Deseas desactivar a ${gerente.nombre}? Ya no podrá iniciar sesión.`,
+      detail: gerente.areas?.length ? `Tiene a su cargo: ${gerente.areas.map((area) => area.codigo || area.nombre).join(', ')}.` : undefined,
+      confirmLabel: 'Desactivar',
+      accion: async () => {
+        try {
+          await deactivateGerenteOperaciones(gerente.id)
+        } catch (requestError) {
+          throw new Error(messageFor(requestError, 'No se pudo completar la acción.'), { cause: requestError })
+        }
+      },
+    })
+    if (!ok) return
+    setAviso(`${gerente.nombre} fue desactivado.`)
+    await loadData()
+  }
+
+  function resetear(gerente) {
+    setAviso('')
+    void confirmar({
+      title: 'Resetear contraseña',
+      message: `Se generará una nueva contraseña temporal para ${gerente.nombre}.`,
+      detail: 'Deberá cambiarla al iniciar sesión. La contraseña actual dejará de funcionar.',
+      confirmLabel: 'Resetear',
+      tone: 'primary',
+      accion: async () => {
+        let result
+        try {
+          result = await resetGerenteOperacionesPassword(gerente.id)
+        } catch (requestError) {
+          throw new Error(messageFor(requestError, 'No se pudo completar la acción.'), { cause: requestError })
+        }
+        await loadData()
+        setModal({ type: 'password', result, recipientName: gerente.nombre })
+      },
+    })
+  }
+
   const gerentes = data?.results || []
   const areas = data?.areas_disponibles || []
+  const termino = normalizar(busqueda.trim())
+  const cumple = (g, filtro = estado) => (
+    (!termino || normalizar(`${g.nombre} ${g.apellido ?? ''} ${g.email} ${(g.areas ?? []).map((a) => `${a.codigo ?? ''} ${a.nombre ?? ''}`).join(' ')}`).includes(termino))
+    && (filtro === 'todos' || (filtro === 'activos' ? g.activo : !g.activo))
+  )
+  const filtrados = gerentes.filter((g) => cumple(g))
+  const activos = gerentes.filter((g) => g.activo).length
+  const sinAreas = gerentes.filter((g) => g.activo && !g.areas?.length).length
+  const hayFiltros = Boolean(termino) || estado !== 'todos'
 
   return (
-    <div className="go-page">
-      <div className="go-page-header">
-        <div>
-          <h1>Gerentes de operaciones</h1>
-          <p>{gerentes.length} registrado{gerentes.length !== 1 ? 's' : ''}</p>
-        </div>
+    <div className="tema-analiza tuvet-page gerentes-operaciones-kit">
+      <PageHeader
+        title="Gerentes de operaciones"
+        description={`${activos} activo${activos !== 1 ? 's' : ''} de ${gerentes.length}${sinAreas ? ` · ${sinAreas} sin áreas asignadas` : ''}.`}
+      >
+        <button type="button" className="tuvet-btn" onClick={() => abrir('create')}>Nuevo gerente de operaciones</button>
+      </PageHeader>
 
-        <button className="go-btn-primary" onClick={() => setModal({ type: 'create' })}>
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Nuevo gerente de operaciones
-        </button>
+      <div className="gok-barra">
+        <div className="tuvet-search-bar" role="search">
+          <Icono nombre="buscar" className="tuvet-search-icon" />
+          <input
+            type="search"
+            value={busqueda}
+            onChange={(event) => setBusqueda(event.target.value)}
+            placeholder="Buscar por nombre, correo o área"
+            aria-label="Buscar por nombre, correo o área"
+          />
+          {busqueda && <button type="button" className="tuvet-btn tuvet-btn-ghost" onClick={() => setBusqueda('')}>Limpiar</button>}
+        </div>
+        <div className="tuvet-filtros" role="group" aria-label="Filtrar por estado">
+          {Object.entries(ESTADOS).map(([clave, etiqueta]) => (
+            <button
+              key={clave}
+              type="button"
+              className={`tuvet-chip ${estado === clave ? 'active' : ''}`}
+              aria-pressed={estado === clave}
+              onClick={() => setEstado(clave)}
+            >
+              {etiqueta} ({gerentes.filter((g) => cumple(g, clave)).length})
+            </button>
+          ))}
+        </div>
       </div>
 
-      {loading ? (
-        <div className="go-loading-state" role="status">Cargando gerentes de operaciones...</div>
-      ) : error ? (
-        <div className="go-error-state" role="alert">
-          <p>{error}</p>
-          <button className="go-btn-secondary" onClick={loadData}>Reintentar</button>
-        </div>
-      ) : !gerentes.length ? (
-        <div className="go-empty-state">No hay gerentes de operaciones registrados.</div>
-      ) : (
-        <div className="go-table-card go-table-wrapper">
-          <table className="go-table">
-            <thead>
-              <tr>
+      <Aviso tipo="success">{aviso}</Aviso>
 
-                <th>Nombre</th>
-                <th>Apellido</th>
-                <th>Email</th>
-                <th>Estado</th>
-                <th>Cambio de contraseña</th>
-                <th>Áreas</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {gerentes.map((gerente) => (
-                <tr key={gerente.id}>
-
-                  <td>{gerente.nombre}</td>
-                  <td>{gerente.apellido || '—'}</td>
-                  <td>{gerente.email}</td>
-                  <td>{gerente.activo ? 'Activo' : 'Inactivo'}</td>
-                  <td>{gerente.debe_cambiar_password ? 'Pendiente' : 'Al día'}</td>
-                  <td>{areasText(gerente.areas)}</td>
-                  <td>
-                    <div className="row-actions">
-                      <button className="action-btn" title="Editar" aria-label="Editar" onClick={() => setModal({ type: 'edit', gerente })}>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                        </svg>
-                      </button>
-                      <button className="action-btn" title="Gestionar áreas" aria-label="Gestionar áreas" onClick={() => setModal({ type: 'areas', gerente })}>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M3 6l9-4 9 4-9 4-9-4z" />
-                          <path d="M3 12l9 4 9-4" />
-                          <path d="M3 18l9 4 9-4" />
-                        </svg>
-                      </button>
-                      <button className="action-btn" title="Resetear contraseña" aria-label="Resetear contraseña" onClick={() => setModal({ type: 'reset', gerente })}>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                          <path d="M7 11V7a5 5 0 0 1 9.9-1" />
-                        </svg>
-                      </button>
-                      {gerente.activo && (
-                        <button className="action-btn action-btn-danger" title="Desactivar" aria-label="Desactivar" onClick={() => setModal({ type: 'deactivate', gerente })}>
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10" />
-                            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  </td>
+      <EstadoCarga
+        loading={loading}
+        error={error}
+        onRetry={loadData}
+        empty={!filtrados.length}
+        emptyText={gerentes.length && hayFiltros ? 'Ningún gerente coincide con la búsqueda o el filtro.' : 'No hay gerentes de operaciones registrados.'}
+        emptyAction={gerentes.length && hayFiltros
+          ? <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => { setBusqueda(''); setEstado('todos') }}>Quitar filtros</button>
+          : <button type="button" className="tuvet-btn" onClick={() => abrir('create')}>Crear el primero</button>}
+      >
+        <div className="tuvet-card gok-tabla-card">
+          <div className="tuvet-table-wrap">
+            <table className="tuvet-table gok-tabla">
+              <thead>
+                <tr>
+                  <th scope="col">Gerente</th>
+                  <th scope="col">Áreas</th>
+                  <th scope="col">Estado</th>
+                  <th scope="col"><span className="tuvet-visually-hidden">Acciones</span></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtrados.map((gerente) => {
+                  const nombreCompleto = `${gerente.nombre} ${gerente.apellido || ''}`.trim()
+                  return (
+                    <tr key={gerente.id} className={gerente.activo ? '' : 'tuvet-row-inactiva'}>
+                      <td>
+                        <span className="gok-persona">
+                          <Avatar nombre={nombreCompleto} size="sm" />
+                          <span className="gok-persona-texto">
+                            <strong className="gok-nombre"><span>{gerente.nombre}</span> {gerente.apellido && <span>{gerente.apellido}</span>}</strong>
+                            <span className="gok-email" title={gerente.email}>{gerente.email}</span>
+                          </span>
+                        </span>
+                      </td>
+                      <td><AreasTags areas={gerente.areas} /></td>
+                      <td>
+                        <span className="tuvet-badges">
+                          <span className={`tuvet-badge ${gerente.activo ? 'tuvet-badge-aprobada' : 'tuvet-badge-cancelada'}`}>
+                            <Icono nombre={gerente.activo ? 'check' : 'cerrar'} className="tuvet-badge-icon" />
+                            {gerente.activo ? 'Activo' : 'Inactivo'}
+                          </span>
+                          {gerente.debe_cambiar_password && (
+                            <span className="tuvet-badge tuvet-badge-pendiente" title="Aún usa la contraseña temporal">
+                              <Icono nombre="llave" className="tuvet-badge-icon" />
+                              Cambiar contraseña
+                            </span>
+                          )}
+                        </span>
+                      </td>
+                      <td className="tuvet-cell-acciones">
+                        <button type="button" className="tuvet-icon-action" title="Editar" aria-label={`Editar a ${nombreCompleto}`} onClick={() => abrir('edit', gerente)}>
+                          <Icono nombre="editar" />
+                        </button>
+                        <button type="button" className="tuvet-icon-action" title="Gestionar áreas" aria-label={`Gestionar áreas de ${nombreCompleto}`} onClick={() => abrir('areas', gerente)}>
+                          <Icono nombre="edificio" />
+                        </button>
+                        <button type="button" className="tuvet-icon-action" title="Resetear contraseña" aria-label={`Resetear contraseña de ${nombreCompleto}`} onClick={() => resetear(gerente)}>
+                          <Icono nombre="llave" />
+                        </button>
+                        {gerente.activo && (
+                          <button type="button" className="tuvet-icon-action tuvet-icon-action-danger" title="Desactivar" aria-label={`Desactivar a ${nombreCompleto}`} onClick={() => desactivar(gerente)}>
+                            <Icono nombre="prohibido" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="gok-pie" aria-live="polite">Mostrando {filtrados.length} de {gerentes.length} gerentes</p>
         </div>
-      )}
+      </EstadoCarga>
 
       {modal?.type === 'create' && (
         <CreateModal
@@ -491,7 +564,10 @@ export default function GerentesOperacionesPage() {
         <IdentityModal
           gerente={modal.gerente}
           onClose={close}
-          onSubmit={(body) => mutate(() => updateGerenteOperaciones(modal.gerente.id, body))}
+          onSubmit={async (body) => {
+            await mutate(() => updateGerenteOperaciones(modal.gerente.id, body))
+            setAviso('Cambios guardados.')
+          }}
         />
       )}
       {modal?.type === 'areas' && (
@@ -499,37 +575,14 @@ export default function GerentesOperacionesPage() {
           gerente={modal.gerente}
           availableAreas={areas}
           onClose={close}
-          onAssign={(id) => mutate(() => assignArea(modal.gerente.id, id))}
-          onReassign={(id) => mutate(() => reassignArea(modal.gerente.id, id))}
+          onAssign={async (id) => { await mutate(() => assignArea(modal.gerente.id, id)); setAviso('Área asignada correctamente.') }}
+          onReassign={async (id) => { await mutate(() => reassignArea(modal.gerente.id, id)); setAviso('Reasignación programada correctamente.') }}
         />
-      )}
-      {modal?.type === 'deactivate' && (
-        <ConfirmModal
-          title="Desactivar gerente"
-          confirm="Desactivar"
-          onClose={close}
-          onConfirm={() => mutate(() => deactivateGerenteOperaciones(modal.gerente.id))}
-        >
-          ¿Deseas desactivar a {modal.gerente.nombre}? Ya no podrá iniciar sesión.
-        </ConfirmModal>
-      )}
-      {modal?.type === 'reset' && (
-        <ConfirmModal
-          title="Resetear contraseña"
-          confirm="Resetear"
-          onClose={close}
-          onConfirm={async () => {
-            const result = await resetGerenteOperacionesPassword(modal.gerente.id)
-            await loadData()
-            setModal({ type: 'password', result, recipientName: modal.gerente.nombre })
-          }}
-        >
-          Se generará una nueva contraseña temporal.
-        </ConfirmModal>
       )}
       {modal?.type === 'password' && (
         <PasswordModal result={modal.result} recipientName={modal.recipientName} onClose={close} />
       )}
+      {dialogo}
     </div>
   )
 }

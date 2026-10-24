@@ -123,12 +123,15 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
     }
   }, [])
 
+  // Se recarga solo al cambiar la fecha o el perfil; las cargas usan contadores de versión para
+  // descartar respuestas viejas, así que no deben ser dependencias (se recrean en cada render).
   useEffect(() => {
     viewVersion.current += 1
     tareasRequestVersion.current += 1
     trabajosCampoRequestVersion.current += 1
     loadTareas()
     loadTrabajosCampo()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fecha, perfil])
 
   function handleForbidden(error) {
@@ -327,15 +330,15 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
         accessRevoked = handleForbidden(err)
         if (!accessRevoked) setLoteError(err.message)
       }
-    } finally {
-      if (!isCurrentAction()) return
-      setSeleccionadas([])
-      if (!accessRevoked) {
-        await loadTareas()
-        if (!isCurrentAction()) return
-      }
-      setRegistrandoLote(false)
     }
+    // Cierre común. Antes vivía en un `finally` con `return`, que ocultaba cualquier error inesperado.
+    if (!isCurrentAction()) return
+    setSeleccionadas([])
+    if (!accessRevoked) {
+      await loadTareas()
+      if (!isCurrentAction()) return
+    }
+    setRegistrandoLote(false)
   }
 
   const tareasDeJornada = useMemo(

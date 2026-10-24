@@ -1,0 +1,61 @@
+/*
+ * Gerentes de operaciones (Analiza) con el diseño del kit compartido (TuvetUi + tema .tema-analiza).
+ * Todo va limitado a .gerentes-operaciones-kit (y a los modales del kit) para no afectar a otras páginas.
+ * Misma estructura que Usuarios y Gerentes de área; las áreas se muestran como etiquetas.
+ */
+
+.gerentes-operaciones-kit .gok-barra { display: flex; flex-direction: column; gap: .75rem; }
+
+.gerentes-operaciones-kit .gok-tabla-card { padding: 0; overflow: hidden; }
+.gerentes-operaciones-kit .gok-tabla th,
+.gerentes-operaciones-kit .gok-tabla td { padding-left: .6rem; padding-right: .6rem; }
+.gerentes-operaciones-kit .gok-tabla th:first-child,
+.gerentes-operaciones-kit .gok-tabla td:first-child { padding-left: 1rem; }
+.gerentes-operaciones-kit .gok-tabla th:last-child,
+.gerentes-operaciones-kit .gok-tabla td:last-child { padding-right: 1rem; }
+.gerentes-operaciones-kit .gok-tabla .tuvet-badge { white-space: nowrap; }
+
+.gerentes-operaciones-kit .gok-persona { display: inline-flex; align-items: center; gap: .6rem; max-width: 100%; }
+.gerentes-operaciones-kit .gok-persona-texto { display: grid; min-width: 0; line-height: 1.3; }
+.gerentes-operaciones-kit .gok-nombre { color: var(--tv-fg); font-weight: 600; }
+
+.gerentes-operaciones-kit .gok-email {
+  max-width: 280px;
+  overflow: hidden;
+  color: var(--tv-subtle);
+  font-size: .82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Áreas como etiquetas que se acomodan en varias líneas. */
+.gok-areas { display: flex; flex-wrap: wrap; gap: .3rem; max-width: 320px; }
+.gok-areas .tuvet-tag { margin: 0; }
+
+.gerentes-operaciones-kit .gok-tabla td.tuvet-cell-acciones { white-space: nowrap; }
+.gerentes-operaciones-kit .gok-tabla td.tuvet-cell-acciones > * + * { margin-left: .5rem; }
+.gerentes-operaciones-kit .gok-tabla .tuvet-icon-action { width: 34px; height: 34px; }
+
+.gerentes-operaciones-kit .gok-pie { margin: 0; padding: .7rem 1rem; border-top: 1px solid var(--tv-border); color: var(--tv-subtle); font-size: .82rem; }
+
+/* Modal de áreas: áreas actuales y las dos operaciones explicadas. */
+.tuvet-modal .gok-areas-actuales { display: grid; gap: .35rem; }
+.tuvet-modal .gok-operaciones { display: grid; gap: .6rem; }
+
+.tuvet-modal .gok-operacion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .6rem 1rem;
+  padding: .75rem .9rem;
+  border: 1px solid var(--tv-border);
+  border-radius: var(--tv-radius);
+}
+
+.tuvet-modal .gok-operacion strong { color: var(--tv-fg); font-size: .9rem; }
+.tuvet-modal .gok-operacion p { margin: .1rem 0 0; }
+
+@media (max-width: 1280px) {
+  .gerentes-operaciones-kit .gok-tabla .gok-persona .tuvet-avatar { display: none; }
+}

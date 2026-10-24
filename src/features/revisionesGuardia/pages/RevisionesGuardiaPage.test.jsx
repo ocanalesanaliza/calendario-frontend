@@ -1,28 +1,14 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import RevisionesGuardiaPage from './RevisionesGuardiaPage'
 
-const { getSucursales, getGerentes, getUsuarios, getAnalitica, gridProps } = vi.hoisted(() => ({
+const { getSucursales, getGerentes, getUsuarios, getAnalitica } = vi.hoisted(() => ({
   getSucursales: vi.fn(),
   getGerentes: vi.fn(),
   getUsuarios: vi.fn(),
   getAnalitica: vi.fn(),
-  gridProps: { current: null },
 }))
 
-vi.mock('@mui/x-data-grid', () => ({
-  DataGrid: (props) => {
-    gridProps.current = props
-    return <div role="grid">
-      {props.columns.map((column) => <span key={column.field}>{column.headerName}</span>)}
-      {props.rows.map((row) => <div key={row.id}>{props.columns.map((column) => (
-        column.renderCell ? <span key={column.field}>{column.renderCell({ row })}</span> : <span key={column.field}>{row[column.field]}</span>
-      ))}</div>)}
-      <button type="button" onClick={() => props.onPaginationModelChange({ ...props.paginationModel, page: props.paginationModel.page + 1 })}>Siguiente</button>
-      <label>Por página<select value={props.paginationModel.pageSize} onChange={(event) => props.onPaginationModelChange({ page: props.paginationModel.page, pageSize: Number(event.target.value) })}><option value="10">10</option><option value="20">20</option><option value="50">50</option><option value="100">100</option></select></label>
-    </div>
-  },
-}))
 vi.mock('../../sucursales/services/sucursalesService', () => ({ getSucursales }))
 vi.mock('../../gerentes/services/gerentesService', () => ({ getGerentes }))
 vi.mock('../../usuarios/services/usuariosService', () => ({ getUsuarios }))
@@ -48,35 +34,34 @@ const revision = {
 
 describe('RevisionesGuardiaPage', () => {
   beforeEach(() => {
-    gridProps.current = null
     getSucursales.mockReset().mockResolvedValue([revision.sucursal])
     getGerentes.mockReset().mockResolvedValue([revision.gerente_area])
     getUsuarios.mockReset().mockResolvedValue([revision.usuario])
     getAnalitica.mockReset().mockResolvedValue({ count: 41, results: [revision] })
   })
 
-  it('configura el grid con paginación de servidor y sin filtrado u ordenamiento local', async () => {
+  it('muestra la tabla compacta con 6 columnas y la paginación del servidor', async () => {
     render(<RevisionesGuardiaPage />)
 
-    await screen.findByRole('grid')
-
-    expect(gridProps.current).toMatchObject({
-      rowCount: 41,
-      paginationMode: 'server',
-      sortingMode: 'server',
-      filterMode: 'server',
-      disableColumnFilter: true,
-      disableColumnSorting: true,
-    })
-    expect(gridProps.current.columns.map(({ headerName }) => headerName)).toEqual([
-      'Fecha', 'Sucursal', 'Código', 'Gerente de área', 'GS', 'Resultado', 'Cantidad de guardias', 'Nota resumida', 'Acción',
+    const tabla = await screen.findByRole('table')
+    expect(within(tabla).getAllByRole('columnheader').map((th) => th.textContent)).toEqual([
+      'Fecha', 'Sucursal', 'Responsables', 'Resultado', 'Guardias', 'Nota', 'Acciones',
     ])
+    const fila = within(tabla).getAllByRole('row')[1]
+    expect(fila).toHaveTextContent('9 sep2026')
+    expect(fila).toHaveTextContent('Sucursal CentroCENTRO-01')
+    expect(fila).toHaveTextContent('GS AnaGA: GA Centro')
+    expect(within(fila).getByText('Realizada')).toHaveClass('tuvet-badge-aprobada')
+    expect(screen.getByText('Mostrando 1–1 de 41 revisiones')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Página 1' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Página 3' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Página anterior' })).toBeDisabled()
   })
 
   it('aplica filtros y reinicia la página API a 1', async () => {
     render(<RevisionesGuardiaPage />)
-    await screen.findByRole('grid')
-    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
+    await screen.findByRole('table')
+    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }))
     await waitFor(() => expect(getAnalitica).toHaveBeenLastCalledWith({ page: 2, page_size: 20 }))
     fireEvent.change(screen.getByLabelText('Fecha'), { target: { value: '2026-09-09' } })
     fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2026-09-01' } })
@@ -93,20 +78,52 @@ describe('RevisionesGuardiaPage', () => {
     }))
   })
 
-  it('convierte la página 0 del grid a página 1 de API y reinicia al cambiar pageSize', async () => {
+  it('convierte la página 1 de la tabla a página 1 de API y reinicia al cambiar pageSize', async () => {
     render(<RevisionesGuardiaPage />)
-    await screen.findByRole('grid')
+    await screen.findByRole('table')
     expect(getAnalitica).toHaveBeenLastCalledWith({ page: 1, page_size: 20 })
-    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }))
     await waitFor(() => expect(getAnalitica).toHaveBeenLastCalledWith({ page: 2, page_size: 20 }))
     fireEvent.change(screen.getByLabelText('Por página'), { target: { value: '50' } })
     await waitFor(() => expect(getAnalitica).toHaveBeenLastCalledWith({ page: 1, page_size: 50 }))
   })
 
+  it('rellena Desde y Hasta con los atajos de rango sin consultar hasta aplicar', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 9, 22, 10, 0))
+    try {
+      render(<RevisionesGuardiaPage />)
+      await screen.findByRole('table')
+      const llamadas = getAnalitica.mock.calls.length
+
+      fireEvent.click(screen.getByRole('button', { name: 'Últimos 7 días' }))
+      expect(screen.getByLabelText('Desde')).toHaveValue('2026-10-16')
+      expect(screen.getByLabelText('Hasta')).toHaveValue('2026-10-22')
+      fireEvent.click(screen.getByRole('button', { name: 'Este mes' }))
+      expect(screen.getByLabelText('Desde')).toHaveValue('2026-10-01')
+      expect(getAnalitica).toHaveBeenCalledTimes(llamadas)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Aplicar filtros' }))
+      await waitFor(() => expect(getAnalitica).toHaveBeenLastCalledWith({ fecha_inicio: '2026-10-01', fecha_fin: '2026-10-22', page: 1, page_size: 20 }))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('marca con insignia las revisiones donde no se presentó guardia', async () => {
+    getAnalitica.mockResolvedValueOnce({ count: 1, results: [{ ...revision, no_se_presento_guardia: true }] })
+    render(<RevisionesGuardiaPage />)
+    await screen.findByRole('table')
+
+    expect(screen.getByText('Sin guardia')).toHaveClass('tuvet-badge-vencida')
+    expect(screen.getAllByRole('row')[1]).toHaveClass('rk-sin-guardia')
+    expect(screen.getByText('1 sin guardia en esta página')).toBeInTheDocument()
+  })
+
   it('limpia filtros y reinicia la página API a 1', async () => {
     render(<RevisionesGuardiaPage />)
-    await screen.findByRole('grid')
-    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
+    await screen.findByRole('table')
+    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }))
     await waitFor(() => expect(getAnalitica).toHaveBeenLastCalledWith({ page: 2, page_size: 20 }))
     fireEvent.change(screen.getByLabelText('Buscar'), { target: { value: 'Centro' } })
     fireEvent.click(screen.getByRole('button', { name: 'Limpiar' }))
@@ -126,15 +143,15 @@ describe('RevisionesGuardiaPage', () => {
     expect(await screen.findByText('No hay revisiones para los filtros aplicados.')).toBeInTheDocument()
   })
 
-  it('abre el detalle desde la revisión original sin exponer PII en el grid ni solicitar datos adicionales', async () => {
+  it('abre el detalle desde la revisión original sin exponer PII en la tabla ni solicitar datos adicionales', async () => {
     render(<RevisionesGuardiaPage />)
-    await screen.findByRole('grid')
+    await screen.findByRole('table')
     const requestsBeforeOpen = getAnalitica.mock.calls.length
 
-    expect(screen.getByRole('button', { name: 'Ver detalle' })).toBeEnabled()
-    expect(screen.getByRole('grid')).not.toHaveTextContent('0801-2000-12345')
-    expect(screen.getByRole('grid')).not.toHaveTextContent('9999-0000')
-    fireEvent.click(screen.getByRole('button', { name: 'Ver detalle' }))
+    expect(screen.getByRole('button', { name: /^Ver detalle/ })).toBeEnabled()
+    expect(screen.getByRole('table')).not.toHaveTextContent('0801-2000-12345')
+    expect(screen.getByRole('table')).not.toHaveTextContent('9999-0000')
+    fireEvent.click(screen.getByRole('button', { name: /^Ver detalle/ }))
 
     expect(screen.getByRole('dialog')).toHaveTextContent('Sucursal Centro')
     expect(screen.getByRole('dialog')).toHaveTextContent('María López')
@@ -154,8 +171,8 @@ describe('RevisionesGuardiaPage', () => {
   it('no trata campos ausentes como faltantes de uniforme o equipamiento', async () => {
     getAnalitica.mockResolvedValueOnce({ count: 1, results: [{ ...revision, guardias: [{ numero_guardia: 1, uniforme: { botas: true }, equipamiento: {} }] }] })
     render(<RevisionesGuardiaPage />)
-    await screen.findByRole('grid')
-    fireEvent.click(screen.getByRole('button', { name: 'Ver detalle' }))
+    await screen.findByRole('table')
+    fireEvent.click(screen.getByRole('button', { name: /^Ver detalle/ }))
 
     const dialog = screen.getByRole('dialog')
     expect(dialog).toHaveTextContent('Uniforme no portadoSin faltantes de uniforme.')
@@ -167,16 +184,16 @@ describe('RevisionesGuardiaPage', () => {
   it('muestra guardias múltiples o ausencia de guardias con valores de presentación consistentes', async () => {
     getAnalitica.mockResolvedValueOnce({ count: 1, results: [{ ...revision, guardias: [] }] })
     const { unmount } = render(<RevisionesGuardiaPage />)
-    await screen.findByRole('grid')
-    fireEvent.click(screen.getByRole('button', { name: 'Ver detalle' }))
+    await screen.findByRole('table')
+    fireEvent.click(screen.getByRole('button', { name: /^Ver detalle/ }))
     expect(screen.getByRole('dialog')).toHaveTextContent('Cantidad de guardias0')
     expect(screen.getByText('No hay guardias registrados.')).toBeInTheDocument()
     unmount()
 
     getAnalitica.mockResolvedValueOnce({ count: 1, results: [{ ...revision, guardias: [revision.guardias[0], { numero_guardia: 2 }] }] })
     render(<RevisionesGuardiaPage />)
-    await screen.findByRole('grid')
-    fireEvent.click(screen.getByRole('button', { name: 'Ver detalle' }))
+    await screen.findByRole('table')
+    fireEvent.click(screen.getByRole('button', { name: /^Ver detalle/ }))
     expect(screen.getByRole('dialog')).toHaveTextContent('Número2')
     expect(screen.getByRole('dialog')).toHaveTextContent('Identidad—')
     expect(screen.getByRole('dialog')).toHaveTextContent('Teléfono—')
@@ -184,8 +201,8 @@ describe('RevisionesGuardiaPage', () => {
 
   it('cierra por botón y Escape, restaura el foco y no solicita datos adicionales', async () => {
     render(<RevisionesGuardiaPage />)
-    await screen.findByRole('grid')
-    const trigger = screen.getByRole('button', { name: 'Ver detalle' })
+    await screen.findByRole('table')
+    const trigger = screen.getByRole('button', { name: /^Ver detalle/ })
     const requestsBeforeClose = getAnalitica.mock.calls.length
 
     trigger.focus()
@@ -205,8 +222,8 @@ describe('RevisionesGuardiaPage', () => {
 
   it('contiene Tab dentro del diálogo', async () => {
     render(<RevisionesGuardiaPage />)
-    await screen.findByRole('grid')
-    const trigger = screen.getByRole('button', { name: 'Ver detalle' })
+    await screen.findByRole('table')
+    const trigger = screen.getByRole('button', { name: /^Ver detalle/ })
     trigger.focus()
     fireEvent.click(trigger)
 

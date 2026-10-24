@@ -1,7 +1,7 @@
 /*
  * Selector de empresa para cuentas de Sistemas.
  * Cada tarjeta usa el color de su calendario: índigo (Analiza) y verde azulado (Tuvet).
- * Ver docs/configuracion_diseño/04_pantallas_seguimiento.md (Selector de empresa).
+ * Ver design/configuracion_diseño/04_pantallas_seguimiento.md (Selector de empresa).
  */
 .selector-empresa {
   --se-bg: #eef1f6;

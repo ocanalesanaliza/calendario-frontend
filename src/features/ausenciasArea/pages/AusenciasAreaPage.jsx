@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useAuth } from '../../auth/context/AuthContext'
 import { getProfileCapabilities } from '../../auth/profilePolicies'
 import { createIdempotencyKey } from '../../calendarArea/services/calendarAreaApi'
@@ -440,7 +440,7 @@ export default function AusenciasAreaPage() {
   const catalogRequest = useRef(0)
   const tabRefs = useRef({})
 
-  async function loadCatalog(date, endDate) {
+  const loadCatalog = useCallback(async (date, endDate) => {
     if (!canManageGASpecialSituations) return
     const request = ++catalogRequest.current
     setCatalogLoading(true)
@@ -456,9 +456,9 @@ export default function AusenciasAreaPage() {
     } finally {
       if (request === catalogRequest.current) setCatalogLoading(false)
     }
-  }
+  }, [canManageGASpecialSituations])
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -470,12 +470,13 @@ export default function AusenciasAreaPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [canManageGASpecialSituations])
 
+  // `retry` fuerza una nueva carga desde el botón "Reintentar".
   useEffect(() => {
     void load()
     void loadCatalog()
-  }, [retry, canManageGASpecialSituations])
+  }, [retry, load, loadCatalog])
 
   async function command(command, ...args) {
     await command(...args)
@@ -520,9 +521,13 @@ export default function AusenciasAreaPage() {
           <div className="tuvet-card ak-tabla-card ak-acento-vacaciones">
             <div className="tuvet-table-wrap">
               <table className="tuvet-table ak-tabla">
-                <thead><tr><th scope="col">Período solicitado</th><th scope="col">Motivo</th><th scope="col">Estado</th><th scope="col"><span className="tuvet-visually-hidden">Acciones</span></th></tr></thead>
+                <thead><tr><th scope="col">Gerente Área</th><th scope="col">Período solicitado</th><th scope="col">Motivo</th><th scope="col">Estado</th><th scope="col"><span className="tuvet-visually-hidden">Acciones</span></th></tr></thead>
                 <tbody>{filteredVacations.map((request) => (
                   <tr key={idOf(request)}>
+                    {/* Quién pidió las vacaciones: lo envía el backend en la misma lista, sin otra petición. */}
+                    <td>{gaName(request) === '—'
+                      ? <span className="tuvet-hint">—</span>
+                      : <span className="tuvet-persona-cell"><Avatar nombre={gaName(request)} size="sm" /><strong>{gaName(request)}</strong></span>}</td>
                     <td className="ak-periodo-cell">{vacationPeriodOf(request)}</td>
                     <td className="ak-motivo">{vacationReasonOf(request)}</td>
                     <td><StatusBadge item={request} className={`ausencias-area-admin-badge ausencias-area-admin-badge--${status(request)}`} /></td>
@@ -578,7 +583,9 @@ export default function AusenciasAreaPage() {
             <thead><tr><th scope="col">Gerente de área</th><th scope="col">Fecha</th><th scope="col">Tipo</th><th scope="col">Razón</th><th scope="col">Jornada</th><th scope="col">Estado</th><th scope="col"><span className="tuvet-visually-hidden">Acciones</span></th></tr></thead>
             <tbody>{situations.map((situation) => (
               <tr key={idOf(situation)} className={isActive(situation) ? undefined : 'tuvet-row-inactiva'}>
-                <td><span className="tuvet-persona-cell"><Avatar nombre={gaName(situation)} size="sm" /><strong>{gaName(situation)}</strong></span></td>
+                <td>{gaName(situation) === '—'
+                  ? <span className="tuvet-hint">—</span>
+                  : <span className="tuvet-persona-cell"><Avatar nombre={gaName(situation)} size="sm" /><strong>{gaName(situation)}</strong></span>}</td>
                 <td className="ak-nowrap">{localizedDate(dateOf(situation))}</td>
                 <td><span className="tuvet-badge ak-tipo">{typeLabel(situation)}</span></td>
                 <td className="ak-motivo">{reasonOf(situation)}</td>

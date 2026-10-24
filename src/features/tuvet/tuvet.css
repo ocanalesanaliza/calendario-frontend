@@ -230,8 +230,9 @@
   padding: .5rem 1rem;
   border: 1px solid transparent;
   border-radius: var(--tv-radius-sm);
-  background: var(--tv-primary);
-  color: #FFFFFF;
+  /* --tv-btn-*: colores de botón configurables por empresa y país (Apariencia); sin configurar, los del tema. */
+  background: var(--tv-btn-primary-bg, var(--tv-primary));
+  color: var(--tv-btn-primary-fg, #FFFFFF);
   cursor: pointer;
   font: inherit;
   font-size: .875rem;
@@ -240,7 +241,7 @@
   transition: background var(--tv-dur-fast) var(--tv-ease), border-color var(--tv-dur-fast) var(--tv-ease), box-shadow var(--tv-dur-fast) var(--tv-ease);
 }
 
-.tuvet-btn:hover:not(:disabled) { background: var(--tv-primary-hover); }
+.tuvet-btn:hover:not(:disabled) { background: var(--tv-btn-primary-hover, var(--tv-primary-hover)); }
 .tuvet-btn:active:not(:disabled) { transform: translateY(1px); }
 .tuvet-btn:disabled { cursor: not-allowed; opacity: .45; }
 .tuvet-btn .tuvet-icon { width: 16px; height: 16px; }
@@ -255,7 +256,7 @@
   outline-offset: 2px;
 }
 
-.tuvet-btn-secondary { border-color: var(--tv-border); background: var(--tv-surface); color: var(--tv-text); }
+.tuvet-btn-secondary { border-color: var(--tv-border); background: var(--tv-btn-secondary-bg, var(--tv-surface)); color: var(--tv-btn-secondary-fg, var(--tv-text)); }
 .tuvet-btn-secondary:hover:not(:disabled) { border-color: var(--tv-border-strong); background: var(--tv-surface-muted); }
 
 .tuvet-btn-ghost { min-height: 32px; padding: .25rem .6rem; background: transparent; color: var(--tv-primary); }
@@ -264,7 +265,7 @@
 /* Acción destructiva: rojo semántico, separada visualmente de la principal. */
 .tuvet-btn-danger { border-color: var(--tv-danger-soft); background: var(--tv-surface); color: var(--tv-danger-text); }
 .tuvet-btn-danger:hover:not(:disabled) { border-color: var(--tv-danger); background: var(--tv-danger-soft); }
-.tuvet-btn-danger-solid { background: var(--tv-danger); color: #FFFFFF; }
+.tuvet-btn-danger-solid { background: var(--tv-btn-danger-bg, var(--tv-danger)); color: var(--tv-btn-danger-fg, #FFFFFF); }
 .tuvet-btn-danger-solid:hover:not(:disabled) { background: var(--tv-danger-hover); }
 
 .tuvet-btn-link {
@@ -1219,7 +1220,7 @@
 
 /* ══════════════════════════════════════════════════════════════════
  * Panel de seguimiento (vistas Tabla, Tarjetas, Tablero) y asignación.
- * Ver docs/configuracion_diseño/04_pantallas_seguimiento.md
+ * Ver design/configuracion_diseño/04_pantallas_seguimiento.md
  * ══════════════════════════════════════════════════════════════════ */
 
 /* Selector de vista (segmentado) */

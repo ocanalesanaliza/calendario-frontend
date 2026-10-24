@@ -100,7 +100,6 @@ describe('Layout Mis tareas navigation', () => {
   })
 
   it('hides Mi almuerzo for an Admin Master while keeping Calendario del área hidden and the lunch route available', () => {
-    localStorage.getItem.mockReturnValue('0')
     useAuth.mockReturnValue({
       perfil: {
         type: 'admin_master',
@@ -110,6 +109,8 @@ describe('Layout Mis tareas navigation', () => {
     })
 
     render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+    // El menú inicia contraído: se expande para ver nombres y el rol del usuario.
+    fireEvent.click(screen.getByRole('button', { name: 'Expandir menú' }))
 
     expect(screen.getByText('Admin Master')).toBeInTheDocument()
     expect(screen.queryByText('Mi almuerzo')).not.toBeInTheDocument()

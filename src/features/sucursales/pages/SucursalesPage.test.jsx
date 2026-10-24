@@ -353,7 +353,7 @@ describe('SucursalesPage: número de guardias', () => {
     render(<SucursalesPage />)
     await screen.findByText('Sucursal Centro')
     fireEvent.click(screen.getByTitle('Desactivar'))
-    const dialog = screen.getByRole('dialog', { name: 'Desactivar sucursal' })
+    const dialog = screen.getByRole('alertdialog', { name: 'Desactivar sucursal' })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Desactivar' }))
 
     expect(await within(dialog).findByText('No tienes permiso para desactivar esta sucursal.')).toBeInTheDocument()
@@ -368,7 +368,7 @@ describe('SucursalesPage: número de guardias', () => {
     render(<SucursalesPage />)
     await screen.findByText('Sucursal Centro')
     fireEvent.click(screen.getByTitle('Quitar GS'))
-    const dialog = screen.getByRole('dialog', { name: 'Quitar GS de la sucursal' })
+    const dialog = screen.getByRole('alertdialog', { name: 'Quitar GS de la sucursal' })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Quitar GS' }))
 
     expect(await within(dialog).findByText('No tienes permiso para quitar este GS.')).toBeInTheDocument()

@@ -1,7 +1,7 @@
 import { nombrePersona } from './formato'
 
 // Meta de cumplimiento mensual mostrada en el panel. El backend no define una meta:
-// es un valor de presentación acordado (ver docs/configuracion_diseño).
+// es un valor de presentación acordado (ver design/configuracion_diseño).
 export const META_CUMPLIMIENTO = 90
 export const UMBRAL_CERCA = 75
 export const DIAS_PROXIMOS = 3

@@ -61,7 +61,9 @@ function DecisionRequestsView() {
     }
   }, [])
 
-  useEffect(() => { loadRequests() }, [loadRequests])
+  // Carga inicial y tras cada cambio de sus dependencias (sincronización con el servidor).
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void loadRequests() }, [loadRequests])
 
   async function decide(kind, id, decision, reason) {
     setAction(`${kind}-${id}`)
@@ -127,7 +129,6 @@ function HistorialSolicitudes() {
   const [data, setData] = useState({ results: [], count: 0, total_pages: 0 })
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { setPage(1) }, [busqueda])
 
   const loadHistorial = useCallback(async () => {
     setLoading(true)
@@ -145,12 +146,14 @@ function HistorialSolicitudes() {
     }
   }, [busqueda, page])
 
-  useEffect(() => { loadHistorial() }, [loadHistorial])
+  // Carga inicial y tras cada cambio de sus dependencias (sincronización con el servidor).
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void loadHistorial() }, [loadHistorial])
 
   return <>
     <div className="toolbar"><div className="search-wrapper">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-      <input type="text" placeholder="Buscar por nombre, email o motivo..." value={busqueda} onChange={(event) => setBusqueda(event.target.value)} />
+      <input type="text" placeholder="Buscar por nombre, email o motivo..." value={busqueda} onChange={(event) => { setBusqueda(event.target.value); setPage(1) }} />
     </div></div>
     {loading ? <Loading /> : data.results.length === 0 ? <div className="empty-state">No hay solicitudes en el historial.</div> : <div className="campo-enviadas-list">
       {data.results.map((request) => <div key={request.id_trabajo_campo} className="campo-enviada-row">
@@ -214,7 +217,9 @@ function BranchManagerRequestsView() {
     }
   }, [perfil?.id])
 
-  useEffect(() => { loadRequests() }, [loadRequests])
+  // Carga inicial y tras cada cambio de sus dependencias (sincronización con el servidor).
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void loadRequests() }, [loadRequests])
 
   async function cancel(service, id) {
     setError('')

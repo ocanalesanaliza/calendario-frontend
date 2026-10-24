@@ -147,10 +147,12 @@ describe('AusenciasAreaPage', () => {
   it('shows the requester identity supplied by the vacation list without another request', async () => {
     setup(manager, { vacations: [{ ...request, gerente_area: { id: 8, nombre: 'Ana GA' } }] })
 
-    const [vacationTable, specialSituationsTable] = await screen.findAllByRole('table')
+    // Vacaciones y situaciones están en pestañas: se revisa cada tabla en la suya.
+    const vacationTable = await screen.findByRole('table')
     expect(within(vacationTable).getByRole('columnheader', { name: 'Gerente Área' })).toBeInTheDocument()
     expect(within(vacationTable).getByText('Ana GA')).toBeInTheDocument()
-    expect(within(specialSituationsTable).getByText('Ana GA')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: /Situaciones especiales/ }))
+    expect(within(screen.getByRole('table')).getByText('Ana GA')).toBeInTheDocument()
     expect(getGAVacationRequests).toHaveBeenCalledTimes(1)
     expect(getGASpecialSituations).toHaveBeenCalledTimes(1)
   })
@@ -161,9 +163,10 @@ describe('AusenciasAreaPage', () => {
       special: [{ ...situation, gerente_area_id: null, gerente_area: null }],
     })
 
-    const [vacationTable, specialSituationsTable] = await screen.findAllByRole('table')
-    expect(within(vacationTable).getAllByRole('row')[1]).toHaveTextContent('—')
-    expect(within(specialSituationsTable).getAllByRole('row')[1]).toHaveTextContent('—')
+    const vacationTable = await screen.findByRole('table')
+    expect(within(vacationTable).getAllByRole('cell')[0]).toHaveTextContent(/^—$/)
+    fireEvent.click(screen.getByRole('tab', { name: /Situaciones especiales/ }))
+    expect(within(screen.getByRole('table')).getAllByRole('cell')[0]).toHaveTextContent(/^—$/)
     expect(screen.queryByText('GA #undefined')).not.toBeInTheDocument()
   })
   it('lets GO approve and reject with a reason and shows special situation controls', async () => {
@@ -197,6 +200,8 @@ describe('AusenciasAreaPage', () => {
     expect(screen.getByRole('button', { name: 'Aprobar' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Rechazar' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancelar solicitud' })).not.toBeInTheDocument()
+    // Las situaciones especiales están en su propia pestaña.
+    fireEvent.click(screen.getByRole('tab', { name: /Situaciones especiales/ }))
     expect(screen.getByRole('button', { name: 'Desactivar' })).toBeInTheDocument()
   })
 

@@ -92,12 +92,18 @@ export default function ReportesPage() {
     if (esAdmin) getGerentes().then(setGerentes).catch(() => {})
   }, [esAdmin])
 
+  // Un admin debe elegir primero el gerente: sin él no se piden usuarios y la lista se muestra vacía.
+  const requiereGerente = esAdmin && !idGerenteArea
   useEffect(() => {
-    setIdUsuario('')
-    const params = esAdmin && idGerenteArea ? { id_gerente_area: idGerenteArea } : {}
-    if (esAdmin && !idGerenteArea) { setUsuarios([]); return }
-    getUsuarios(params).then(setUsuarios).catch(() => setUsuarios([]))
-  }, [esAdmin, idGerenteArea])
+    if (requiereGerente) return undefined
+    let vigente = true
+    const params = esAdmin ? { id_gerente_area: idGerenteArea } : {}
+    getUsuarios(params)
+      .then((data) => { if (vigente) setUsuarios(data) })
+      .catch(() => { if (vigente) setUsuarios([]) })
+    return () => { vigente = false }
+  }, [esAdmin, idGerenteArea, requiereGerente])
+  const usuariosDisponibles = requiereGerente ? [] : usuarios
 
   function buildBody() {
     const body = { tipo, enviar_correo: enviarCorreo }
@@ -179,7 +185,7 @@ export default function ReportesPage() {
           {esAdmin && (
             <div className="rp-filtro-group">
               <label>Gerente de área</label>
-              <select value={idGerenteArea} onChange={(e) => setIdGerenteArea(e.target.value)}>
+              <select value={idGerenteArea} onChange={(e) => { setIdGerenteArea(e.target.value); setIdUsuario('') }}>
                 <option value="">Todos</option>
                 {gerentes.map((g) => (
                   <option key={g.id_gerente_area} value={g.id_gerente_area}>{g.nombre}</option>
@@ -188,12 +194,12 @@ export default function ReportesPage() {
             </div>
           )}
 
-          {usuarios.length > 0 && (
+          {usuariosDisponibles.length > 0 && (
             <div className="rp-filtro-group">
               <label>Usuario</label>
               <select value={idUsuario} onChange={(e) => setIdUsuario(e.target.value)}>
                 <option value="">Todos</option>
-                {usuarios.map((u) => (
+                {usuariosDisponibles.map((u) => (
                   <option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>
                 ))}
               </select>

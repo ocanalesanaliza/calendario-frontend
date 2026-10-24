@@ -255,6 +255,8 @@ export default function CalendarioAreaPage() {
     if (absenceRequest === absenceRequestRef.current) setLoading(false)
   }
 
+  // Carga inicial al entrar; los cambios de mes la repiten desde handleDatesSet.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void Promise.resolve().then(loadMonth) }, [])
 
   const loadAbsences = useCallback(async (requestedMonth = month) => {
@@ -288,6 +290,8 @@ export default function CalendarioAreaPage() {
     }
   }
 
+  // Carga inicial al entrar; los cambios de mes la repiten desde handleDatesSet.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void Promise.resolve().then(loadPerformance) }, [])
 
   function handleDatesSet({ view }) {

@@ -1,0 +1,180 @@
+/*
+ * Configuración (Analiza) con el diseño del kit compartido (TuvetUi + tema .tema-analiza).
+ * Variante "lista compacta": una fila por ajuste con nombre corto, (i) con la explicación y el número.
+ * Todo va limitado a .configuracion-kit para no afectar a otras páginas.
+ */
+
+/* Lista a la izquierda y panel de resumen a la derecha; en pantallas estrechas se apilan. */
+.configuracion-kit .ck-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(260px, 1fr);
+  gap: 1rem;
+  align-items: start;
+  max-width: 1040px;
+}
+
+.configuracion-kit .ck-principal,
+.configuracion-kit .ck-lateral { display: grid; gap: 1rem; min-width: 0; }
+
+.configuracion-kit .ck-lista { padding: 0; }
+
+.configuracion-kit .ck-panel-titulo {
+  margin: 0;
+  color: var(--tv-muted);
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.configuracion-kit .ck-lista-titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  min-height: 44px;
+  padding: .5rem .6rem .5rem 1rem;
+  border-bottom: 1px solid var(--tv-border);
+}
+
+.configuracion-kit .ck-fabrica { min-height: 32px; padding: .25rem .6rem; font-size: .8rem; }
+
+/* Valor guardado mientras hay un cambio sin guardar en la fila. */
+.configuracion-kit .ck-antes {
+  padding: .1rem .45rem;
+  border-radius: 999px;
+  background: var(--tv-warning-soft);
+  color: var(--tv-warning-text);
+  font-size: .75rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.configuracion-kit .ck-permiso {
+  display: flex;
+  align-items: flex-start;
+  gap: .45rem;
+  margin: 0;
+  padding-top: .7rem;
+  border-top: 1px solid var(--tv-border);
+  color: var(--tv-muted);
+  font-size: .8rem;
+  line-height: 1.4;
+}
+
+.configuracion-kit .ck-permiso-icono { flex-shrink: 0; width: 15px; height: 15px; margin-top: .1rem; color: var(--tv-subtle); }
+
+/* Tarjetas del panel lateral. */
+.configuracion-kit .ck-panel { display: grid; gap: .75rem; padding: 1rem; }
+.configuracion-kit .ck-panel-sub { margin: -.4rem 0 0; }
+
+.configuracion-kit .ck-persona { display: flex; align-items: center; gap: .75rem; }
+.configuracion-kit .ck-persona-texto { display: grid; gap: .1rem; min-width: 0; }
+.configuracion-kit .ck-persona-texto strong { color: var(--tv-fg); font-size: .95rem; }
+.configuracion-kit .ck-persona-cuando { color: var(--tv-primary-text); font-size: .85rem; font-weight: 600; }
+.configuracion-kit .ck-sin-cambios { margin: 0; }
+
+.configuracion-kit .ck-hoy { display: grid; gap: .6rem; margin: 0; padding: 0; list-style: none; }
+.configuracion-kit .ck-hoy li { display: flex; align-items: flex-start; gap: .55rem; color: var(--tv-muted); font-size: .86rem; line-height: 1.45; }
+.configuracion-kit .ck-hoy strong { color: var(--tv-fg); font-weight: 600; }
+.configuracion-kit .ck-hoy-icono { flex-shrink: 0; width: 16px; height: 16px; margin-top: .15rem; color: var(--tv-primary); }
+
+.configuracion-kit .ck-fecha {
+  display: inline-block;
+  padding: 0 .4rem;
+  border-radius: 6px;
+  background: var(--tv-primary-softer);
+  color: var(--tv-primary-text);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .configuracion-kit .ck-layout { grid-template-columns: 1fr; }
+}
+
+.configuracion-kit .ck-fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .6rem;
+  padding: .7rem 1rem;
+  border-bottom: 1px solid var(--tv-border);
+}
+
+.configuracion-kit .ck-nombre { flex: 1; min-width: 0; color: var(--tv-fg); font-size: .92rem; font-weight: 500; }
+
+/* (i): la explicación aparece al pasar el ratón o al enfocar con el teclado. */
+.configuracion-kit .ck-info {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: var(--tv-subtle);
+  cursor: help;
+}
+
+.configuracion-kit .ck-info:hover { color: var(--tv-primary); }
+.configuracion-kit .ck-info:focus-visible { outline: 2px solid var(--tv-primary-accent); outline-offset: 1px; }
+.configuracion-kit .ck-info-icono { width: 18px; height: 18px; }
+
+.configuracion-kit .ck-tip {
+  position: absolute;
+  right: -.5rem;
+  bottom: calc(100% + .4rem);
+  z-index: 5;
+  width: 240px;
+  padding: .5rem .65rem;
+  border-radius: 8px;
+  background: var(--tv-fg);
+  color: var(--tv-surface);
+  font-size: .78rem;
+  font-weight: 500;
+  line-height: 1.4;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity var(--tv-dur-fast) var(--tv-ease);
+}
+
+.configuracion-kit .ck-info:hover .ck-tip,
+.configuracion-kit .ck-info:focus-visible .ck-tip { opacity: 1; visibility: visible; }
+
+.configuracion-kit .ck-num {
+  width: 72px;
+  min-height: 38px;
+  padding: .3rem .55rem;
+  border: 1.5px solid var(--tv-border);
+  border-radius: var(--tv-radius-sm);
+  background: var(--tv-surface);
+  color: var(--tv-fg);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  text-align: right;
+}
+
+.configuracion-kit .ck-num:hover { border-color: var(--tv-border-strong); }
+.configuracion-kit .ck-num:focus-visible { outline: none; border-color: var(--tv-primary-accent); box-shadow: 0 0 0 3px var(--tv-ring); }
+.configuracion-kit .ck-fila.has-error .ck-num { border-color: var(--tv-danger); }
+
+.configuracion-kit .ck-dias { width: 2.2rem; color: var(--tv-subtle); font-size: .85rem; }
+
+/* El error ocupa su propia línea bajo la fila. */
+.configuracion-kit .ck-error { flex-basis: 100%; justify-content: flex-end; }
+
+.configuracion-kit .ck-pie { display: flex; justify-content: flex-end; padding: .75rem 1rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .configuracion-kit .ck-tip { transition: none; }
+}
+
+@media (max-width: 640px) {
+  .configuracion-kit .ck-tip { right: auto; left: -6rem; width: 200px; }
+}

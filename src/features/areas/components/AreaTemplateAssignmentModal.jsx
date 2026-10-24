@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { assignAreaTemplate, cancelPending, getAssignableAreaTemplates, getState } from '../../calendarArea/services/areaTemplateAssignmentsService'
 
 const items = (data) => Array.isArray(data) ? data : data?.results || []
@@ -12,8 +12,11 @@ export default function AreaTemplateAssignmentModal({ area, onClose }) {
   const dialogRef = useRef(null); const previousFocus = useRef(null)
   const [state, setState] = useState(null); const [templates, setTemplates] = useState([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [saving, setSaving] = useState(false)
   const [selected, setSelected] = useState(''); const [startDate, setStartDate] = useState(''); const [confirmCancel, setConfirmCancel] = useState(false)
-  async function load() { setLoading(true); setError(''); try { const [assignment, catalog] = await Promise.all([getState(area.id), getAssignableAreaTemplates(area.id)]); setState(assignment); setTemplates(items(catalog)) } catch (requestError) { setError(errorMessage(requestError, 'No se pudo cargar la asignación de plantilla.')) } finally { setLoading(false) } }
-  useEffect(() => { previousFocus.current = document.activeElement; dialogRef.current?.focus(); void load(); return () => previousFocus.current?.focus() }, [area.id])
+  const load = useCallback(async () => { setLoading(true); setError(''); try { const [assignment, catalog] = await Promise.all([getState(area.id), getAssignableAreaTemplates(area.id)]); setState(assignment); setTemplates(items(catalog)) } catch (requestError) { setError(errorMessage(requestError, 'No se pudo cargar la asignación de plantilla.')) } finally { setLoading(false) } }, [area.id])
+  // El foco se toma al abrir y se devuelve al cerrar; la carga se repite si cambia el área.
+  useEffect(() => { previousFocus.current = document.activeElement; dialogRef.current?.focus(); return () => previousFocus.current?.focus() }, [])
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void load() }, [load])
   function keyDown(event) { if (event.key === 'Escape') { event.preventDefault(); onClose(); return } if (event.key !== 'Tab') return; const nodes = [...dialogRef.current.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled])')]; const first = nodes[0]; const last = nodes.at(-1); if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() } }
   const assignment = state?.effective_assignment
   const pending = state?.pending_assignment ?? state?.pending

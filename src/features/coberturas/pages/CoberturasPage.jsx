@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+﻿import { useCallback, useState, useEffect } from 'react'
 import { getCoberturas, createCobertura, activarCobertura, cancelarCobertura, completarCobertura } from '../services/coberturasService'
 import { getUsuarios } from '../../usuarios/services/usuariosService'
 import { getSucursales, getTitularSucursal } from '../../sucursales/services/sucursalesService'
@@ -30,9 +30,7 @@ export default function CoberturasPage() {
 
   const showToast = (message, type = 'error') => setToast({ message, type })
 
-  useEffect(() => { loadData() }, [filtroEstado])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true)
     try {
       const params = {}
@@ -43,7 +41,12 @@ export default function CoberturasPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filtroEstado])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadData()
+  }, [loadData])
 
   async function handleAccion(id, accion) {
     try {
@@ -216,6 +219,8 @@ function CoberturaModal({ onSubmit, onClose, showToast }) {
 
   useEffect(() => {
     if (!form.id_sucursal_destino) {
+      // Sin sucursal de destino no hay titular que consultar.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTitular(null)
       return
     }

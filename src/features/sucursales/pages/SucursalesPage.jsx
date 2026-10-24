@@ -370,7 +370,8 @@ function SucursalModal({ esAdmin, inicial, conPlantilla, onSubmit, onClose }) {
       if (esAdmin) body.numero_guardias = numeroGuardias
       await onSubmit(body, idPlantilla ? Number(idPlantilla) : null, fechaPlantilla || null)
     } catch (err) {
-      const { porCampo, general } = erroresDelServidor(err, ['nombre', 'codigo', 'calendar_area_id', 'id_gerente_area', 'numero_guardias'])
+      // country_id se muestra en el campo País (derivado del área), no como aviso general.
+      const { porCampo, general } = erroresDelServidor(err, ['nombre', 'codigo', 'calendar_area_id', 'country_id', 'id_gerente_area', 'numero_guardias'])
       setFieldErrors(porCampo)
       setErrorGeneral(general)
       enfocarPrimerError(formRef.current)
