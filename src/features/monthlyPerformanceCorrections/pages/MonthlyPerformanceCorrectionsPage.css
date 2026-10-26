@@ -1,0 +1,9 @@
+.monthly-performance-corrections { max-width: 1120px; }
+.mpc-summary, .mpc-proposal, .mpc-receipt, .mpc-audit { margin-top: 1.5rem; padding: 1rem; border: 1px solid var(--tuvet-border, #d6dde5); border-radius: .75rem; background: var(--tuvet-surface, #fff); }
+.mpc-summary dl, .mpc-proposal dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem 1.5rem; }
+.mpc-summary dl div, .mpc-proposal dl div { display: grid; gap: .2rem; }
+.mpc-summary dt, .mpc-proposal dt { font-weight: 700; }
+.mpc-summary dd, .mpc-proposal dd { margin: 0; }
+.mpc-weights { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+@media (max-width: 768px) { .mpc-summary dl, .mpc-proposal dl, .mpc-weights { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .monthly-performance-corrections * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
