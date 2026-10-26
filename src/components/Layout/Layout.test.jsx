@@ -4,11 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AlmuerzosRoute } from '../../App'
 import Layout from './Layout'
 
-const { useAuth, getTrabajosCampo, getCoberturas, getSolicitudesVacacion } = vi.hoisted(() => ({
+const { useAuth, getTrabajosCampo, getCoberturas, getSolicitudesVacacion, getOperationalAlertsCount } = vi.hoisted(() => ({
   useAuth: vi.fn(),
   getTrabajosCampo: vi.fn(),
   getCoberturas: vi.fn(),
   getSolicitudesVacacion: vi.fn(),
+  getOperationalAlertsCount: vi.fn(),
 }))
 
 const capabilityModuleLabels = ['Sucursales', 'Usuarios', 'Plantillas', 'Situaciones especiales', 'Status', 'Reportes']
@@ -17,6 +18,7 @@ vi.mock('../../features/auth/context/AuthContext', () => ({ useAuth }))
 vi.mock('../../features/trabajosCampo/services/trabajosCampoService', () => ({ getTrabajosCampo }))
 vi.mock('../../features/coberturas/services/coberturasService', () => ({ getCoberturas }))
 vi.mock('../../features/vacacionesProgramadas/services/vacacionesProgramadasService', () => ({ getSolicitudesVacacion }))
+vi.mock('../../features/operationalAlerts/services/operationalAlertsService', () => ({ getOperationalAlertsCount }))
 
 describe('Layout Mis tareas navigation', () => {
   beforeEach(() => {
@@ -28,12 +30,14 @@ describe('Layout Mis tareas navigation', () => {
     getTrabajosCampo.mockReset()
     getCoberturas.mockReset()
     getSolicitudesVacacion.mockReset()
+    getOperationalAlertsCount.mockReset()
     getTrabajosCampo.mockResolvedValue({ results: [] })
     getCoberturas.mockResolvedValue({ results: [] })
     getSolicitudesVacacion.mockResolvedValue({ results: [] })
+    getOperationalAlertsCount.mockResolvedValue({ count: 0 })
   })
 
-  it('shows only the Systems management menu for an active Systems account that was previously a GA', () => {
+  it('shows only the Systems management menu for an active Systems account that was previously a GA', async () => {
     useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true, can_access_my_tasks: true }, logout: vi.fn() })
 
     render(
@@ -53,6 +57,7 @@ describe('Layout Mis tareas navigation', () => {
     expect(screen.getByRole('link', { name: 'Gerentes de operaciones' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Organización' })).toHaveAttribute('href', '/organizacion')
     expect(screen.getByRole('link', { name: 'Admin Masters' })).toHaveAttribute('href', '/admin-master-asignaciones')
+    expect(screen.getByTitle('Operational alerts')).toHaveAttribute('href', '/alertas-operativas')
   })
 
   it.each([
@@ -67,6 +72,33 @@ describe('Layout Mis tareas navigation', () => {
     render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
 
     expect(screen.queryByRole('link', { name: 'Admin Masters' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Operational alerts/ })).not.toBeInTheDocument()
+  })
+
+  it('shows the independent operational-alert count without changing pending-request navigation', async () => {
+    getOperationalAlertsCount.mockResolvedValue({ count: 7 })
+    useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, logout: vi.fn() })
+
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+
+    expect(await screen.findByTitle('Operational alerts')).toHaveAttribute('href', '/alertas-operativas')
+    fireEvent.click(screen.getByRole('button', { name: 'Expandir menú' }))
+    expect(screen.getByText('7')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Notificaciones' })).toBeInTheDocument()
+    expect(getTrabajosCampo).not.toHaveBeenCalled()
+    expect(getCoberturas).not.toHaveBeenCalled()
+  })
+
+  it('hides operational alerts and does not request its count for a flag-only non-Systems identity', () => {
+    useAuth.mockReturnValue({
+      perfil: { type: 'gerente_area', es_cuenta_sistemas: true, activo: true, habilitado: true },
+      logout: vi.fn(),
+    })
+
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+
+    expect(screen.queryByRole('link', { name: /Operational alerts/ })).not.toBeInTheDocument()
+    expect(getOperationalAlertsCount).not.toHaveBeenCalled()
   })
 
   it('shows the six capability-controlled modules to a Systems master admin with granted capabilities', () => {

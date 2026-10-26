@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AdminMaestroRoute, AlmuerzosRoute, AusenciasAreaRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GerentesOperacionesRoute, MisTareasRoute, OrganizacionRoute, PendientesRoute, PlantillasAreaRoute, RendimientoRoute, SystemsOnlyRoute } from './App'
+import { AdminMaestroRoute, AlmuerzosRoute, AusenciasAreaRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GerentesOperacionesRoute, MisTareasRoute, OperationalAlertsRoute, OrganizacionRoute, PendientesRoute, PlantillasAreaRoute, RendimientoRoute, SystemsOnlyRoute } from './App'
 
 const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
 
@@ -113,6 +113,24 @@ describe('Sistemas-only routes', () => {
     render(<MemoryRouter initialEntries={['/admin-master-asignaciones']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/admin-master-asignaciones" element={<SystemsOnlyRoute><p>Asignaciones autorizadas</p></SystemsOnlyRoute>} /></Routes></MemoryRouter>)
 
     expect(screen.getByText('Asignaciones autorizadas')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['GA', { type: 'gerente_area', activo: true, habilitado: true }, false],
+    ['reassigned GA', { type: 'gerente_area', es_cuenta_sistemas: true, activo: true, habilitado: true }, false],
+    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, false],
+    ['Admin Master', { type: 'admin_master', activo: true, habilitado: true }, false],
+    ['Master Admin', { es_admin_maestro: true, activo: true, habilitado: true }, false],
+    ['GS', { type: 'gerente_sucursal', activo: true, habilitado: true }, false],
+    ['inactive Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: false, habilitado: true }, false],
+    ['disabled Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: false }, false],
+    ['active enabled Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, true],
+  ])('allows operational alerts only for %s', async (_actor, perfil, admitted) => {
+    useAuth.mockReturnValue({ perfil })
+    render(<MemoryRouter initialEntries={['/alertas-operativas']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/alertas-operativas" element={<OperationalAlertsRoute><p>Alertas autorizadas</p></OperationalAlertsRoute>} /></Routes></MemoryRouter>)
+
+    if (admitted) expect(screen.getByText('Alertas autorizadas')).toBeInTheDocument()
+    else expect(await screen.findByText('Inicio')).toBeInTheDocument()
   })
 
   it('blocks lunch for a Systems account that was previously a GA', async () => {

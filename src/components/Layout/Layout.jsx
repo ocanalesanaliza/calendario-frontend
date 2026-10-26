@@ -6,6 +6,7 @@ import { getCoberturas } from '../../features/coberturas/services/coberturasServ
 import { getSolicitudesVacacion } from '../../features/vacacionesProgramadas/services/vacacionesProgramadasService'
 import { getProfileCapabilities } from '../../features/auth/profilePolicies'
 import { useApariencia } from '../../features/apariencia/AparienciaContext'
+import { getOperationalAlertsCount } from '../../features/operationalAlerts/services/operationalAlertsService'
 import './Layout.css'
 
 const NAV_CATEGORY_KEYS = ['dia-a-dia', 'gestion', 'personas', 'analitica', 'administracion']
@@ -38,9 +39,11 @@ function Layout() {
     canAccessPerformanceReports,
     canAccessAreaAbsences,
     isSystemsAccount,
+    canAccessOperationalAlerts,
     canAccessPendingRequests,
   } = getProfileCapabilities(perfil)
   const hideRestrictedNavigation = esGerenteArea
+  const [operationalAlertsCount, setOperationalAlertsCount] = useState(0)
 
   const [notifOpen, setNotifOpen]     = useState(false)
   const [notificaciones, setNotificaciones] = useState([])
@@ -146,6 +149,21 @@ function Layout() {
         .catch(() => {})
     }
   }, [esGerenteArea, esSucursal, location.pathname])
+
+  useEffect(() => {
+    let active = true
+    if (!canAccessOperationalAlerts) {
+      return () => { active = false }
+    }
+    getOperationalAlertsCount()
+      .then((data) => {
+        if (active) setOperationalAlertsCount(Number(data?.count ?? data?.active_count) || 0)
+      })
+      .catch(() => {
+        if (active) setOperationalAlertsCount(0)
+      })
+    return () => { active = false }
+  }, [canAccessOperationalAlerts])
 
   function handleNotifClick(item) {
     setNotifOpen(false)
@@ -438,6 +456,18 @@ function Layout() {
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               <circle cx="12" cy="10" r="2" />
               <path d="M12 12v4M12 14.5h1.5" />
+            </svg>
+          ),
+        },
+        {
+          to: '/alertas-operativas',
+          label: 'Operational alerts',
+          visible: canAccessOperationalAlerts,
+          badge: operationalAlertsCount,
+          icon: (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10.29 3.86 1.82 18A2 2 0 0 0 3.53 21h16.94A2 2 0 0 0 22.18 18L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+              <path d="M12 9v4M12 17h.01" />
             </svg>
           ),
         },

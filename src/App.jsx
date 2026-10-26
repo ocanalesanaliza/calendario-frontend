@@ -46,6 +46,7 @@ import TuvetSeguimientoPage from './features/tuvet/pages/TuvetSeguimientoPage'
 import TuvetAsignarPage from './features/tuvet/pages/TuvetAsignarPage'
 import AparienciaPage from './features/apariencia/pages/AparienciaPage'
 import { AparienciaProvider } from './features/apariencia/AparienciaContext'
+import OperationalAlertsPage from './features/operationalAlerts/pages/OperationalAlertsPage'
 
 export function RendimientoRoute({ children }) {
   const { perfil } = useAuth()
@@ -87,6 +88,12 @@ export function GerentesOperacionesRoute({ children }) {
 export function SystemsOnlyRoute({ children }) {
   const { perfil } = useAuth()
   if (!getProfileCapabilities(perfil).isSystemsAccount) return <Navigate to="/" replace />
+  return children
+}
+
+export function OperationalAlertsRoute({ children }) {
+  const { perfil } = useAuth()
+  if (!getProfileCapabilities(perfil).canAccessOperationalAlerts) return <Navigate to="/" replace />
   return children
 }
 
@@ -225,6 +232,7 @@ function App() {
           <Route path="/gerentes" element={<AreaManagerAssignmentRoute><GerentesPage /></AreaManagerAssignmentRoute>} />
           <Route path="/gerentes-operaciones" element={<GerentesOperacionesRoute><GerentesOperacionesPage /></GerentesOperacionesRoute>} />
           <Route path="/admin-master-asignaciones" element={<SystemsOnlyRoute><AdminMasterAssignmentsPage /></SystemsOnlyRoute>} />
+          <Route path="/alertas-operativas" element={<SystemsOnlyRoute><OperationalAlertsRoute><OperationalAlertsPage /></OperationalAlertsRoute></SystemsOnlyRoute>} />
           <Route path="/areas" element={<AreaManagerAssignmentRoute><AreasPage /></AreaManagerAssignmentRoute>} />
           <Route path="/organizacion" element={<OrganizacionRoute><OrganizacionPage /></OrganizacionRoute>} />
           <Route path="/mis-tareas" element={<MisTareasRoute><MisTareasPage /></MisTareasRoute>} />
