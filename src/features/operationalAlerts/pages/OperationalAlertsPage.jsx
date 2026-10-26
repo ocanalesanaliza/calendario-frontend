@@ -27,7 +27,7 @@ function dateOf(alert) {
 
 function errorText(error) {
   if (error?.status === 403) return 'No tienes autorización para consultar las alertas operativas. El servidor mantiene la autorización.'
-  return error?.message || 'No fue posible cargar las alertas operativas.'
+  return 'No fue posible cargar las alertas operativas.'
 }
 
 export default function OperationalAlertsPage() {

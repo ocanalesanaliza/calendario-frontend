@@ -51,7 +51,7 @@ describe('OperationalAlertsPage', () => {
   })
 
   it('shows the history empty state and a retryable generic API error', async () => {
-    service.getOperationalAlerts.mockResolvedValueOnce(page([])).mockRejectedValueOnce(new Error())
+    service.getOperationalAlerts.mockResolvedValueOnce(page([])).mockRejectedValueOnce(new Error('Raw English API failure'))
     render(<OperationalAlertsPage />)
     expect(await screen.findByText(/No hay alertas operativas activas/)).toBeInTheDocument()
 
@@ -82,7 +82,7 @@ describe('OperationalAlertsPage', () => {
     resolveNext(page([alert('b', 'Second', 'Retry')], 'cursor-b'))
     expect(await screen.findByText('Second')).toBeInTheDocument()
 
-    service.getOperationalAlerts.mockRejectedValueOnce(new Error())
+    service.getOperationalAlerts.mockRejectedValueOnce(new Error('Raw next-page API failure'))
     fireEvent.click(screen.getByRole('button', { name: 'Cargar más' }))
     expect(await screen.findByText('No fue posible cargar las alertas operativas.')).toBeInTheDocument()
     expect(screen.getByText('First')).toBeInTheDocument()
