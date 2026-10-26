@@ -14,7 +14,7 @@ function nextCursorOf(data) {
 }
 
 function labelOf(alert) {
-  return alert?.label ?? alert?.title ?? alert?.message ?? alert?.event_label ?? 'Operational alert'
+  return alert?.label ?? alert?.title ?? alert?.message ?? alert?.event_label ?? 'Alerta operativa'
 }
 
 function contextOf(alert) {
@@ -26,8 +26,8 @@ function dateOf(alert) {
 }
 
 function errorText(error) {
-  if (error?.status === 403) return 'Operational alerts are unavailable because you are not authorized. The server remains authoritative for access.'
-  return error?.message || 'Unable to load operational alerts.'
+  if (error?.status === 403) return 'No tienes autorización para consultar las alertas operativas. El servidor mantiene la autorización.'
+  return error?.message || 'No fue posible cargar las alertas operativas.'
 }
 
 export default function OperationalAlertsPage() {
@@ -80,23 +80,23 @@ export default function OperationalAlertsPage() {
   }
 
   const emptyText = scope === 'active'
-    ? 'No active operational alerts are available.'
-    : 'No operational-alert history is available.'
+    ? 'No hay alertas operativas activas.'
+    : 'No hay alertas operativas en el historial.'
 
   return (
     <div className="tema-analiza tuvet-page operational-alerts-page">
       <PageHeader
-        title="Operational alerts"
-        description="Read-only Systems visibility for responsibility gaps and scheduler outcomes."
+        title="Alertas operativas"
+        description="Consulta de solo lectura para Sistemas sobre brechas de responsabilidad y resultados del planificador."
       />
 
-      <div className="tuvet-tabs" role="tablist" aria-label="Operational-alert scope">
-        <button type="button" role="tab" aria-selected={scope === 'active'} className={`tuvet-tab ${scope === 'active' ? 'active' : ''}`} onClick={() => selectScope('active')}>Active</button>
-        <button type="button" role="tab" aria-selected={scope === 'history'} className={`tuvet-tab ${scope === 'history' ? 'active' : ''}`} onClick={() => selectScope('history')}>History</button>
+      <div className="tuvet-tabs" role="tablist" aria-label="Alcance de alertas operativas">
+        <button type="button" role="tab" aria-selected={scope === 'active'} className={`tuvet-tab ${scope === 'active' ? 'active' : ''}`} onClick={() => selectScope('active')}>Activas</button>
+        <button type="button" role="tab" aria-selected={scope === 'history'} className={`tuvet-tab ${scope === 'history' ? 'active' : ''}`} onClick={() => selectScope('history')}>Historial</button>
       </div>
 
       <EstadoCarga loading={loading} error={error} onRetry={() => loadFirstPage(scope)} empty={!error && !loading && alerts.length === 0} emptyText={emptyText}>
-        <section aria-label={`${scope === 'active' ? 'Active' : 'History'} operational alerts`}>
+        <section aria-label={`Alertas operativas ${scope === 'active' ? 'activas' : 'del historial'}`}>
           <ul className="tuvet-list" aria-live="polite">
             {alerts.map((alert, index) => (
               <li className="tuvet-card" key={alert?.id ?? `${dateOf(alert)}-${index}`}>
@@ -110,11 +110,11 @@ export default function OperationalAlertsPage() {
           {loadMoreError && <Aviso tipo="error">{loadMoreError}</Aviso>}
           {nextCursor && (
             <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={loadMore} disabled={loadingMore} aria-busy={loadingMore}>
-              {loadingMore ? 'Loading more…' : 'Load more'}
+              {loadingMore ? 'Cargando más…' : 'Cargar más'}
             </button>
           )}
           {loadMoreError && nextCursor && !loadingMore && (
-            <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={loadMore}>Retry loading more</button>
+            <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={loadMore}>Reintentar la carga</button>
           )}
         </section>
       </EstadoCarga>

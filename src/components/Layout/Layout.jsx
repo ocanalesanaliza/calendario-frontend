@@ -461,7 +461,7 @@ function Layout() {
         },
         {
           to: '/alertas-operativas',
-          label: 'Operational alerts',
+          label: 'Alertas operativas',
           visible: canAccessOperationalAlerts,
           badge: operationalAlertsCount,
           icon: (

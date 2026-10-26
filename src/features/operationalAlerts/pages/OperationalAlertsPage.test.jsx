@@ -16,6 +16,11 @@ describe('OperationalAlertsPage', () => {
     render(<OperationalAlertsPage />)
 
     expect(screen.getByRole('status', { name: 'Cargando' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Alertas operativas' })).toBeInTheDocument()
+    expect(screen.getByText(/Consulta de solo lectura para Sistemas/)).toBeInTheDocument()
+    expect(screen.getByRole('tablist', { name: 'Alcance de alertas operativas' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Activas' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Historial' })).toHaveAttribute('aria-selected', 'false')
     expect(await screen.findByText('Second from server')).toBeInTheDocument()
     expect(service.getOperationalAlerts).toHaveBeenCalledWith({ scope: 'active', limit: 25 })
     expect(screen.getAllByRole('listitem').map((item) => item.textContent)).toEqual(expect.arrayContaining([
@@ -29,7 +34,7 @@ describe('OperationalAlertsPage', () => {
     render(<OperationalAlertsPage />)
     await screen.findByText('Active')
 
-    fireEvent.click(screen.getByRole('tab', { name: 'History' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Historial' }))
     expect(await screen.findByText('Historical')).toBeInTheDocument()
     expect(service.getOperationalAlerts).toHaveBeenLastCalledWith({ scope: 'history', limit: 25 })
     expect(screen.queryByText('Active', { selector: 'strong' })).not.toBeInTheDocument()
@@ -38,20 +43,20 @@ describe('OperationalAlertsPage', () => {
   it('shows meaningful empty states and a backend 403 state', async () => {
     service.getOperationalAlerts.mockResolvedValueOnce(page([])).mockRejectedValueOnce(Object.assign(new Error('Forbidden'), { status: 403 }))
     const { rerender } = render(<OperationalAlertsPage />)
-    expect(await screen.findByText(/No active operational alerts/)).toBeInTheDocument()
+    expect(await screen.findByText(/No hay alertas operativas activas/)).toBeInTheDocument()
 
     rerender(<OperationalAlertsPage key="forbidden" />)
-    expect(await screen.findByText(/not authorized/i)).toBeInTheDocument()
-    expect(screen.getByText(/server remains authoritative/i)).toBeInTheDocument()
+    expect(await screen.findByText(/No tienes autorización para consultar las alertas operativas/)).toBeInTheDocument()
+    expect(screen.getByText(/El servidor mantiene la autorización/i)).toBeInTheDocument()
   })
 
   it('shows the history empty state and a retryable generic API error', async () => {
-    service.getOperationalAlerts.mockResolvedValueOnce(page([])).mockRejectedValueOnce(new Error('Service unavailable'))
+    service.getOperationalAlerts.mockResolvedValueOnce(page([])).mockRejectedValueOnce(new Error())
     render(<OperationalAlertsPage />)
-    expect(await screen.findByText(/No active operational alerts/)).toBeInTheDocument()
+    expect(await screen.findByText(/No hay alertas operativas activas/)).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('tab', { name: 'History' }))
-    expect(await screen.findByText('Service unavailable')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Historial' }))
+    expect(await screen.findByText('No fue posible cargar las alertas operativas.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
     await waitFor(() => expect(service.getOperationalAlerts).toHaveBeenCalledTimes(3))
   })
@@ -59,10 +64,10 @@ describe('OperationalAlertsPage', () => {
   it('renders the history-specific empty state', async () => {
     service.getOperationalAlerts.mockResolvedValueOnce(page([])).mockResolvedValueOnce(page([]))
     render(<OperationalAlertsPage />)
-    await screen.findByText(/No active operational alerts/)
+    await screen.findByText(/No hay alertas operativas activas/)
 
-    fireEvent.click(screen.getByRole('tab', { name: 'History' }))
-    expect(await screen.findByText(/No operational-alert history/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Historial' }))
+    expect(await screen.findByText(/No hay alertas operativas en el historial/)).toBeInTheDocument()
   })
 
   it('appends a cursor page, prevents duplicate loading, and retains rows on cursor errors', async () => {
@@ -71,19 +76,19 @@ describe('OperationalAlertsPage', () => {
     render(<OperationalAlertsPage />)
     await screen.findByText('First')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Loading more…' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cargar más' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cargando más…' }))
     expect(service.getOperationalAlerts).toHaveBeenCalledTimes(2)
     resolveNext(page([alert('b', 'Second', 'Retry')], 'cursor-b'))
     expect(await screen.findByText('Second')).toBeInTheDocument()
 
-    service.getOperationalAlerts.mockRejectedValueOnce(new Error('Next page failed'))
-    fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
-    expect(await screen.findByText(/Next page failed/)).toBeInTheDocument()
+    service.getOperationalAlerts.mockRejectedValueOnce(new Error())
+    fireEvent.click(screen.getByRole('button', { name: 'Cargar más' }))
+    expect(await screen.findByText('No fue posible cargar las alertas operativas.')).toBeInTheDocument()
     expect(screen.getByText('First')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Approve|Reject|Acknowledge/ })).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Retry loading more' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar la carga' }))
     await waitFor(() => expect(service.getOperationalAlerts).toHaveBeenCalledTimes(4))
   })
 })

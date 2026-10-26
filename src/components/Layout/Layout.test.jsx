@@ -57,7 +57,7 @@ describe('Layout Mis tareas navigation', () => {
     expect(screen.getByRole('link', { name: 'Gerentes de operaciones' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Organización' })).toHaveAttribute('href', '/organizacion')
     expect(screen.getByRole('link', { name: 'Admin Masters' })).toHaveAttribute('href', '/admin-master-asignaciones')
-    expect(screen.getByTitle('Operational alerts')).toHaveAttribute('href', '/alertas-operativas')
+    expect(screen.getByTitle('Alertas operativas')).toHaveAttribute('href', '/alertas-operativas')
   })
 
   it.each([
@@ -72,7 +72,7 @@ describe('Layout Mis tareas navigation', () => {
     render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
 
     expect(screen.queryByRole('link', { name: 'Admin Masters' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /Operational alerts/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Alertas operativas/ })).not.toBeInTheDocument()
   })
 
   it('shows the independent operational-alert count without changing pending-request navigation', async () => {
@@ -81,7 +81,7 @@ describe('Layout Mis tareas navigation', () => {
 
     render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
 
-    expect(await screen.findByTitle('Operational alerts')).toHaveAttribute('href', '/alertas-operativas')
+    expect(await screen.findByTitle('Alertas operativas')).toHaveAttribute('href', '/alertas-operativas')
     fireEvent.click(screen.getByRole('button', { name: 'Expandir menú' }))
     expect(screen.getByText('7')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Notificaciones' })).toBeInTheDocument()
@@ -97,7 +97,7 @@ describe('Layout Mis tareas navigation', () => {
 
     render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
 
-    expect(screen.queryByRole('link', { name: /Operational alerts/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Alertas operativas/ })).not.toBeInTheDocument()
     expect(getOperationalAlertsCount).not.toHaveBeenCalled()
   })
 
