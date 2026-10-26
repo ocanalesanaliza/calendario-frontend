@@ -48,6 +48,7 @@ import AparienciaPage from './features/apariencia/pages/AparienciaPage'
 import { AparienciaProvider } from './features/apariencia/AparienciaContext'
 import OperationalAlertsPage from './features/operationalAlerts/pages/OperationalAlertsPage'
 import SystemsPerformanceHistoryPage from './features/performanceHistory/pages/SystemsPerformanceHistoryPage'
+import MonthlyPerformanceCorrectionsPage from './features/monthlyPerformanceCorrections/pages/MonthlyPerformanceCorrectionsPage'
 
 export function RendimientoRoute({ children }) {
   const { perfil } = useAuth()
@@ -101,6 +102,12 @@ export function OperationalAlertsRoute({ children }) {
 export function PerformanceHistoryRoute({ children }) {
   const { perfil } = useAuth()
   if (!getProfileCapabilities(perfil).canAccessPerformanceHistory) return <Navigate to="/" replace />
+  return children
+}
+
+export function MonthlyPerformanceCorrectionsRoute({ children }) {
+  const { perfil } = useAuth()
+  if (!getProfileCapabilities(perfil).canManageMonthlyPerformanceCorrections) return <Navigate to="/" replace />
   return children
 }
 
@@ -240,7 +247,8 @@ function App() {
           <Route path="/gerentes-operaciones" element={<GerentesOperacionesRoute><GerentesOperacionesPage /></GerentesOperacionesRoute>} />
           <Route path="/admin-master-asignaciones" element={<SystemsOnlyRoute><AdminMasterAssignmentsPage /></SystemsOnlyRoute>} />
            <Route path="/alertas-operativas" element={<SystemsOnlyRoute><OperationalAlertsRoute><OperationalAlertsPage /></OperationalAlertsRoute></SystemsOnlyRoute>} />
-           <Route path="/historial-rendimiento-mensual" element={<PerformanceHistoryRoute><SystemsPerformanceHistoryPage /></PerformanceHistoryRoute>} />
+            <Route path="/historial-rendimiento-mensual" element={<PerformanceHistoryRoute><SystemsPerformanceHistoryPage /></PerformanceHistoryRoute>} />
+            <Route path="/correcciones-rendimiento-mensual" element={<MonthlyPerformanceCorrectionsRoute><MonthlyPerformanceCorrectionsPage /></MonthlyPerformanceCorrectionsRoute>} />
           <Route path="/areas" element={<AreaManagerAssignmentRoute><AreasPage /></AreaManagerAssignmentRoute>} />
           <Route path="/organizacion" element={<OrganizacionRoute><OrganizacionPage /></OrganizacionRoute>} />
           <Route path="/mis-tareas" element={<MisTareasRoute><MisTareasPage /></MisTareasRoute>} />

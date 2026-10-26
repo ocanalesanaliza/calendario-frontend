@@ -15,7 +15,7 @@ S6. T8.C: final integration and verification. Pending; not implemented in T8.A.
 ## Tasks
 
 - [x] T8.A | S1-S4 | inline | complete | RED L6; GREEN L7 | commit pending
-- [ ] T8.B | S5 | inline | pending | not started | commit pending
+- [x] T8.B | S5 | inline | complete | RED L9; GREEN L10-L11 | commit pending
 - [ ] T8.C | S6 | inline | pending | not started | commit pending
 
 ## Log
@@ -65,3 +65,9 @@ L6. Candidate-caused S4 defect: after an initial Areas-load failure, `Reintentar
 L7. GREEN: retry now distinguishes the failed operation. A failed Areas load sets `areasLoadError`; `Reintentar` starts another Areas attempt, while history errors retain the history retry path. The regression test passed: 5/5 page tests. Focused T8.A tests passed: 7/7. Route, navigation, and policy tests passed: 149/149. Lint passed. Full suite: 635 passed, with only the documented 11 localStorage baseline failures (9 LoginPage, 2 AparienciaContext); OperationalAlertsPage passed. Independent recheck found the original Areas retry blocker structurally corrected; its isolated scratch runtime lacked Vitest.
 
 L8. T8.A is complete with observed functional evidence. T8.B and T8.C remain pending.
+
+L9. T8.B RED: before the new correction service and page existed, there was no route, capability, correction API client, confirmation flow, receipt, or audit-chain coverage for S5.
+
+L10. T8.B GREEN (pre-commit): focused service/history tests passed 7/7; route, navigation, policy, service, and history tests passed 156/156; lint passed. The full suite reported only the documented 11 localStorage-environment failures (9 LoginPage and 2 AparienciaContext); 637 tests passed. Final correction-page coverage and `git diff --check` remain required before T8.B can be marked complete.
+
+L11. T8.B completion evidence: correction page and service tests passed 6/6 after adding the validation-command idempotency replay probe; independent verification found no T8.B blockers. `git diff --check` passed. Risk: item 3 (authorization, idempotency, freshness, and opaque identifiers); independent verification completed.

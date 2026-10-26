@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 import SystemsPerformanceHistoryPage from './SystemsPerformanceHistoryPage'
 
 const service = vi.hoisted(() => ({ getPerformanceHistory: vi.fn(), getAreas: vi.fn() }))
@@ -12,6 +13,8 @@ const result = (kind = 'definitive', state = 'closed') => ({
   performance: { kind, state, version: 4, expected_weight: '20', credited_weight: '15', percentage: kind === 'provisional' ? null : '75', as_of: '2026-10-25T10:30:00Z', snapshot_id: 'never-render-this' },
 })
 
+function renderPage() { return render(<MemoryRouter><SystemsPerformanceHistoryPage /></MemoryRouter>) }
+
 describe('SystemsPerformanceHistoryPage', () => {
   beforeEach(() => {
     service.getAreas.mockReset(); service.getPerformanceHistory.mockReset()
@@ -20,7 +23,7 @@ describe('SystemsPerformanceHistoryPage', () => {
   })
 
   it('shows inactive areas, searches a matching one-month range, and never exposes snapshot ids', async () => {
-    render(<SystemsPerformanceHistoryPage />)
+    renderPage()
     await screen.findByText('Responsable')
     expect(screen.getByRole('option', { name: /Área Sur.*Inactiva/ })).toBeInTheDocument()
     expect(service.getPerformanceHistory).toHaveBeenCalledWith(expect.objectContaining({ areaId: '7', fromMonth: expect.any(String), toMonth: expect.any(String), limit: 25 }))
@@ -33,7 +36,7 @@ describe('SystemsPerformanceHistoryPage', () => {
   })
 
   it('rejects ranges of 24 months or more before requesting history', async () => {
-    render(<SystemsPerformanceHistoryPage />)
+    renderPage()
     await screen.findByText('Responsable')
     fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2024-01' } })
     fireEvent.change(screen.getByLabelText('Hasta'), { target: { value: '2026-01' } })
@@ -44,7 +47,7 @@ describe('SystemsPerformanceHistoryPage', () => {
 
   it('keeps opaque cursors unchanged and distinguishes provisional N/A from definitive data', async () => {
     service.getPerformanceHistory.mockResolvedValueOnce({ results: [result('provisional', 'not_applicable')], next_cursor: 'opaque+/cursor' }).mockResolvedValueOnce({ results: [result('definitive', 'not_applicable')], next_cursor: null })
-    render(<SystemsPerformanceHistoryPage />)
+    renderPage()
     expect(await screen.findByText('Provisional')).toBeInTheDocument()
     expect(screen.getAllByText('No aplica').length).toBeGreaterThan(0)
     expect(screen.queryByText('Versión 4')).not.toBeInTheDocument()
@@ -54,17 +57,17 @@ describe('SystemsPerformanceHistoryPage', () => {
     expect(screen.getByText('Versión 4')).toBeInTheDocument()
   })
 
-  it('offers loading, empty, error retry, keyboard focus and read-only controls', async () => {
+  it('offers loading, empty, error retry, keyboard focus and a contextual correction control', async () => {
     let resolveAreas
     service.getAreas.mockImplementationOnce(() => new Promise((resolve) => { resolveAreas = resolve }))
-    render(<SystemsPerformanceHistoryPage />)
+    renderPage()
     expect(screen.getByRole('status', { name: 'Cargando' })).toBeInTheDocument()
     resolveAreas(areas)
     await screen.findByText('Responsable')
     expect(screen.getByRole('button', { name: 'Consultar historial' })).toBeVisible()
     expect(document.querySelector('.systems-performance-history')).toHaveClass('tema-analiza')
     expect(document.querySelector('.systems-performance-history')).toHaveAttribute('data-responsive-breakpoints', '375 768 1024 1440')
-    expect(screen.queryByRole('button', { name: /corregir|aprobar|rechazar|confirmar/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Corregir rendimiento' })).toBeVisible()
   })
 
   it('retries loading Areas after an initial Areas failure', async () => {
@@ -72,7 +75,7 @@ describe('SystemsPerformanceHistoryPage', () => {
       .mockRejectedValueOnce(new Error('network failure'))
       .mockResolvedValueOnce(areas)
 
-    render(<SystemsPerformanceHistoryPage />)
+    renderPage()
 
     expect(await screen.findByRole('alert')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))

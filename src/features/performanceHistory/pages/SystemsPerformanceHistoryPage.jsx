@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Aviso, EstadoCarga, PageHeader } from '../../tuvet/components/TuvetUi'
 import { getAreas } from '../../areas/services/areasService'
 import { getPerformanceHistory } from '../services/performanceHistoryService'
@@ -48,12 +49,17 @@ function normalizeError(error) {
   return 'No fue posible cargar el historial de rendimiento mensual.'
 }
 
-function HistoryRow({ row }) {
+function HistoryRow({ row, onSelectTarget }) {
   const performance = row?.performance ?? {}
   const definitive = performance.kind === 'definitive'
   const responsibility = row?.responsibility?.nombre ?? row?.responsibility?.name ?? row?.responsibility ?? '—'
   const area = row?.area ? areaLabel(row.area) : '—'
   const state = performance.state === 'not_applicable' ? 'No aplica' : (performance.state ?? '—')
+  const canCorrect = definitive && Object.prototype.hasOwnProperty.call(performance, 'snapshot_id') && performance.snapshot_id !== null && performance.snapshot_id !== undefined
+  const safeTarget = canCorrect ? {
+    snapshotId: performance.snapshot_id,
+    summary: { area, responsibility, period: formatMonth(row?.period), state, version: performance.version, expected_weight: performance.expected_weight, credited_weight: performance.credited_weight, percentage: performance.percentage },
+  } : null
 
   return (
     <tr>
@@ -69,11 +75,13 @@ function HistoryRow({ row }) {
         <span>{formatDate(performance.as_of)}</span>
         <small>{definitive ? 'Cierre definitivo' : 'Proyección generada'}</small>
       </td>
+      {onSelectTarget && <td>{canCorrect && <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => onSelectTarget(safeTarget)}>Corregir rendimiento</button>}</td>}
     </tr>
   )
 }
 
-export default function SystemsPerformanceHistoryPage() {
+export default function SystemsPerformanceHistoryPage({ selectionMode = false, onSelectTarget }) {
+  const navigate = useNavigate()
   const [initialMonth] = useState(() => monthToday())
   const [areas, setAreas] = useState([])
   const [areaId, setAreaId] = useState('')
@@ -159,7 +167,7 @@ export default function SystemsPerformanceHistoryPage() {
 
   return (
     <main className="tema-analiza tuvet-page systems-performance-history" data-responsive-breakpoints="375 768 1024 1440">
-      <PageHeader title="Historial de rendimiento mensual" description="Consulta de solo lectura para Sistemas. El servidor conserva la autorización de los datos." />
+      <PageHeader title={selectionMode ? 'Seleccionar rendimiento definitivo' : 'Historial de rendimiento mensual'} description={selectionMode ? 'Selecciona un cierre definitivo con evidencia para continuar.' : 'Consulta de solo lectura para Sistemas. El servidor conserva la autorización de los datos.'} />
       <Aviso tipo="info">Los resultados definitivos indican la fecha de cierre; los provisionales, cuándo se generó la proyección.</Aviso>
 
       <form className="sph-filters" onSubmit={submit} aria-label="Filtros del historial mensual">
@@ -179,8 +187,8 @@ export default function SystemsPerformanceHistoryPage() {
       <EstadoCarga loading={loadingAreas || loading} error={error} onRetry={retry} empty={!loadingAreas && !loading && !error && rows.length === 0} emptyText="No hay resultados para el área y el periodo seleccionados.">
         <div className="sph-table-wrap" tabIndex="0" aria-label="Resultados del historial de rendimiento mensual">
           <table className="sph-table">
-            <thead><tr><th>Área</th><th>Responsabilidad</th><th>Mes</th><th>Estado</th><th>Versión</th><th>Peso esperado</th><th>Peso acreditado</th><th>Porcentaje</th><th>Actualizado</th></tr></thead>
-            <tbody>{rows.map((row, index) => <HistoryRow key={`${row?.period ?? 'period'}-${index}`} row={row} />)}</tbody>
+            <thead><tr><th>Área</th><th>Responsabilidad</th><th>Mes</th><th>Estado</th><th>Versión</th><th>Peso esperado</th><th>Peso acreditado</th><th>Porcentaje</th><th>Actualizado</th>{(selectionMode || !selectionMode) && <th>{selectionMode ? 'Seleccionar' : 'Corrección'}</th>}</tr></thead>
+            <tbody>{rows.map((row, index) => <HistoryRow key={`${row?.period ?? 'period'}-${index}`} row={row} onSelectTarget={selectionMode ? onSelectTarget : (target) => navigate('/correcciones-rendimiento-mensual', { state: { target } })} />)}</tbody>
           </table>
         </div>
         {nextCursor && <button type="button" className="tuvet-btn tuvet-btn-secondary sph-load-more" onClick={() => request({ cursor: nextCursor, append: true })} disabled={loadingMore}>{loadingMore ? 'Cargando más…' : 'Cargar más'}</button>}
