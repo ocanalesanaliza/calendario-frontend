@@ -38,7 +38,7 @@ describe('Layout Mis tareas navigation', () => {
   })
 
   it('shows only the Systems management menu for an active Systems account that was previously a GA', async () => {
-    useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true, can_access_my_tasks: true }, logout: vi.fn() })
+    useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true, can_access_my_tasks: true, capabilities: { has_global_scope: true } }, logout: vi.fn() })
 
     render(
       <MemoryRouter>
@@ -58,6 +58,7 @@ describe('Layout Mis tareas navigation', () => {
     expect(screen.getByRole('link', { name: 'Organización' })).toHaveAttribute('href', '/organizacion')
     expect(screen.getByRole('link', { name: 'Admin Masters' })).toHaveAttribute('href', '/admin-master-asignaciones')
     expect(screen.getByTitle('Alertas operativas')).toHaveAttribute('href', '/alertas-operativas')
+    expect(screen.getByTitle('Historial de rendimiento mensual')).toHaveAttribute('href', '/historial-rendimiento-mensual')
   })
 
   it.each([
@@ -99,6 +100,13 @@ describe('Layout Mis tareas navigation', () => {
 
     expect(screen.queryByRole('link', { name: /Alertas operativas/ })).not.toBeInTheDocument()
     expect(getOperationalAlertsCount).not.toHaveBeenCalled()
+    expect(screen.queryByRole('link', { name: 'Historial de rendimiento mensual' })).not.toBeInTheDocument()
+  })
+
+  it('shows performance-history navigation only to active global Systems', () => {
+    useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+    expect(screen.getByTitle('Historial de rendimiento mensual')).toHaveAttribute('href', '/historial-rendimiento-mensual')
   })
 
   it('shows the six capability-controlled modules to a Systems master admin with granted capabilities', () => {

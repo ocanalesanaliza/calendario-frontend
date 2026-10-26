@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AdminMaestroRoute, AlmuerzosRoute, AusenciasAreaRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GerentesOperacionesRoute, MisTareasRoute, OperationalAlertsRoute, OrganizacionRoute, PendientesRoute, PlantillasAreaRoute, RendimientoRoute, SystemsOnlyRoute } from './App'
+import { AdminMaestroRoute, AlmuerzosRoute, AusenciasAreaRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GerentesOperacionesRoute, MisTareasRoute, OperationalAlertsRoute, OrganizacionRoute, PendientesRoute, PerformanceHistoryRoute, PlantillasAreaRoute, RendimientoRoute, SystemsOnlyRoute } from './App'
 
 const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
 
@@ -146,6 +146,30 @@ describe('Sistemas-only routes', () => {
 
     expect(await screen.findByText('Inicio')).toBeInTheDocument()
     expect(screen.queryByText('Almuerzo autorizado')).not.toBeInTheDocument()
+  })
+})
+
+describe('PerformanceHistoryRoute', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  it.each([
+    ['GA', { type: 'gerente_area', activo: true, habilitado: true }, false],
+    ['reassigned GA', { type: 'gerente_area', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, false],
+    ['Admin Master', { type: 'admin_master', activo: true, habilitado: true }, false],
+    ['Master Admin', { es_admin_maestro: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['GS', { type: 'gerente_sucursal', activo: true, habilitado: true }, false],
+    ['inactive Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: false, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['disabled Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: false, capabilities: { has_global_scope: true } }, false],
+    ['flag-only Systems', { es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['role-mismatched Systems', { type: 'admin_master', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['non-global Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, false],
+    ['active global Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, true],
+  ])('admits only %s', async (_name, perfil, admitted) => {
+    useAuth.mockReturnValue({ perfil })
+    render(<MemoryRouter initialEntries={['/historial-rendimiento-mensual']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/historial-rendimiento-mensual" element={<PerformanceHistoryRoute><p>Historial autorizado</p></PerformanceHistoryRoute>} /></Routes></MemoryRouter>)
+    if (admitted) expect(screen.getByText('Historial autorizado')).toBeInTheDocument()
+    else expect(await screen.findByText('Inicio')).toBeInTheDocument()
   })
 })
 

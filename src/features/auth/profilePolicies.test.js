@@ -83,6 +83,23 @@ describe('getProfileCapabilities', () => {
   })
 
   it.each([
+    ['active global Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, true],
+    ['GA', { type: 'gerente_area', activo: true, habilitado: true }, false],
+    ['reassigned GA', { type: 'gerente_area', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, false],
+    ['Admin Master', { type: 'admin_master', activo: true, habilitado: true }, false],
+    ['Master Admin', { es_admin_maestro: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['GS', { type: 'gerente_sucursal', activo: true, habilitado: true }, false],
+    ['inactive Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: false, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['disabled Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: false, capabilities: { has_global_scope: true } }, false],
+    ['flag-only Systems', { es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['role-mismatched Systems', { type: 'admin_master', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['non-global Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, false],
+  ])('sets performance-history access for %s to %s', (_role, profile, expected) => {
+    expect(getProfileCapabilities(profile).canAccessPerformanceHistory).toBe(expected)
+  })
+
+  it.each([
     ['GA', { type: 'gerente_area' }, true, true, false, true, false],
     ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, true, false, true, false, true],
     ['active Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, true, false, true, false, true],
