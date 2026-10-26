@@ -65,4 +65,3 @@ L6. Candidate-caused S4 defect: after an initial Areas-load failure, `Reintentar
 L7. GREEN: retry now distinguishes the failed operation. A failed Areas load sets `areasLoadError`; `Reintentar` starts another Areas attempt, while history errors retain the history retry path. The regression test passed: 5/5 page tests. Focused T8.A tests passed: 7/7. Route, navigation, and policy tests passed: 149/149. Lint passed. Full suite: 635 passed, with only the documented 11 localStorage baseline failures (9 LoginPage, 2 AparienciaContext); OperationalAlertsPage passed. Independent recheck found the original Areas retry blocker structurally corrected; its isolated scratch runtime lacked Vitest.
 
 L8. T8.A is complete with observed functional evidence. T8.B and T8.C remain pending.
-
