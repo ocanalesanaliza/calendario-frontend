@@ -2,6 +2,7 @@ import { apiRequest } from '../../../services/apiClient'
 
 const AREAS_ENDPOINT = '/api/calendar/performance/areas/'
 const HISTORY_ENDPOINT = '/api/calendar/performance/history/'
+const OCCURRENCES_ENDPOINT = '/api/calendar/performance/occurrences/'
 
 async function parseResponse(response, fallbackMessage) {
   const data = await response.json().catch(() => null)
@@ -30,4 +31,24 @@ export async function getGOAuthorizedAreas({ businessDate, fromMonth, toMonth } 
 export async function getGOAreaPerformanceHistory({ areaId, businessDate, fromMonth, toMonth, cursor, limit } = {}) {
   const query = makeQuery({ area_id: areaId, business_date: businessDate, from_month: fromMonth, to_month: toMonth, cursor, limit }, ['area_id', 'business_date', 'from_month', 'to_month', 'cursor', 'limit'])
   return parseResponse(await apiRequest(`${HISTORY_ENDPOINT}${query}`, { method: 'GET' }), 'No fue posible cargar el historial de rendimiento de áreas.')
+}
+
+export async function getGOOccurrences({ areaId, responsibilityId, businessDate, fromMonth, toMonth, cursor, limit } = {}) {
+  const query = makeQuery(
+    { area_id: areaId, responsibility_id: responsibilityId, business_date: businessDate, from_month: fromMonth, to_month: toMonth, cursor, limit },
+    ['area_id', 'responsibility_id', 'business_date', 'from_month', 'to_month', 'cursor', 'limit'],
+  )
+  return parseResponse(await apiRequest(`${OCCURRENCES_ENDPOINT}${query}`, { method: 'GET' }), 'No fue posible cargar la evidencia de ocurrencias autorizadas.')
+}
+
+export async function getGOOccurrenceDetail(occurrenceId) {
+  return parseResponse(await apiRequest(`${OCCURRENCES_ENDPOINT}${encodeURIComponent(String(occurrenceId))}/`, { method: 'GET' }), 'No fue posible cargar el detalle de la ocurrencia autorizada.')
+}
+
+export async function getGOResponsibilityGaps({ areaId, businessDate, fromDate, toDate, cursor, limit } = {}) {
+  const query = makeQuery(
+    { business_date: businessDate, from_date: fromDate, to_date: toDate, cursor, limit },
+    ['business_date', 'from_date', 'to_date', 'cursor', 'limit'],
+  )
+  return parseResponse(await apiRequest(`/api/calendar/areas/${encodeURIComponent(String(areaId))}/responsibility-gaps/${query}`, { method: 'GET' }), 'No fue posible cargar las brechas de responsabilidad del Área.')
 }

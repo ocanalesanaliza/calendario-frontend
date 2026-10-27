@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getGOAuthorizedAreas, getGOAreaPerformanceHistory } from './goPerformanceHistoryService'
+import { getGOAuthorizedAreas, getGOAreaPerformanceHistory, getGOOccurrenceDetail, getGOOccurrences, getGOResponsibilityGaps } from './goPerformanceHistoryService'
 
 const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn() }))
 vi.mock('../../../services/apiClient', () => ({ apiRequest }))
@@ -33,5 +33,29 @@ describe('goPerformanceHistoryService', () => {
       message: 'No fue posible cargar el historial de rendimiento de áreas.',
       status: 403,
     })
+  })
+
+  it('requests occurrence evidence only with the selected Area, responsibility, and single history period', async () => {
+    const payload = { scope: {}, results: [] }
+    apiRequest.mockResolvedValueOnce(response(payload))
+
+    await expect(getGOOccurrences({ areaId: 7, responsibilityId: 19, fromMonth: '2026-10', toMonth: '2026-10' })).resolves.toBe(payload)
+    expect(apiRequest).toHaveBeenCalledWith('/api/calendar/performance/occurrences/?area_id=7&responsibility_id=19&from_month=2026-10&to_month=2026-10', { method: 'GET' })
+  })
+
+  it('uses only a list-issued occurrence identifier for the detail endpoint shape', async () => {
+    const payload = { task: { title: 'Inventario' } }
+    apiRequest.mockResolvedValueOnce(response(payload))
+
+    await expect(getGOOccurrenceDetail('opaque-listed-occurrence')).resolves.toBe(payload)
+    expect(apiRequest).toHaveBeenCalledWith('/api/calendar/performance/occurrences/opaque-listed-occurrence/', { method: 'GET' })
+  })
+
+  it('requests responsibility gaps with documented Area/range parameters and preserves an opaque cursor', async () => {
+    const payload = { results: [], next_cursor: 'opaque+/gap' }
+    apiRequest.mockResolvedValueOnce(response(payload))
+
+    await expect(getGOResponsibilityGaps({ areaId: 7, businessDate: '2026-10-31', fromDate: '2026-09-01', toDate: '2026-10-31', cursor: 'opaque+/gap', limit: 25 })).resolves.toBe(payload)
+    expect(apiRequest).toHaveBeenCalledWith('/api/calendar/areas/7/responsibility-gaps/?business_date=2026-10-31&from_date=2026-09-01&to_date=2026-10-31&cursor=opaque%2B%2Fgap&limit=25', { method: 'GET' })
   })
 })
