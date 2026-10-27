@@ -15,7 +15,7 @@ S6. T8.C: final integration and verification. Pending; not implemented in T8.A.
 ## Tasks
 
 - [x] T8.A | S1-S4 | inline | complete | RED L6; GREEN L7 | commit pending
-- [ ] T8.B | S5 | inline | pending final independent verification | RED L9, L12; GREEN L10-L11, L13 | commit pending
+- [ ] T8.B | S5 | inline | pending final feature closure | RED L9, L12; GREEN L10-L11, L13-L14 | commit pending
 - [ ] T8.C | S6 | inline | pending | not started | commit pending
 
 ## Log
@@ -75,3 +75,5 @@ L11. T8.B completion evidence: correction page and service tests passed 6/6 afte
 L12. Four independent-verification blockers were corrected before commit: correction navigation belonged immediately after Alertas operativas in Personas, correction-specific capability/route/navigation coverage was absent, audit rows did not distinguish null legacy receipts from corrected receipts, and stale/idempotency conflicts did not explicitly clear a pending command. RED evidence: the focused correction-page regression failed for missing audit receipt distinction; manual bound validation already passed after its accessible radio selector was corrected.
 
 L13. GREEN evidence: focused correction/history/App/Layout/profile-policy tests passed 188/188 and lint passed. Full-suite baseline is 668 passed with 12 documented failures: 9 LoginPage localStorage.clear failures, 2 AparienciaContext localStorage.clear failures, and one InventoryDemoPage timeout reproduced on parent `76ea9654ba33b14b29c1609dab2db03e9efc0a29`; its focused test passes on parent and candidate. T8.B remains pending final independent verification of this committed correction range. Risk: item 3 (authorization, idempotency, freshness, opaque identifiers, and receipt semantics).
+
+L14. Direct Systems-only correction capability and route actor-matrix coverage was added. `npm.cmd run test -- src/App.test.jsx src/features/auth/profilePolicies.test.js` passed 139/139; `npm.cmd run test -- src/features/monthlyPerformanceCorrections/pages/MonthlyPerformanceCorrectionsPage.test.jsx src/features/monthlyPerformanceCorrections/services/monthlyPerformanceCorrectionsService.test.js` passed 10/10; `npm.cmd run lint` and `git diff --check` passed. T8.B remains pending final feature closure; T8.C remains pending and is not complete. The intermittent full-suite `InventarioDemoPage.test.jsx` timeout is separate, unresolved test debt pending a separate maintenance unit, outside T8 scope; Inventario was not modified or repaired.

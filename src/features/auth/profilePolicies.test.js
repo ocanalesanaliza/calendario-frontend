@@ -112,7 +112,7 @@ describe('getProfileCapabilities', () => {
     ['flag-only Systems', { es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
     ['role-mismatched Systems', { type: 'admin_master', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
     ['non-global Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, false],
-  ])('sets monthly-correction management for %s to %s', (_role, profile, expected) => {
+  ])('sets monthly-correction management only for %s to %s', (_role, profile, expected) => {
     expect(getProfileCapabilities(profile).canManageMonthlyPerformanceCorrections).toBe(expected)
   })
 
