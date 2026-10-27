@@ -42,6 +42,7 @@ function Layout() {
     canAccessOperationalAlerts,
     canAccessPerformanceHistory,
     canManageMonthlyPerformanceCorrections,
+    canAccessGOAreaPerformanceHistory,
     canAccessPendingRequests,
   } = getProfileCapabilities(perfil)
   const hideRestrictedNavigation = esGerenteArea
@@ -523,6 +524,18 @@ function Layout() {
               <path d="M3 3v18h18" />
               <path d="M7 14l3-3 3 2 5-6" />
               <path d="M18 7h-3V4" />
+            </svg>
+          ),
+        },
+        {
+          to: '/historial-rendimiento-go',
+          label: 'Rendimiento de áreas',
+          visible: canAccessGOAreaPerformanceHistory,
+          icon: (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 3v18h18" />
+              <path d="M7 15l3-4 3 2 4-6" />
+              <path d="M17 7h-3V4" />
             </svg>
           ),
         },

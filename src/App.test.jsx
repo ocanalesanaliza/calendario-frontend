@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AdminMaestroRoute, AlmuerzosRoute, AusenciasAreaRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GerentesOperacionesRoute, MisTareasRoute, MonthlyPerformanceCorrectionsRoute, OperationalAlertsRoute, OrganizacionRoute, PendientesRoute, PerformanceHistoryRoute, PlantillasAreaRoute, RendimientoRoute, SystemsOnlyRoute } from './App'
+import { AdminMaestroRoute, AlmuerzosRoute, AusenciasAreaRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GOAreaPerformanceHistoryRoute, GerentesOperacionesRoute, MisTareasRoute, MonthlyPerformanceCorrectionsRoute, OperationalAlertsRoute, OrganizacionRoute, PendientesRoute, PerformanceHistoryRoute, PlantillasAreaRoute, RendimientoRoute, SystemsOnlyRoute } from './App'
 
 const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
 
@@ -169,6 +169,27 @@ describe('PerformanceHistoryRoute', () => {
     useAuth.mockReturnValue({ perfil })
     render(<MemoryRouter initialEntries={['/historial-rendimiento-mensual']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/historial-rendimiento-mensual" element={<PerformanceHistoryRoute><p>Historial autorizado</p></PerformanceHistoryRoute>} /></Routes></MemoryRouter>)
     if (admitted) expect(screen.getByText('Historial autorizado')).toBeInTheDocument()
+    else expect(await screen.findByText('Inicio')).toBeInTheDocument()
+  })
+})
+
+describe('GOAreaPerformanceHistoryRoute', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  it.each([
+    ['active enabled GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, true],
+    ['GA', { type: 'gerente_area', activo: true, habilitado: true }, false],
+    ['reassigned GA', { type: 'gerente_area', es_cuenta_sistemas: true, activo: true, habilitado: true }, false],
+    ['Admin Master', { type: 'admin_master', activo: true, habilitado: true }, false],
+    ['Master Admin', { es_admin_maestro: true, activo: true, habilitado: true }, false],
+    ['GS', { type: 'gerente_sucursal', activo: true, habilitado: true }, false],
+    ['Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, false],
+    ['inactive GO', { type: 'gerente_operaciones', activo: false, habilitado: true }, false],
+    ['disabled GO', { type: 'gerente_operaciones', activo: true, habilitado: false }, false],
+  ])('admits only %s', async (_name, perfil, admitted) => {
+    useAuth.mockReturnValue({ perfil })
+    render(<MemoryRouter initialEntries={['/historial-rendimiento-go']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/historial-rendimiento-go" element={<GOAreaPerformanceHistoryRoute><p>Historial GO autorizado</p></GOAreaPerformanceHistoryRoute>} /></Routes></MemoryRouter>)
+    if (admitted) expect(screen.getByText('Historial GO autorizado')).toBeInTheDocument()
     else expect(await screen.findByText('Inicio')).toBeInTheDocument()
   })
 })

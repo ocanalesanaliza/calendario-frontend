@@ -100,6 +100,21 @@ describe('getProfileCapabilities', () => {
   })
 
   it.each([
+    ['active enabled GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, true],
+    ['GA', { type: 'gerente_area', activo: true, habilitado: true }, false],
+    ['reassigned GA', { type: 'gerente_area', es_cuenta_sistemas: true, activo: true, habilitado: true }, false],
+    ['Admin Master', { type: 'admin_master', activo: true, habilitado: true }, false],
+    ['Master Admin', { es_admin_maestro: true, activo: true, habilitado: true }, false],
+    ['GS', { type: 'gerente_sucursal', activo: true, habilitado: true }, false],
+    ['Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, false],
+    ['inactive GO', { type: 'gerente_operaciones', activo: false, habilitado: true }, false],
+    ['disabled GO', { type: 'gerente_operaciones', activo: true, habilitado: false }, false],
+    ['role-mismatched profile', { type: 'admin_master', activo: true, habilitado: true }, false],
+  ])('sets GO Area-performance history access for %s to %s', (_role, profile, expected) => {
+    expect(getProfileCapabilities(profile).canAccessGOAreaPerformanceHistory).toBe(expected)
+  })
+
+  it.each([
     ['active global Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, true],
     ['GA', { type: 'gerente_area', activo: true, habilitado: true }, false],
     ['reassigned GA', { type: 'gerente_area', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],

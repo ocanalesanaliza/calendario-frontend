@@ -1,0 +1,38 @@
+.go-area-performance-history { color: var(--tv-text); }
+
+.go-area-performance-history .go-performance-filters {
+  display: grid;
+  grid-template-columns: minmax(14rem, 2fr) repeat(2, minmax(9rem, 1fr)) auto;
+  align-items: end;
+  gap: 1rem;
+  margin: 1rem 0;
+  padding: 1rem;
+  background: var(--tv-surface);
+  border: 1px solid var(--tv-border);
+  border-radius: var(--tv-radius);
+  box-shadow: var(--tv-shadow-sm);
+}
+
+.go-area-performance-history .go-performance-field { display: grid; gap: .4rem; min-width: 0; }
+.go-area-performance-history .go-performance-field label { color: var(--tv-fg); font-weight: 700; }
+.go-area-performance-history .go-performance-field small { color: var(--tv-muted); }
+.go-area-performance-history .go-performance-field select,
+.go-area-performance-history .go-performance-field input { min-height: var(--tv-target); padding: .45rem .65rem; color: var(--tv-text); background: var(--tv-surface); border: 1px solid var(--tv-border-strong); border-radius: var(--tv-radius-sm); }
+.go-area-performance-history .go-performance-field select:focus-visible,
+.go-area-performance-history .go-performance-field input:focus-visible,
+.go-area-performance-history .go-performance-table-wrap:focus-visible { outline: 2px solid var(--tv-primary-accent); outline-offset: 2px; box-shadow: 0 0 0 3px var(--tv-ring); }
+.go-area-performance-history .go-performance-table-wrap { overflow-x: auto; background: var(--tv-surface); border: 1px solid var(--tv-border); border-radius: var(--tv-radius); }
+.go-area-performance-history .go-performance-table { width: 100%; min-width: 67rem; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.go-area-performance-history .go-performance-table th,
+.go-area-performance-history .go-performance-table td { padding: .75rem; border-bottom: 1px solid var(--tv-border); text-align: left; vertical-align: top; }
+.go-area-performance-history .go-performance-table th { color: var(--tv-fg); background: var(--tv-sunken); white-space: nowrap; }
+.go-area-performance-history .go-performance-number { text-align: right; white-space: nowrap; }
+.go-area-performance-history .go-performance-state { display: inline-flex; padding: .2rem .5rem; border-radius: var(--tv-radius-sm); font-size: .8125rem; font-weight: 700; }
+.go-area-performance-history .go-performance-state-definitive { color: var(--tv-success-text); background: var(--tv-success-soft); }
+.go-area-performance-history .go-performance-state-provisional { color: var(--tv-warning-text); background: var(--tv-warning-soft); }
+.go-area-performance-history .go-performance-load-more { margin-top: 1rem; }
+.go-area-performance-history .go-performance-empty { padding: 1rem; background: var(--tv-surface); border: 1px solid var(--tv-border); border-radius: var(--tv-radius); color: var(--tv-muted); }
+
+@media (max-width: 900px) { .go-area-performance-history .go-performance-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .go-area-performance-history .go-performance-filters { grid-template-columns: 1fr; } .go-area-performance-history .go-performance-filters .tuvet-btn { width: 100%; min-height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .go-area-performance-history *, .go-area-performance-history *::before, .go-area-performance-history *::after { scroll-behavior: auto; transition-duration: .01ms; animation-duration: .01ms; } }

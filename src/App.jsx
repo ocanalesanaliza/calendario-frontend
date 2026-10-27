@@ -49,6 +49,7 @@ import { AparienciaProvider } from './features/apariencia/AparienciaContext'
 import OperationalAlertsPage from './features/operationalAlerts/pages/OperationalAlertsPage'
 import SystemsPerformanceHistoryPage from './features/performanceHistory/pages/SystemsPerformanceHistoryPage'
 import MonthlyPerformanceCorrectionsPage from './features/monthlyPerformanceCorrections/pages/MonthlyPerformanceCorrectionsPage'
+import GOAreaPerformanceHistoryPage from './features/goPerformanceHistory/pages/GOAreaPerformanceHistoryPage'
 
 export function RendimientoRoute({ children }) {
   const { perfil } = useAuth()
@@ -108,6 +109,12 @@ export function PerformanceHistoryRoute({ children }) {
 export function MonthlyPerformanceCorrectionsRoute({ children }) {
   const { perfil } = useAuth()
   if (!getProfileCapabilities(perfil).canManageMonthlyPerformanceCorrections) return <Navigate to="/" replace />
+  return children
+}
+
+export function GOAreaPerformanceHistoryRoute({ children }) {
+  const { perfil } = useAuth()
+  if (!getProfileCapabilities(perfil).canAccessGOAreaPerformanceHistory) return <Navigate to="/" replace />
   return children
 }
 
@@ -248,7 +255,8 @@ function App() {
           <Route path="/admin-master-asignaciones" element={<SystemsOnlyRoute><AdminMasterAssignmentsPage /></SystemsOnlyRoute>} />
            <Route path="/alertas-operativas" element={<SystemsOnlyRoute><OperationalAlertsRoute><OperationalAlertsPage /></OperationalAlertsRoute></SystemsOnlyRoute>} />
             <Route path="/historial-rendimiento-mensual" element={<PerformanceHistoryRoute><SystemsPerformanceHistoryPage /></PerformanceHistoryRoute>} />
-            <Route path="/correcciones-rendimiento-mensual" element={<MonthlyPerformanceCorrectionsRoute><MonthlyPerformanceCorrectionsPage /></MonthlyPerformanceCorrectionsRoute>} />
+          <Route path="/correcciones-rendimiento-mensual" element={<MonthlyPerformanceCorrectionsRoute><MonthlyPerformanceCorrectionsPage /></MonthlyPerformanceCorrectionsRoute>} />
+          <Route path="/historial-rendimiento-go" element={<GOAreaPerformanceHistoryRoute><GOAreaPerformanceHistoryPage /></GOAreaPerformanceHistoryRoute>} />
           <Route path="/areas" element={<AreaManagerAssignmentRoute><AreasPage /></AreaManagerAssignmentRoute>} />
           <Route path="/organizacion" element={<OrganizacionRoute><OrganizacionPage /></OrganizacionRoute>} />
           <Route path="/mis-tareas" element={<MisTareasRoute><MisTareasPage /></MisTareasRoute>} />
