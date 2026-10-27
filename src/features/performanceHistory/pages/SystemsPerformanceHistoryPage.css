@@ -1,0 +1,35 @@
+.systems-performance-history {
+  color: var(--tv-text);
+}
+
+.systems-performance-history .sph-filters {
+  display: grid;
+  grid-template-columns: minmax(12rem, 2fr) repeat(2, minmax(9rem, 1fr)) auto;
+  align-items: end;
+  gap: 1rem;
+  margin: 1rem 0;
+  padding: 1rem;
+  background: var(--tv-surface);
+  border: 1px solid var(--tv-border);
+  border-radius: var(--tv-radius);
+  box-shadow: var(--tv-shadow-sm);
+}
+
+.systems-performance-history .sph-field { display: grid; gap: .4rem; min-width: 0; }
+.systems-performance-history .sph-field label { color: var(--tv-fg); font-weight: 700; }
+.systems-performance-history .sph-field small, .systems-performance-history td small { color: var(--tv-muted); display: block; margin-top: .25rem; }
+.systems-performance-history .sph-field select, .systems-performance-history .sph-field input { min-height: var(--tv-target); padding: .45rem .65rem; color: var(--tv-text); background: var(--tv-surface); border: 1px solid var(--tv-border-strong); border-radius: var(--tv-radius-sm); }
+.systems-performance-history .sph-field select:focus-visible, .systems-performance-history .sph-field input:focus-visible, .systems-performance-history .sph-table-wrap:focus-visible { outline: 2px solid var(--tv-primary-accent); outline-offset: 2px; box-shadow: 0 0 0 3px var(--tv-ring); }
+.systems-performance-history .sph-table-wrap { overflow-x: auto; background: var(--tv-surface); border: 1px solid var(--tv-border); border-radius: var(--tv-radius); }
+.systems-performance-history .sph-table { width: 100%; min-width: 58rem; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.systems-performance-history .sph-table th, .systems-performance-history .sph-table td { padding: .75rem; border-bottom: 1px solid var(--tv-border); text-align: left; vertical-align: top; }
+.systems-performance-history .sph-table th { color: var(--tv-fg); background: var(--tv-sunken); white-space: nowrap; }
+.systems-performance-history .sph-number { text-align: right; white-space: nowrap; }
+.systems-performance-history .sph-state { display: inline-flex; padding: .2rem .5rem; border-radius: var(--tv-radius-sm); font-size: .8125rem; font-weight: 700; }
+.systems-performance-history .sph-state-definitive { color: var(--tv-success-text); background: var(--tv-success-soft); }
+.systems-performance-history .sph-state-provisional { color: var(--tv-warning-text); background: var(--tv-warning-soft); }
+.systems-performance-history .sph-load-more { margin-top: 1rem; }
+
+@media (max-width: 900px) { .systems-performance-history .sph-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .systems-performance-history .sph-filters { grid-template-columns: 1fr; } .systems-performance-history .sph-filters .tuvet-btn { width: 100%; min-height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .systems-performance-history *, .systems-performance-history *::before, .systems-performance-history *::after { scroll-behavior: auto; transition-duration: 0.01ms; animation-duration: 0.01ms; } }

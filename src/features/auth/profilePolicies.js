@@ -21,6 +21,8 @@ export function getProfileCapabilities(profile) {
     isOperationsManager,
     isSystemsAccount,
     canAccessOperationalAlerts: isSystemsRole && isSystemsAccount,
+    canAccessPerformanceHistory: isSystemsRole && isSystemsAccount && capabilities?.has_global_scope === true,
+    canManageMonthlyPerformanceCorrections: isSystemsRole && isSystemsAccount && capabilities?.has_global_scope === true,
     hasGlobalScope: isMasterAdmin,
     canManageBranches: capabilities?.manage_branches === true,
     canManageTemplates: capabilities?.manage_templates === true,
