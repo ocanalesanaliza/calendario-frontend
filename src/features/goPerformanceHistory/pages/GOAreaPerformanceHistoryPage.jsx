@@ -48,6 +48,16 @@ function displayValue(value, suffix = '') {
   return value === null || value === undefined || value === '' ? '—' : `${value}${suffix}`
 }
 
+function responsibilityLabel(responsibility) {
+  if (typeof responsibility === 'string') return responsibility || 'Responsabilidad sin fechas disponibles'
+  if (!responsibility || typeof responsibility !== 'object') return 'Responsabilidad sin fechas disponibles'
+
+  const start = typeof responsibility.starts_on === 'string' && responsibility.starts_on ? responsibility.starts_on : null
+  const end = typeof responsibility.ends_on === 'string' && responsibility.ends_on ? responsibility.ends_on : null
+  if (!start && !end) return 'Responsabilidad sin fechas disponibles'
+  return `Desde ${start ?? 'fecha no disponible'} · ${end ? `Hasta ${end}` : 'Vigente'}`
+}
+
 function normalizeError(error, fallback) {
   if (error?.status === 403) return 'No tienes autorización para consultar este historial. El servidor mantiene la autorización para cada Área y rango solicitado.'
   return fallback
@@ -57,7 +67,7 @@ function HistoryRow({ row }) {
   const performance = row?.performance ?? {}
   const definitive = performance.kind === 'definitive'
   const notApplicable = isNotApplicable(performance)
-  const responsibility = row?.responsibility?.nombre ?? row?.responsibility?.name ?? row?.responsibility ?? '—'
+  const responsibility = responsibilityLabel(row?.responsibility)
   const state = notApplicable ? 'No aplica' : (performance.state ?? '—')
 
   return (
