@@ -13,6 +13,7 @@ const MODES = [
   { value: 'ajuste_manual_excepcional', label: 'Ajuste manual excepcional', description: 'Registra pesos excepcionales con una justificación.' },
   { value: 'correccion_de_dato_fuente', label: 'Corrección de dato fuente', description: 'Corrige pesos derivados de un dato fuente.' },
 ]
+const MODE_LABELS = Object.fromEntries(MODES.map((mode) => [mode.value, mode.label]))
 
 function display(value) { return value === null || value === undefined || value === '' ? 'No aplica' : value }
 function summaryLines(summary = {}) {
@@ -40,7 +41,7 @@ function localErrors({ reason, classification, expectedWeight, creditedWeight })
 function errorMessage(error) {
   if (error?.status === 403) return 'No tienes autorización para realizar correcciones excepcionales. El servidor mantiene la autorización.'
   if (error?.status === 404) return 'El rendimiento seleccionado ya no está disponible. Vuelve a buscarlo.'
-  if (error?.status === 409) return 'Esta confirmación ya se usó con datos distintos. Revisa el resultado o inicia una nueva corrección.'
+  if (error?.payload?.code === 'idempotency_key_reused' || error?.status === 409) return 'Esta confirmación ya se usó con datos distintos. Revisa el resultado o inicia una nueva corrección.'
   if (error?.status === 412) return 'El rendimiento cambió antes de confirmar. Revisa la versión más reciente y valida de nuevo.'
   return 'No fue posible procesar la solicitud. Revisa los datos e inténtalo de nuevo.'
 }
@@ -72,6 +73,7 @@ export default function MonthlyPerformanceCorrectionsPage() {
 
   const clearPending = () => { setCommandKey(null); setProposal(null); setReceipt(null) }
   const update = (setter) => (value) => { setter(value); clearPending() }
+  const selectTarget = (nextTarget) => { clearPending(); setTarget(nextTarget) }
 
   useEffect(() => {
     if (!target?.snapshotId) return
@@ -104,6 +106,7 @@ export default function MonthlyPerformanceCorrectionsPage() {
       setProposal(await validateMonthlyPerformanceCorrection({ ...payload(), idempotency_key: idempotencyKey }))
     }
     catch (error) {
+      if ([409, 412].includes(error?.status) || error?.payload?.code === 'idempotency_key_reused') clearPending()
       setNotice(errorMessage(error))
       if (error?.status === 422) {
         const { porCampo } = erroresDelServidor(error, ['reason', 'expected_weight', 'credited_weight'])
@@ -121,12 +124,12 @@ export default function MonthlyPerformanceCorrectionsPage() {
       const refreshed = await getMonthlyPerformanceCorrectionAudit(target.snapshotId)
       setAudit(Array.isArray(refreshed) ? refreshed : (refreshed?.results ?? []))
     } catch (error) {
-      if ([409, 412].includes(error?.status)) clearPending()
+      if ([409, 412].includes(error?.status) || error?.payload?.code === 'idempotency_key_reused') clearPending()
       throw new Error(errorMessage(error), { cause: error })
     }
   }
 
-  if (!target) return <main className="tema-analiza tuvet-page monthly-performance-corrections" data-responsive-breakpoints="375 768 1024 1440"><PageHeader title="Correcciones de rendimiento" description="Selecciona un cierre definitivo para iniciar una corrección excepcional." /><Aviso tipo="info">Solo se pueden corregir resultados definitivos con evidencia de cierre.</Aviso><SystemsPerformanceHistoryPage selectionMode onSelectTarget={setTarget} /></main>
+  if (!target) return <main className="tema-analiza tuvet-page monthly-performance-corrections" data-responsive-breakpoints="375 768 1024 1440"><PageHeader title="Correcciones de rendimiento" description="Selecciona un cierre definitivo para iniciar una corrección excepcional." /><Aviso tipo="info">Solo se pueden corregir resultados definitivos con evidencia de cierre.</Aviso><SystemsPerformanceHistoryPage selectionMode onSelectTarget={selectTarget} /></main>
 
   return <main className="tema-analiza tuvet-page monthly-performance-corrections" data-responsive-breakpoints="375 768 1024 1440">
     <PageHeader title="Correcciones de rendimiento" description="La autorización final permanece en el servidor." />
@@ -140,7 +143,7 @@ export default function MonthlyPerformanceCorrectionsPage() {
     </form>
     {proposal?.valid && <section className="mpc-proposal" aria-live="polite"><h2>Resultado propuesto</h2><dl>{summaryLines({ ...proposal.proposed_successor, period: target.summary?.period, area: target.summary?.area, responsibility: target.summary?.responsibility }).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl><button type="button" className="tuvet-btn" onClick={() => confirmar({ title: 'Confirmar corrección excepcional', message: `Se agregará una corrección para ${target.summary?.area ?? 'el rendimiento seleccionado'}. Motivo: ${reason.trim()}`, detail: 'El resultado se conserva como una nueva revisión y no modifica el registro original.', confirmLabel: 'Confirmar corrección', accion: confirmWrite })}>Confirmar corrección</button></section>}
     {receipt && <section className="mpc-receipt" aria-live="polite"><h2>Comprobante de corrección</h2><p>La corrección fue registrada. Conserva el resultado propuesto y su historial de revisiones.</p>{receipt?.replayed === true && <p>Se mostró el mismo comprobante de una confirmación ya registrada.</p>}</section>}
-    <section className="mpc-audit"><h2>Historial de correcciones</h2><EstadoCarga loading={auditLoading} error={auditError} empty={!auditLoading && !auditError && audit.length === 0} emptyText="No hay correcciones registradas para este cierre."><ol>{audit.map((item, index) => <li key={item?.version ?? index}>Revisión {display(item?.version)} · {display(item?.state)} · {display(item?.percentage)}%</li>)}</ol></EstadoCarga></section>
+    <section className="mpc-audit"><h2>Historial de correcciones</h2><EstadoCarga loading={auditLoading} error={auditError} empty={!auditLoading && !auditError && audit.length === 0} emptyText="No hay correcciones registradas para este cierre."><ol>{[...audit].sort((left, right) => Number(left?.version ?? 0) - Number(right?.version ?? 0)).map((item, index) => { const auditReceipt = item?.t8_receipt; const classification = auditReceipt?.classification ?? auditReceipt?.type; return <li key={item?.version ?? index}><strong>Revisión {display(item?.version)}</strong><span> · {display(item?.state)} · Peso esperado: {display(item?.expected_weight)} · Peso acreditado: {display(item?.credited_weight)} · {display(item?.percentage)}%</span>{auditReceipt === null ? <p>Sin comprobante de corrección T8: revisión original o heredada.</p> : <dl><div><dt>Tipo de corrección</dt><dd>{display(MODE_LABELS[classification] ?? classification)}</dd></div><div><dt>Motivo</dt><dd>{display(auditReceipt?.reason)}</dd></div><div><dt>Registrada</dt><dd>{display(auditReceipt?.timestamp ?? auditReceipt?.created_at)}</dd></div></dl>}</li> })}</ol></EstadoCarga></section>
     {dialogo}
   </main>
 }

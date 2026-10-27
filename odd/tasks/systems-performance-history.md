@@ -15,7 +15,7 @@ S6. T8.C: final integration and verification. Pending; not implemented in T8.A.
 ## Tasks
 
 - [x] T8.A | S1-S4 | inline | complete | RED L6; GREEN L7 | commit pending
-- [x] T8.B | S5 | inline | complete | RED L9; GREEN L10-L11 | commit pending
+- [ ] T8.B | S5 | inline | pending final independent verification | RED L9, L12; GREEN L10-L11, L13 | commit pending
 - [ ] T8.C | S6 | inline | pending | not started | commit pending
 
 ## Log
@@ -71,3 +71,7 @@ L9. T8.B RED: before the new correction service and page existed, there was no r
 L10. T8.B GREEN (pre-commit): focused service/history tests passed 7/7; route, navigation, policy, service, and history tests passed 156/156; lint passed. The full suite reported only the documented 11 localStorage-environment failures (9 LoginPage and 2 AparienciaContext); 637 tests passed. Final correction-page coverage and `git diff --check` remain required before T8.B can be marked complete.
 
 L11. T8.B completion evidence: correction page and service tests passed 6/6 after adding the validation-command idempotency replay probe; independent verification found no T8.B blockers. `git diff --check` passed. Risk: item 3 (authorization, idempotency, freshness, and opaque identifiers); independent verification completed.
+
+L12. Four independent-verification blockers were corrected before commit: correction navigation belonged immediately after Alertas operativas in Personas, correction-specific capability/route/navigation coverage was absent, audit rows did not distinguish null legacy receipts from corrected receipts, and stale/idempotency conflicts did not explicitly clear a pending command. RED evidence: the focused correction-page regression failed for missing audit receipt distinction; manual bound validation already passed after its accessible radio selector was corrected.
+
+L13. GREEN evidence: focused correction/history/App/Layout/profile-policy tests passed 188/188 and lint passed. Full-suite baseline is 668 passed with 12 documented failures: 9 LoginPage localStorage.clear failures, 2 AparienciaContext localStorage.clear failures, and one InventoryDemoPage timeout reproduced on parent `76ea9654ba33b14b29c1609dab2db03e9efc0a29`; its focused test passes on parent and candidate. T8.B remains pending final independent verification of this committed correction range. Risk: item 3 (authorization, idempotency, freshness, opaque identifiers, and receipt semantics).

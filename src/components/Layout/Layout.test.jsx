@@ -109,6 +109,34 @@ describe('Layout Mis tareas navigation', () => {
     expect(screen.getByTitle('Historial de rendimiento mensual')).toHaveAttribute('href', '/historial-rendimiento-mensual')
   })
 
+  it('places monthly corrections immediately after operational alerts in Personas for active global Systems', () => {
+    useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+    const links = [...document.querySelectorAll('a')]
+    const alertIndex = links.indexOf(screen.getByTitle('Alertas operativas'))
+    const correction = screen.getByTitle('Correcciones de rendimiento')
+    expect(correction).toHaveAttribute('href', '/correcciones-rendimiento-mensual')
+    expect(links[alertIndex + 1]).toBe(correction)
+  })
+
+  it.each([
+    ['GA', { type: 'gerente_area', activo: true, habilitado: true }],
+    ['reassigned GA', { type: 'gerente_area', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }],
+    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }],
+    ['Admin Master', { type: 'admin_master', activo: true, habilitado: true }],
+    ['Master Admin', { es_admin_maestro: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }],
+    ['GS', { type: 'gerente_sucursal', activo: true, habilitado: true }],
+    ['inactive Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: false, habilitado: true, capabilities: { has_global_scope: true } }],
+    ['disabled Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: false, capabilities: { has_global_scope: true } }],
+    ['flag-only Systems', { es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }],
+    ['role-mismatched Systems', { type: 'admin_master', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }],
+    ['non-global Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }],
+  ])('hides monthly corrections from %s', (_label, perfil) => {
+    useAuth.mockReturnValue({ perfil, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+    expect(screen.queryByTitle('Correcciones de rendimiento')).not.toBeInTheDocument()
+  })
+
   it('shows the six capability-controlled modules to a Systems master admin with granted capabilities', () => {
     useAuth.mockReturnValue({
       perfil: {
