@@ -87,7 +87,6 @@ export default function OperationalAlertsPage() {
     <div className="tema-analiza tuvet-page operational-alerts-page">
       <PageHeader
         title="Alertas operativas"
-        description="Consulta de solo lectura para Sistemas sobre brechas de responsabilidad y resultados del planificador."
       />
 
       <div className="tuvet-tabs" role="tablist" aria-label="Alcance de alertas operativas">
