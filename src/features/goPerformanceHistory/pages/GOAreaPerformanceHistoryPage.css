@@ -46,8 +46,15 @@
 .go-area-performance-history .go-evidence-record:focus-visible { outline: 2px solid var(--tv-primary-accent); outline-offset: 2px; box-shadow: 0 0 0 3px var(--tv-ring); }
 .go-area-performance-history .go-evidence-record-title { color: var(--tv-fg); font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
 .go-area-performance-history .go-evidence-record-meta { display: flex; flex-wrap: wrap; gap: .25rem .5rem; color: var(--tv-muted); font-size: .875rem; line-height: 1.5; }
-.go-area-performance-history .go-evidence-record-meta > span { font-weight: 700; }
+.go-area-performance-history .go-evidence-record-date-meta { display: inline-flex; flex-wrap: wrap; gap: .25rem .5rem; font-weight: 700; }
 .go-area-performance-history .go-evidence-record-date { color: inherit; font-variant-numeric: tabular-nums; }
+.go-area-performance-history .go-evidence-record-status { display: inline-flex; align-items: center; width: fit-content; min-height: 1.5rem; padding: .125rem .5rem; border: 1px solid transparent; border-radius: var(--tv-radius-sm); font-size: .75rem; font-weight: 700; line-height: 1.25; white-space: nowrap; }
+.go-area-performance-history .go-evidence-record-status-pending { color: var(--tv-primary-text); background: var(--tv-primary-soft); border-color: var(--tv-primary-border); }
+.go-area-performance-history .go-evidence-record-status-completed { color: var(--tv-success-text); background: var(--tv-success-soft); }
+.go-area-performance-history .go-evidence-record-status-overdue { color: var(--tv-danger-text); background: var(--tv-danger-soft); }
+.go-area-performance-history .go-evidence-record-status-justified { color: var(--tv-warning-text); background: var(--tv-warning-soft); }
+.go-area-performance-history .go-evidence-record-status-deferred { color: var(--tv-primary-text); background: var(--tv-primary-softer); border-color: var(--tv-primary-border); }
+.go-area-performance-history .go-evidence-record-status-neutral { color: var(--tv-muted); background: var(--tv-sunken); border-color: var(--tv-border); }
 .go-area-performance-history .go-evidence-pagination { display: grid; justify-items: start; gap: .75rem; margin-top: 1rem; }
 .go-area-performance-history .go-evidence-detail { display: grid; gap: 1rem; }
 .go-area-performance-history .go-evidence-detail-header { padding-bottom: .75rem; border-bottom: 1px solid var(--tv-border); }

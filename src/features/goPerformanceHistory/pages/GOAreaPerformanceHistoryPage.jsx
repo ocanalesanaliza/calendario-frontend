@@ -6,6 +6,13 @@ import './GOAreaPerformanceHistoryPage.css'
 
 const PAGE_SIZE = 25
 const ALL_AREAS_VALUE = '__all_areas__'
+const OCCURRENCE_STATUS = {
+  pendiente: { label: 'Pendiente', tone: 'pending' },
+  completada: { label: 'Completada', tone: 'completed' },
+  vencida: { label: 'Vencida', tone: 'overdue' },
+  justificada: { label: 'Justificada', tone: 'justified' },
+  diferida: { label: 'Diferida', tone: 'deferred' },
+}
 
 function currentMonth() {
   const date = new Date()
@@ -82,6 +89,10 @@ function occurrenceItems(data) {
 function occurrenceId(occurrence) {
   const id = occurrence?.id
   return id === null || id === undefined || id === '' ? null : String(id)
+}
+
+function occurrenceStatus(status) {
+  return OCCURRENCE_STATUS[status] ?? { label: 'Estado no disponible', tone: 'neutral' }
 }
 
 function uniqueOccurrences(items, existing = []) {
@@ -376,7 +387,10 @@ export default function GOAreaPerformanceHistoryPage() {
             <ul className="go-evidence-revision-list">{(occurrenceDetail?.revisions ?? occurrenceDetail?.revision_history ?? []).map((revision, index) => <li key={`${revision?.created_at ?? 'revision'}-${index}`}><span>{revision?.status ?? 'Revisión registrada'}</span><span>{formatDate(revision?.created_at)}</span></li>)}</ul>
           </section>
         </div> : <EstadoCarga loading={occurrencesLoading || detailLoading} error={occurrencesError || detailError} onRetry={() => { if (detailError) setOccurrenceDetail(null); else openOccurrences(occurrenceModal) }} empty={!occurrencesLoading && !occurrencesError && occurrences.length === 0} emptyText="No hay ocurrencias autorizadas para este segmento.">
-          <ul className="go-evidence-list">{occurrences.map((occurrence) => <li key={occurrenceId(occurrence)}><button type="button" className="tuvet-btn tuvet-btn-secondary go-evidence-record" onClick={() => void openOccurrenceDetail(occurrence)}><span className="go-evidence-record-title">{occurrence?.task?.title ?? 'Ocurrencia autorizada'}</span><span className="go-evidence-record-meta"><span>Fecha de origen</span><time className="go-evidence-record-date" dateTime={occurrence?.origin_date_local ?? undefined}>{formatDate(occurrence?.origin_date_local)}</time></span></button></li>)}</ul>
+          <ul className="go-evidence-list">{occurrences.map((occurrence) => {
+            const status = occurrenceStatus(occurrence?.latest_status)
+            return <li key={occurrenceId(occurrence)}><button type="button" className="tuvet-btn tuvet-btn-secondary go-evidence-record" onClick={() => void openOccurrenceDetail(occurrence)}><span className="go-evidence-record-title">{occurrence?.task?.title ?? 'Ocurrencia autorizada'}</span><span className="go-evidence-record-meta"><span className="go-evidence-record-date-meta"><span>Fecha de origen</span><time className="go-evidence-record-date" dateTime={occurrence?.origin_date_local ?? undefined}>{formatDate(occurrence?.origin_date_local)}</time></span><span className={`go-evidence-record-status go-evidence-record-status-${status.tone}`} aria-label={`Estado: ${status.label}`}>{status.label}</span></span></button></li>
+          })}</ul>
           {occurrenceCursor && <div className="go-evidence-pagination">
             {occurrencesLoadMoreError && <Aviso tipo="warning">{occurrencesLoadMoreError}</Aviso>}
             <button type="button" className="tuvet-btn tuvet-btn-secondary go-performance-load-more" onClick={retryMoreOccurrences} disabled={occurrencesLoadingMore}>{occurrencesLoadingMore ? 'Cargando más…' : (occurrencesLoadMoreError ? 'Reintentar cargar más ocurrencias' : 'Cargar más ocurrencias')}</button>

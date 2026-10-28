@@ -201,6 +201,45 @@ describe('GOAreaPerformanceHistoryPage', () => {
     expect(document.querySelector('.go-evidence-detail-section')).toBeInTheDocument()
   })
 
+  it.each([
+    ['pendiente', 'Pendiente', 'pending'],
+    ['completada', 'Completada', 'completed'],
+    ['vencida', 'Vencida', 'overdue'],
+    ['justificada', 'Justificada', 'justified'],
+    ['diferida', 'Diferida', 'deferred'],
+  ])('renders the %s occurrence status as an accessible semantic badge', async (latestStatus, label, tone) => {
+    service.getGOOccurrences.mockResolvedValueOnce({ results: [{ id: `opaque-${latestStatus}`, task: { title: `Tarea ${label}` }, origin_date_local: '2026-10-04', latest_status: latestStatus }] })
+    render(<GOAreaPerformanceHistoryPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver evidencia de ocurrencias' }))
+    const evidenceRecord = await screen.findByRole('button', { name: new RegExp(`Tarea ${label}`) })
+    const title = evidenceRecord.querySelector('.go-evidence-record-title')
+    const date = evidenceRecord.querySelector('time.go-evidence-record-date')
+    const badge = evidenceRecord.querySelector('.go-evidence-record-status')
+
+    expect(title).toHaveTextContent(`Tarea ${label}`)
+    expect(date).toBeInTheDocument()
+    expect(badge).toHaveTextContent(label)
+    expect(badge).toHaveClass(`go-evidence-record-status-${tone}`)
+    expect(badge).toHaveAttribute('aria-label', `Estado: ${label}`)
+    expect(badge).not.toBe(title)
+    expect(badge).not.toBe(date)
+  })
+
+  it.each([undefined, null, 'desconocido'])('uses a safe neutral status badge when latest_status is %s', async (latestStatus) => {
+    service.getGOOccurrences.mockResolvedValueOnce({ results: [{ id: 'opaque-unknown-status', task: { title: 'Tarea sin estado disponible' }, origin_date_local: '2026-10-04', latest_status: latestStatus }] })
+    render(<GOAreaPerformanceHistoryPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver evidencia de ocurrencias' }))
+    const evidenceRecord = await screen.findByRole('button', { name: /Tarea sin estado disponible/ })
+    const badge = evidenceRecord.querySelector('.go-evidence-record-status')
+
+    expect(badge).toHaveTextContent('Estado no disponible')
+    expect(badge).toHaveClass('go-evidence-record-status-neutral')
+    expect(badge).toHaveAttribute('aria-label', 'Estado: Estado no disponible')
+    expect(document.body.textContent).not.toContain('opaque-unknown-status')
+  })
+
   it('shows occurrence loading, empty and authorization error states', async () => {
     service.getGOOccurrences.mockResolvedValueOnce({ results: [] }).mockRejectedValueOnce(Object.assign(new Error('forbidden'), { status: 403 }))
     render(<GOAreaPerformanceHistoryPage />)
