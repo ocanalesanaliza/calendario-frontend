@@ -15,6 +15,28 @@ const TYPE_LABELS = {
   capacitacion: 'Capacitación',
 }
 
+const OCCURRENCE_STATUS_PRESENTATIONS = {
+  pendiente: { className: 'calendar-occurrence--pendiente', label: 'Pendiente' },
+  completada: { className: 'calendar-occurrence--completada', label: 'Completada' },
+  vencida: { className: 'calendar-occurrence--vencida', label: 'Vencida' },
+  justificada: { className: 'calendar-occurrence--justificada', label: 'Justificada' },
+  diferida: { className: 'calendar-occurrence--diferida', label: 'Diferida' },
+}
+
+const MONTHLY_PERFORMANCE_STATES = new Set(['provisional', 'closed', 'corrected', 'not_applicable'])
+
+function safeUnknownStatusLabel(status) {
+  if (typeof status !== 'string') return null
+  const label = status.trim()
+  return /^[\p{L}\p{N}][\p{L}\p{N} -]{0,38}$/u.test(label) ? label : null
+}
+
+export function occurrenceStatusPresentation(status) {
+  if (OCCURRENCE_STATUS_PRESENTATIONS[status]) return OCCURRENCE_STATUS_PRESENTATIONS[status]
+  const safeLabel = MONTHLY_PERFORMANCE_STATES.has(status) ? null : safeUnknownStatusLabel(status)
+  return { className: 'calendar-occurrence--pendiente', label: safeLabel ?? 'Pendiente' }
+}
+
 function absenceDate(absence) {
   return absence.date ?? absence.fecha ?? absence.effective_date
 }
@@ -94,6 +116,7 @@ export function selectVisibleOccurrences(occurrences = [], absences = []) {
 
 export function occurrenceToCalendarEvent(occurrence) {
   const occurrenceId = occurrence.occurrence_id ?? occurrence.id
+  const statusPresentation = occurrenceStatusPresentation(occurrence.status)
 
   return {
     id: String(occurrenceId),
@@ -101,9 +124,12 @@ export function occurrenceToCalendarEvent(occurrence) {
     start: occurrence.effective_date,
     allDay: occurrence.all_day,
     editable: false,
+    classNames: [statusPresentation.className],
     extendedProps: {
       occurrence_id: occurrenceId,
       status: occurrence.status,
+      status_class: statusPresentation.className,
+      status_label: statusPresentation.label,
       template: occurrence.template,
       template_version: occurrence.template_version,
       coverage_snapshot: occurrence.coverage_snapshot,

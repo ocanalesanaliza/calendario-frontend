@@ -7,12 +7,12 @@ let datesSetHandler
 
 vi.mock('../services/calendarioAreaService', () => ({ completeAreaOccurrence, getMonthlyAreaAbsences, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, rescheduleAreaOccurrence }))
 vi.mock('@fullcalendar/react', () => ({
-  default: ({ events, datesSet, eventClick, eventClassNames }) => {
+  default: ({ events, datesSet, eventClick, eventClassNames, eventContent }) => {
     datesSetHandler = datesSet
     return <div data-testid="full-calendar" data-read-only={String(events.every((event) => event.editable === false))}>
       <div className="fc-col-header" data-testid="calendar-weekday-header" />
       <div className="fc-daygrid-day fc-day-today" data-testid="calendar-current-day" />
-      {events.map((event) => <button type="button" className={eventClassNames?.({ event })} key={event.id} onClick={(click) => eventClick({ event: { ...event, extendedProps: event.extendedProps }, jsEvent: click.nativeEvent })}>{event.title}</button>)}
+      {events.map((event) => <button type="button" aria-label={event.title} className={[event.classNames, eventClassNames?.({ event })].flat().join(' ')} key={event.id} onClick={(click) => eventClick({ event: { ...event, extendedProps: event.extendedProps }, jsEvent: click.nativeEvent })}>{eventContent?.({ event }) ?? event.title}</button>)}
       <button type="button" onClick={() => datesSet({ view: { currentStart: new Date(2026, 9, 1) } })}>Mes anterior</button>
       <button type="button" onClick={() => datesSet({ view: { currentStart: new Date(2026, 10, 1) } })}>Siguiente mes</button>
     </div>
@@ -191,7 +191,7 @@ describe('CalendarioAreaPage', () => {
     getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [occurrence] })
     render(<CalendarioAreaPage />)
     fireEvent.click(await screen.findByRole('button', { name: 'Auditoría' }))
-    expect(screen.getByText('Pendiente')).toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toHaveTextContent('Pendiente')
     expect(screen.getByRole('button', { name: 'Completar' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reprogramar' })).toBeInTheDocument()
   })
@@ -200,7 +200,7 @@ describe('CalendarioAreaPage', () => {
     getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [{ ...occurrence, status: 'scheduled', coverage_snapshot: undefined, template: undefined, template_version: undefined }] })
     render(<CalendarioAreaPage />)
     fireEvent.click(await screen.findByRole('button', { name: 'Auditoría' }))
-    expect(screen.getByText('scheduled')).toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toHaveTextContent('scheduled')
     expect(screen.queryByRole('button', { name: 'Completar' })).not.toBeInTheDocument()
     expect(screen.queryByText('Jornada')).not.toBeInTheDocument()
   })
@@ -307,13 +307,46 @@ describe('CalendarioAreaPage', () => {
 
     render(<CalendarioAreaPage />)
 
-    expect(await screen.findByText('Auditoría')).toHaveClass('calendario-area-event-chip')
-    expect(screen.getByText('Inventario')).toHaveClass('calendario-area-event-chip')
-    expect(screen.getByText('Auditoría')).toHaveClass('calendario-area-event-chip--occurrence')
+    expect((await screen.findByText('Auditoría')).closest('button')).toHaveClass('calendario-area-event-chip')
+    expect(screen.getByText('Inventario').closest('button')).toHaveClass('calendario-area-event-chip')
+    expect(screen.getByText('Auditoría').closest('button')).toHaveClass('calendario-area-event-chip--occurrence')
     expect(screen.getByText('Auditoría').closest('.tema-analiza')).toHaveAttribute('data-responsive-breakpoints', '375 768 1024 1440')
     expect(screen.getByTestId('full-calendar').closest('.calendario-area-calendar__surface')).toBeInTheDocument()
     expect(screen.getByTestId('calendar-weekday-header')).toBeInTheDocument()
     expect(screen.getByTestId('calendar-current-day')).toBeInTheDocument()
+  })
+
+  it('renders each occurrence status as visible text with a distinct semantic chip class', async () => {
+    const statuses = [
+      ['pendiente', 'Pendiente'],
+      ['completada', 'Completada'],
+      ['vencida', 'Vencida'],
+      ['justificada', 'Justificada'],
+      ['diferida', 'Diferida'],
+    ]
+    getMonthlyAreaOccurrences.mockResolvedValue({
+      occurrences: statuses.map(([status], index) => ({ ...occurrence, occurrence_id: index + 10, task: `Tarea ${status}`, status })),
+    })
+
+    render(<CalendarioAreaPage />)
+
+    for (const [status, label] of statuses) {
+      const task = await screen.findByText(`Tarea ${status}`)
+      expect(task.closest('button')).toHaveClass(`calendar-occurrence--${status}`)
+      expect(screen.getByText(label)).toBeInTheDocument()
+    }
+    expect(screen.getByText('Tarea diferida').closest('button')).toHaveClass('calendar-occurrence--diferida')
+    expect(screen.getByText('Tarea pendiente').closest('button')).not.toHaveClass('calendar-occurrence--diferida')
+  })
+
+  it('uses the pending chip family for an unknown occurrence status without crashing', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [{ ...occurrence, task: 'Tarea futura', status: 'en espera' }] })
+
+    render(<CalendarioAreaPage />)
+
+    const task = await screen.findByText('Tarea futura')
+    expect(task.closest('button')).toHaveClass('calendar-occurrence--pendiente')
+    expect(screen.getByText('en espera')).toBeInTheDocument()
   })
 
   it('presents separated provisional, definitive, and not-applicable performance segments without aggregation', async () => {
