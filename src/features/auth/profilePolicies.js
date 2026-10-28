@@ -33,6 +33,7 @@ export function getProfileCapabilities(profile) {
     canAccessOperationalDashboard: capabilities?.access_operational_dashboard === true,
     canAccessPerformanceReports: capabilities?.access_performance_reports === true,
     canAccessLunch: profile !== null && profile !== undefined && !isSystemsRole,
+    canAccessGOTeamLunch: isOperationsManager && isActiveProfile(profile),
     canAccessMyTasks: !isSystemsRole && profile?.can_access_my_tasks === true,
     canAccessPendingRequests: isBranchManager || isAreaManager || isSystemsAccount || isAdminMaster || isMasterAdmin,
     canDecidePendingRequests: isAreaManager || isSystemsAccount || isAdminMaster || isMasterAdmin,

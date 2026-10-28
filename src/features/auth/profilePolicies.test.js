@@ -47,6 +47,16 @@ describe('getProfileCapabilities', () => {
     expect(capabilities.canManageOperationsManagers).toBe(false)
   })
 
+  it.each([
+    ['active enabled GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, true],
+    ['inactive GO', { type: 'gerente_operaciones', activo: false, habilitado: true }, false],
+    ['disabled GO', { type: 'gerente_operaciones', activo: true, habilitado: false }, false],
+    ['GA', { type: 'gerente_area', activo: true, habilitado: true }, false],
+    ['Systems', { type: 'sistemas', activo: true, habilitado: true }, false],
+  ])('sets GO team-lunch mode for %s to %s', (_role, profile, expected) => {
+    expect(getProfileCapabilities(profile).canAccessGOTeamLunch).toBe(expected)
+  })
+
   it('denies module access when the server omits capabilities', () => {
     const capabilities = getProfileCapabilities({ type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true })
 

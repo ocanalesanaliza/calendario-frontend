@@ -27,6 +27,7 @@ function Layout() {
     isMasterAdmin: esAdmin,
     isOperationsManager: esGerenteOperaciones,
     canAccessLunch,
+    canAccessGOTeamLunch,
     canAccessMyTasks: puedeAccederMisTareas,
     canManageAreaManagers,
     canManageOperationsManagers,
@@ -226,7 +227,7 @@ function Layout() {
         },
         {
           to: '/almuerzos',
-          label: 'Mi almuerzo',
+          label: canAccessGOTeamLunch ? 'Almuerzos de mi equipo' : 'Mi almuerzo',
           visible: canAccessLunch && !isAdminMaster,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

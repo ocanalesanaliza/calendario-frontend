@@ -1,6 +1,8 @@
 import { useCallback, useState, useEffect } from 'react'
 import { getMiAlmuerzo, activarAlmuerzo, cerrarAlmuerzo, getDashboardAlmuerzos } from '../services/almuerzosService'
 import { useAuth } from '../../auth/context/AuthContext'
+import { getProfileCapabilities } from '../../auth/profilePolicies'
+import '../../tuvet/tuvet.css'
 import './AlmuerzosPage.css'
 
 const ESTADO_LABEL = {
@@ -24,19 +26,28 @@ const CIERRE_LABEL = {
 export default function AlmuerzosPage() {
   const { perfil } = useAuth()
   const isAreaManager = perfil?.type === 'gerente_area'
+  const { canAccessGOTeamLunch } = getProfileCapabilities(perfil)
   const [activeTab, setActiveTab] = useState('personal')
   const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0)
 
+  if (canAccessGOTeamLunch) {
+    return (
+      <div className="almuerzos-page tema-analiza">
+        <DashboardAlmuerzos goMode />
+      </div>
+    )
+  }
+
   if (!isAreaManager) {
     return (
-      <div className="almuerzos-page">
+      <div className="almuerzos-page tema-analiza">
         <MiAlmuerzo />
       </div>
     )
   }
 
   return (
-    <div className="almuerzos-page">
+    <div className="almuerzos-page tema-analiza">
       <div className="tab-bar" role="tablist" aria-label="Almuerzos">
         <button
           className={`tab-btn${activeTab === 'personal' ? ' active' : ''}`}
@@ -188,7 +199,7 @@ function MiAlmuerzo({ onUpdated }) {
   )
 }
 
-function DashboardAlmuerzos({ refreshKey }) {
+function DashboardAlmuerzos({ refreshKey, goMode = false }) {
   const [registros, setRegistros] = useState([])
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState('')
@@ -206,7 +217,7 @@ function DashboardAlmuerzos({ refreshKey }) {
       setRegistros(data.results ?? [])
     } catch (requestError) {
       setRegistros([])
-      setError(requestError.message)
+      setError(requestError)
     } finally {
       setLoading(false)
     }
@@ -218,22 +229,38 @@ function DashboardAlmuerzos({ refreshKey }) {
     void loadDashboard()
   }, [loadDashboard, refreshKey])
 
+  const dashboardError = !goMode
+    ? error?.message
+    : error?.status === 403
+      ? 'No tienes permiso para consultar los almuerzos del equipo.'
+      : 'No fue posible cargar los almuerzos del equipo. Intenta de nuevo.'
+
   return (
     <section className="almuerzo-dashboard">
       <div className="page-header">
         <div>
-          <p>Estado de almuerzos del equipo</p>
+          {goMode ? (
+            <>
+              <h1>Almuerzos de gerentes de área</h1>
+              <p>Resultados correspondientes a los gerentes de área supervisados actualmente.</p>
+            </>
+          ) : (
+            <p>Estado de almuerzos del equipo</p>
+          )}
         </div>
       </div>
 
       <div className="toolbar">
+        <label className="visually-hidden" htmlFor="almuerzos-fecha">Fecha de almuerzos</label>
         <input
+          id="almuerzos-fecha"
           type="date"
           className="fecha-picker"
           value={fecha}
           onChange={(e) => setFecha(e.target.value)}
         />
-        <select className="filtro-select" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
+        <label className="visually-hidden" htmlFor="almuerzos-estado">Estado de almuerzos</label>
+        <select id="almuerzos-estado" className="filtro-select" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
           <option value="">Todos los estados</option>
           <option value="no_iniciado">Sin almuerzo</option>
           <option value="en_almuerzo">En almuerzo</option>
@@ -242,11 +269,14 @@ function DashboardAlmuerzos({ refreshKey }) {
       </div>
 
       {error ? (
-        <p className="almuerzo-error" role="alert">{error}</p>
+        <div className="almuerzo-error" role="alert">
+          <p>{dashboardError}</p>
+          <button type="button" className="btn-reintentar" onClick={() => void loadDashboard()}>Reintentar</button>
+        </div>
       ) : loading ? (
         <div className="loading-state">Cargando...</div>
       ) : registros.length === 0 ? (
-        <div className="empty-state">Sin registros para los filtros aplicados.</div>
+        <div className="empty-state">{goMode ? 'No hay gerentes de área supervisados actualmente.' : 'Sin registros para los filtros aplicados.'}</div>
       ) : (
         <div className="table-card">
           <table className="almuerzos-table">

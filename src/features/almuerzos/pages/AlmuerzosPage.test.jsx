@@ -50,6 +50,50 @@ describe('AlmuerzosPage', () => {
     expect(getDashboardAlmuerzos).toHaveBeenCalledTimes(1)
   })
 
+  it('shows the read-only supervised-area-manager dashboard directly for an active GO', async () => {
+    perfil = { type: 'gerente_operaciones', activo: true, habilitado: true }
+    getDashboardAlmuerzos.mockResolvedValue({ count: 1, results: [{ id_almuerzo: 1, usuario: { nombre: 'Ana' }, sucursal_actual: { nombre: 'Centro' }, estado: 'finalizado', fecha: '2026-09-07', duracion_minutos: 30 }] })
+
+    render(<AlmuerzosPage />)
+
+    expect(await screen.findByRole('heading', { name: 'Almuerzos de gerentes de área' })).toBeInTheDocument()
+    expect(screen.getByText('Resultados correspondientes a los gerentes de área supervisados actualmente.')).toBeInTheDocument()
+    expect(getDashboardAlmuerzos).toHaveBeenCalledWith({})
+    expect(getMiAlmuerzo).not.toHaveBeenCalled()
+    expect(activarAlmuerzo).not.toHaveBeenCalled()
+    expect(cerrarAlmuerzo).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Iniciar almuerzo' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cerrar almuerzo' })).not.toBeInTheDocument()
+    expect(document.body).not.toHaveTextContent('id_usuario')
+  })
+
+  it('keeps dashboard date and status filters available to GO', async () => {
+    perfil = { type: 'gerente_operaciones', activo: true, habilitado: true }
+    getDashboardAlmuerzos.mockResolvedValue({ count: 0, results: [] })
+
+    render(<AlmuerzosPage />)
+
+    expect(await screen.findByText('No hay gerentes de área supervisados actualmente.')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Fecha de almuerzos'), { target: { value: '2026-09-07' } })
+    await waitFor(() => expect(getDashboardAlmuerzos).toHaveBeenLastCalledWith({ fecha: '2026-09-07' }))
+    fireEvent.change(screen.getByLabelText('Estado de almuerzos'), { target: { value: 'en_almuerzo' } })
+    await waitFor(() => expect(getDashboardAlmuerzos).toHaveBeenLastCalledWith({ fecha: '2026-09-07', estado: 'en_almuerzo' }))
+    screen.getByLabelText('Fecha de almuerzos').focus()
+    expect(screen.getByLabelText('Fecha de almuerzos')).toHaveFocus()
+  })
+
+  it('uses a neutral, accessible dashboard error for GO', async () => {
+    perfil = { type: 'gerente_operaciones', activo: true, habilitado: true }
+    const error = new Error('Forbidden: internal backend error')
+    error.status = 403
+    getDashboardAlmuerzos.mockRejectedValue(error)
+
+    render(<AlmuerzosPage />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('No tienes permiso para consultar los almuerzos del equipo.')
+    expect(screen.queryByText('Forbidden: internal backend error')).not.toBeInTheDocument()
+  })
+
   it('refreshes the area dashboard after a personal action', async () => {
     perfil = { type: 'gerente_area' }
 

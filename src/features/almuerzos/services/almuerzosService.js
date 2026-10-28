@@ -28,6 +28,10 @@ export async function getDashboardAlmuerzos(params = {}) {
   const query = new URLSearchParams(params).toString()
   const res = await apiRequest(`/api/almuerzos/dashboard/${query ? `?${query}` : ''}`)
   const data = await res.json()
-  if (!res.ok) throw new Error(data.detail || 'Error al cargar dashboard de almuerzos')
+  if (!res.ok) {
+    const error = new Error(data.detail || 'Error al cargar dashboard de almuerzos')
+    error.status = res.status
+    throw error
+  }
   return data
 }

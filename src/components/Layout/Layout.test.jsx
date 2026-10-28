@@ -406,4 +406,12 @@ describe('Layout Mis tareas navigation', () => {
 
     expect(screen.queryByRole('link', { name: 'Organización' })).not.toBeInTheDocument()
   })
+
+  it('labels lunch navigation for an active GO as the supervised team dashboard', () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_operaciones', activo: true, habilitado: true }, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+
+    expect(screen.getByTitle('Almuerzos de mi equipo')).toHaveAttribute('href', '/almuerzos')
+    expect(screen.queryByTitle('Mi almuerzo')).not.toBeInTheDocument()
+  })
 })
