@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Aviso, EstadoCarga, Modal, PageHeader } from '../../tuvet/components/TuvetUi'
-import { getGOAreaPerformanceHistory, getGOAuthorizedAreas, getGOOccurrenceDetail, getGOOccurrences, getGOResponsibilityGaps } from '../services/goPerformanceHistoryService'
+import { getGOAllAreasPerformanceHistory, getGOAreaPerformanceHistory, getGOAuthorizedAreas, getGOOccurrenceDetail, getGOOccurrences, getGOResponsibilityGaps } from '../services/goPerformanceHistoryService'
 import '../../tuvet/tuvet.css'
 import './GOAreaPerformanceHistoryPage.css'
 
 const PAGE_SIZE = 25
+const ALL_AREAS_VALUE = '__all_areas__'
 
 function currentMonth() {
   const date = new Date()
@@ -93,7 +94,7 @@ function uniqueOccurrences(items, existing = []) {
   })]
 }
 
-function HistoryRow({ row, onOccurrences }) {
+function HistoryRow({ row, onOccurrences, showArea }) {
   const performance = row?.performance ?? {}
   const definitive = performance.kind === 'definitive'
   const notApplicable = isNotApplicable(performance)
@@ -102,6 +103,7 @@ function HistoryRow({ row, onOccurrences }) {
 
   return (
     <tr>
+      {showArea && <td className="go-performance-area">{areaLabel(row?.area)}</td>}
       <td className="go-performance-manager">{managerLabel(row?.responsibility)}</td>
       <td className="go-performance-period">{formatMonth(row?.period)}</td>
       <td><span className={`go-performance-state go-performance-state-${definitive ? 'definitive' : 'provisional'}`} aria-label={`${definitive ? 'Definitivo' : 'Provisional'} · ${state}`}><strong>{definitive ? 'Definitivo' : 'Provisional'}</strong><span aria-hidden="true"> · </span><span>{state}</span></span></td>
@@ -143,6 +145,22 @@ export default function GOAreaPerformanceHistoryPage() {
   const latestRequest = useRef(0)
   const latestOccurrencesRequest = useRef(0)
 
+  const allAreasSelected = areaId === ALL_AREAS_VALUE
+
+  function resetRangePresentation() {
+    latestOccurrencesRequest.current += 1
+    setRows([])
+    setNextCursor(null)
+    setError('')
+    setOccurrenceModal(null)
+    resetOccurrences()
+    setGapModalOpen(false)
+    setGaps([])
+    setGapCursor(null)
+    setGapsError('')
+    setGapsLoading(false)
+  }
+
   async function loadRange({ requestedAreaId = areaId, cursor, append = false, explicit = false } = {}) {
     const invalid = rangeMessage(fromMonth, toMonth)
     if (invalid) {
@@ -152,6 +170,7 @@ export default function GOAreaPerformanceHistoryPage() {
     setRangeError('')
     setError('')
     const requestId = ++latestRequest.current
+    if (!append) resetRangePresentation()
     if (append) setLoadingMore(true)
     else setLoading(true)
 
@@ -162,17 +181,21 @@ export default function GOAreaPerformanceHistoryPage() {
         const authorizedAreas = Array.isArray(areaData?.results) ? areaData.results : []
         if (requestId !== latestRequest.current) return
         setAreas(authorizedAreas)
-        effectiveAreaId = authorizedAreas.some((area) => String(area.id) === String(requestedAreaId))
+        effectiveAreaId = requestedAreaId === ALL_AREAS_VALUE
+          ? ALL_AREAS_VALUE
+          : authorizedAreas.some((area) => String(area.id) === String(requestedAreaId))
           ? String(requestedAreaId)
-          : String(authorizedAreas[0]?.id ?? '')
+          : ALL_AREAS_VALUE
         setAreaId(effectiveAreaId)
-        if (!effectiveAreaId) {
+        if (authorizedAreas.length === 0) {
           setRows([])
           setNextCursor(null)
           return
         }
       }
-      const data = await getGOAreaPerformanceHistory({ areaId: effectiveAreaId, fromMonth, toMonth, cursor, limit: PAGE_SIZE })
+      const data = effectiveAreaId === ALL_AREAS_VALUE
+        ? await getGOAllAreasPerformanceHistory({ fromMonth, toMonth, cursor, limit: PAGE_SIZE })
+        : await getGOAreaPerformanceHistory({ areaId: effectiveAreaId, fromMonth, toMonth, cursor, limit: PAGE_SIZE })
       if (requestId !== latestRequest.current) return
       setRows((previous) => append ? [...previous, ...(data?.results ?? [])] : (data?.results ?? []))
       setNextCursor(data?.next_cursor ?? null)
@@ -200,6 +223,13 @@ export default function GOAreaPerformanceHistoryPage() {
 
   function retry() {
     loadRange({ explicit: true })
+  }
+
+  function selectArea(event) {
+    const selectedAreaId = event.target.value
+    setAreaId(selectedAreaId)
+    resetRangePresentation()
+    if (selectedAreaId === ALL_AREAS_VALUE) void loadRange({ requestedAreaId: selectedAreaId, explicit: true })
   }
 
   function resetOccurrences() {
@@ -290,6 +320,7 @@ export default function GOAreaPerformanceHistoryPage() {
   }
 
   function openGaps() {
+    if (allAreasSelected) return
     setGapModalOpen(true)
     setGaps([])
     setGapCursor(null)
@@ -298,31 +329,31 @@ export default function GOAreaPerformanceHistoryPage() {
 
   return (
     <main className="tema-analiza tuvet-page go-area-performance-history" data-responsive-breakpoints="375 768 1024 1440">
-      <PageHeader title="Rendimiento de áreas"  />
-      
+      <PageHeader title="Rendimiento de áreas" />
       <form className="go-performance-filters" onSubmit={submit} aria-label="Filtros del historial de rendimiento de áreas">
         <div className="go-performance-field">
           <label htmlFor="go-performance-area">Área</label>
-          <select id="go-performance-area" value={areaId} onChange={(event) => setAreaId(event.target.value)} disabled={loading || areas.length === 0}>
+          <select id="go-performance-area" value={areaId} onChange={selectArea} disabled={loading || areas.length === 0}>
+            <option value={ALL_AREAS_VALUE}>Todos</option>
             {areas.map((area) => <option key={area.id} value={area.id}>{areaLabel(area)}</option>)}
           </select>
-          
         </div>
         <div className="go-performance-field"><label htmlFor="go-performance-from">Desde</label><input id="go-performance-from" type="month" value={fromMonth} onChange={(event) => setFromMonth(event.target.value)} /></div>
         <div className="go-performance-field"><label htmlFor="go-performance-to">Hasta</label><input id="go-performance-to" type="month" value={toMonth} onChange={(event) => setToMonth(event.target.value)} /></div>
         <div className="go-performance-actions" role="group" aria-label="Consultas del historial seleccionado">
           <button type="submit" className="tuvet-btn" disabled={loading}>Consultar historial</button>
-          <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={openGaps} disabled={loading || !areaId}>Consultar brechas de responsabilidad del Área</button>
+          <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={openGaps} disabled={loading || !areaId || allAreasSelected}>Consultar brechas de responsabilidad del Área</button>
         </div>
       </form>
+      {allAreasSelected && <p className="go-performance-helper">Selecciona un Área específica para consultar brechas de responsabilidad.</p>}
       {rangeError && <Aviso tipo="warning">{rangeError}</Aviso>}
 
       <EstadoCarga loading={loading} error={error} onRetry={retry} empty={!loading && !error && areas.length === 0} emptyText="No hay áreas autorizadas para el rango seleccionado.">
-        {areas.length > 0 && rows.length === 0 && !loading ? <div className="go-performance-empty">No hay resultados para el Área y período seleccionados.</div> : (
+        {areas.length > 0 && rows.length === 0 && !loading ? <div className="go-performance-empty">{allAreasSelected ? 'No hay Áreas autorizadas para el rango seleccionado.' : 'No hay resultados para el Área y período seleccionados.'}</div> : (
           <div className="go-performance-table-wrap" tabIndex="0" aria-label="Resultados del historial de rendimiento de áreas">
             <table className="go-performance-table">
-              <thead><tr><th>Gerente de Área</th><th>Período</th><th>Estado</th><th>Porcentaje</th><th>Actualizado</th><th>Evidencia</th></tr></thead>
-              <tbody>{rows.map((row, index) => <HistoryRow key={`${row?.area?.id ?? 'area'}-${row?.responsibility?.id ?? index}-${row?.period ?? 'period'}`} row={row} onOccurrences={openOccurrences} />)}</tbody>
+              <thead><tr>{allAreasSelected && <th className="go-performance-area">Área</th>}<th className="go-performance-manager">Gerente de Área</th><th className="go-performance-period">Período</th><th>Estado</th><th>Porcentaje</th><th className="go-performance-updated">Actualizado</th><th className="go-performance-evidence">Evidencia</th></tr></thead>
+              <tbody>{rows.map((row, index) => <HistoryRow key={`${row?.area?.id ?? 'area'}-${row?.responsibility?.id ?? index}-${row?.period ?? 'period'}`} row={row} onOccurrences={openOccurrences} showArea={allAreasSelected} />)}</tbody>
             </table>
           </div>
         )}

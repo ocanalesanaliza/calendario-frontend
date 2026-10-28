@@ -2,6 +2,7 @@ import { apiRequest } from '../../../services/apiClient'
 
 const AREAS_ENDPOINT = '/api/calendar/performance/areas/'
 const HISTORY_ENDPOINT = '/api/calendar/performance/history/'
+const ALL_AREAS_HISTORY_ENDPOINT = '/api/calendar/performance/history/all-areas/'
 const OCCURRENCES_ENDPOINT = '/api/calendar/performance/occurrences/'
 
 async function parseResponse(response, fallbackMessage) {
@@ -31,6 +32,11 @@ export async function getGOAuthorizedAreas({ businessDate, fromMonth, toMonth } 
 export async function getGOAreaPerformanceHistory({ areaId, businessDate, fromMonth, toMonth, cursor, limit } = {}) {
   const query = makeQuery({ area_id: areaId, business_date: businessDate, from_month: fromMonth, to_month: toMonth, cursor, limit }, ['area_id', 'business_date', 'from_month', 'to_month', 'cursor', 'limit'])
   return parseResponse(await apiRequest(`${HISTORY_ENDPOINT}${query}`, { method: 'GET' }), 'No fue posible cargar el historial de rendimiento de áreas.')
+}
+
+export async function getGOAllAreasPerformanceHistory({ businessDate, fromMonth, toMonth, cursor, limit } = {}) {
+  const query = makeQuery({ business_date: businessDate, from_month: fromMonth, to_month: toMonth, cursor, limit }, ['business_date', 'from_month', 'to_month', 'cursor', 'limit'])
+  return parseResponse(await apiRequest(`${ALL_AREAS_HISTORY_ENDPOINT}${query}`, { method: 'GET' }), 'No fue posible cargar el historial de rendimiento de áreas.')
 }
 
 export async function getGOOccurrences({ areaId, responsibilityId, businessDate, fromMonth, toMonth, cursor, limit } = {}) {

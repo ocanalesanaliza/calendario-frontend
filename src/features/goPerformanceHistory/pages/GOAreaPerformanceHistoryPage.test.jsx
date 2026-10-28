@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import GOAreaPerformanceHistoryPage from './GOAreaPerformanceHistoryPage'
 
 const service = vi.hoisted(() => ({
-  getGOAuthorizedAreas: vi.fn(), getGOAreaPerformanceHistory: vi.fn(), getGOOccurrences: vi.fn(), getGOOccurrenceDetail: vi.fn(), getGOResponsibilityGaps: vi.fn(),
+  getGOAuthorizedAreas: vi.fn(), getGOAllAreasPerformanceHistory: vi.fn(), getGOAreaPerformanceHistory: vi.fn(), getGOOccurrences: vi.fn(), getGOOccurrenceDetail: vi.fn(), getGOResponsibilityGaps: vi.fn(),
 }))
 vi.mock('../services/goPerformanceHistoryService', () => service)
 
@@ -22,15 +22,62 @@ const row = ({ kind = 'definitive', state = 'closed', percentage = '75', version
 describe('GOAreaPerformanceHistoryPage', () => {
   beforeEach(() => {
     service.getGOAuthorizedAreas.mockReset()
+    service.getGOAllAreasPerformanceHistory.mockReset()
     service.getGOAreaPerformanceHistory.mockReset()
     service.getGOOccurrences.mockReset()
     service.getGOOccurrenceDetail.mockReset()
     service.getGOResponsibilityGaps.mockReset()
     service.getGOAuthorizedAreas.mockResolvedValue({ scope: {}, results: areas })
+    service.getGOAllAreasPerformanceHistory.mockResolvedValue({ scope: { mode: 'all_areas' }, results: [row()], next_cursor: null })
     service.getGOAreaPerformanceHistory.mockResolvedValue({ scope: {}, results: [row()], next_cursor: null })
     service.getGOOccurrences.mockResolvedValue({ results: [{ id: 'opaque-occurrence-id', task: { title: 'Inventario mensual' }, origin_date_local: '2026-10-04', attribution_month: '2026-10', frozen_weight: '10', latest_status: 'completed' }] })
     service.getGOOccurrenceDetail.mockResolvedValue({ task: { title: 'Inventario mensual' }, origin_date_local: '2026-10-04', attribution_month: '2026-10', frozen_weight: '10', latest_revision: { status: 'completed', created_at: '2026-10-05T12:00:00Z' }, revisions: [{ status: 'pending', created_at: '2026-10-04T08:00:00Z' }] })
     service.getGOResponsibilityGaps.mockResolvedValue({ results: [{ effective_start: '2026-09-12', detected_at: '2026-09-13T08:00:00Z', status: 'open', opening_reason: 'Sin responsabilidad vigente', opening_provenance: 'Asignación histórica' }], next_cursor: null })
+  })
+
+  it('selects Todos by default, requests all-Area history, and renders a safe Área column without aggregation', async () => {
+    service.getGOAllAreasPerformanceHistory.mockResolvedValueOnce({ scope: { mode: 'all_areas' }, results: [row({ percentage: '75' }), { ...row({ percentage: '20' }), area: { id: 8, codigo: 'SUR', nombre: 'Área Sur' }, responsibility: { id: 2, manager: { display_name: 'Bea Histórica' } } }], next_cursor: null })
+    render(<GOAreaPerformanceHistoryPage />)
+
+    expect(await screen.findByRole('option', { name: 'Todos' })).toHaveProperty('selected', true)
+    await screen.findByText('Bea Histórica')
+    expect(service.getGOAllAreasPerformanceHistory).toHaveBeenCalledWith(expect.objectContaining({ fromMonth: expect.any(String), toMonth: expect.any(String), limit: 25 }))
+    expect(service.getGOAreaPerformanceHistory).not.toHaveBeenCalled()
+    expect(screen.getByRole('columnheader', { name: 'Área' })).toBeInTheDocument()
+    expect(screen.getAllByText('NORTE · Área Norte')).toHaveLength(2)
+    expect(screen.getByText('SUR · Área Sur')).toBeInTheDocument()
+    expect(screen.getByText('75%')).toBeInTheDocument()
+    expect(screen.getByText('20%')).toBeInTheDocument()
+    expect(screen.queryByText('snapshot_id')).not.toBeInTheDocument()
+  })
+
+  it('uses the existing single-Area request and hides Área after selecting a specific Area', async () => {
+    render(<GOAreaPerformanceHistoryPage />)
+    await screen.findByText('Ana Histórica')
+    fireEvent.change(screen.getByLabelText('Área'), { target: { value: '7' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Consultar historial' }))
+
+    await waitFor(() => expect(service.getGOAreaPerformanceHistory).toHaveBeenLastCalledWith(expect.objectContaining({ areaId: '7', limit: 25 })))
+    expect(screen.queryByRole('columnheader', { name: 'Área' })).not.toBeInTheDocument()
+  })
+
+  it('disables Area-specific gaps in Todos mode and restores them for a specific Area', async () => {
+    render(<GOAreaPerformanceHistoryPage />)
+    await screen.findByText('Ana Histórica')
+    const gaps = screen.getByRole('button', { name: 'Consultar brechas de responsabilidad del Área' })
+    expect(gaps).toBeDisabled()
+    expect(screen.getByText('Selecciona un Área específica para consultar brechas de responsabilidad.')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Área'), { target: { value: '7' } })
+    expect(gaps).toBeEnabled()
+  })
+
+  it('shows the required neutral all-Area empty state without exposing opaque state', async () => {
+    service.getGOAllAreasPerformanceHistory.mockResolvedValueOnce({ scope: { mode: 'all_areas' }, results: [], next_cursor: 'opaque-hidden-cursor' })
+    render(<GOAreaPerformanceHistoryPage />)
+
+    expect(await screen.findByText('No hay Áreas autorizadas para el rango seleccionado.')).toBeInTheDocument()
+    expect(document.body.textContent).not.toContain('opaque-hidden-cursor')
+    expect(window.location.search).toBe('')
   })
 
   it('uses the range-authorized selector, identifies an inactive Area, and renders segmented read-only history', async () => {
@@ -48,7 +95,7 @@ describe('GOAreaPerformanceHistoryPage', () => {
 
   it('keeps responsibility data internal when the compact history table omits that column', async () => {
     const backendResponsibility = { id: 1, starts_on: '2026-01-15', ends_on: null, manager: { display_name: 'Ana Histórica' } }
-    service.getGOAreaPerformanceHistory.mockResolvedValueOnce({
+    service.getGOAllAreasPerformanceHistory.mockResolvedValueOnce({
       scope: {},
       results: [row({ responsibility: backendResponsibility })],
       next_cursor: null,
@@ -66,7 +113,7 @@ describe('GOAreaPerformanceHistoryPage', () => {
   })
 
   it('renders a separate historical manager column and safe legacy-null label without visible IDs or URL state', async () => {
-    service.getGOAreaPerformanceHistory.mockResolvedValueOnce({
+    service.getGOAllAreasPerformanceHistory.mockResolvedValueOnce({
       scope: {}, results: [row(), row({ responsibility: { id: 2, starts_on: '2025-01-01', ends_on: '2025-12-31', manager: null } })], next_cursor: null,
     })
     render(<GOAreaPerformanceHistoryPage />)
@@ -81,7 +128,7 @@ describe('GOAreaPerformanceHistoryPage', () => {
   })
 
   it('keeps the history table readable and groups the read-only actions in visual keyboard order', async () => {
-    service.getGOAreaPerformanceHistory.mockResolvedValueOnce({
+    service.getGOAllAreasPerformanceHistory.mockResolvedValueOnce({
       scope: {}, results: [row({ kind: 'provisional', state: 'not_applicable' })], next_cursor: null,
     })
     render(<GOAreaPerformanceHistoryPage />)
@@ -89,7 +136,7 @@ describe('GOAreaPerformanceHistoryPage', () => {
     await screen.findByText('Ana Histórica')
     const rowElement = document.querySelector('.go-performance-table tbody tr')
     expect(rowElement).toHaveTextContent('Ana Histórica')
-    expect(rowElement).not.toHaveTextContent('NORTE · Área Norte')
+    expect(rowElement).toHaveTextContent('NORTE · Área Norte')
     expect(rowElement).not.toHaveTextContent('Desde 2026-01-15 · Vigente')
     expect(screen.getByRole('columnheader', { name: 'Gerente de Área' })).toBeInTheDocument()
     expect(screen.queryByRole('columnheader', { name: 'Responsabilidad' })).not.toBeInTheDocument()
@@ -105,15 +152,15 @@ describe('GOAreaPerformanceHistoryPage', () => {
     expect(screen.getByRole('button', { name: 'Ver evidencia de ocurrencias' })).toBeInTheDocument()
   })
 
-  it('hides Area, responsibility, weights, and version from the compact history table', async () => {
+  it('keeps responsibility, weights, and version hidden from the all-Area history table', async () => {
     render(<GOAreaPerformanceHistoryPage />)
 
     await screen.findByText('Ana Histórica')
-    for (const name of ['Área', 'Responsabilidad', 'Peso esperado', 'Peso acreditado', 'Versión']) {
+    for (const name of ['Responsabilidad', 'Peso esperado', 'Peso acreditado', 'Versión']) {
       expect(screen.queryByRole('columnheader', { name })).not.toBeInTheDocument()
     }
     const historyRow = document.querySelector('.go-performance-table tbody tr')
-    expect(historyRow).not.toHaveTextContent('NORTE · Área Norte')
+    expect(historyRow).toHaveTextContent('NORTE · Área Norte')
     expect(historyRow).not.toHaveTextContent('Versión 4')
   })
 
@@ -152,6 +199,7 @@ describe('GOAreaPerformanceHistoryPage', () => {
     service.getGOResponsibilityGaps.mockResolvedValueOnce({ results: [{ effective_start: '2026-09-12', detected_at: '2026-09-13T08:00:00Z', status: 'open', opening_reason: 'Sin responsabilidad vigente', opening_provenance: 'Asignación histórica' }], next_cursor: 'opaque-gap-cursor' }).mockResolvedValueOnce({ results: [], next_cursor: null })
     render(<GOAreaPerformanceHistoryPage />)
     await screen.findByText('Ana Histórica')
+    fireEvent.change(screen.getByLabelText('Área'), { target: { value: '7' } })
     fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2026-09' } })
     fireEvent.change(screen.getByLabelText('Hasta'), { target: { value: '2026-10' } })
     fireEvent.click(screen.getByRole('button', { name: 'Consultar historial' }))
@@ -172,7 +220,7 @@ describe('GOAreaPerformanceHistoryPage', () => {
   })
 
   it('falls back safely when a backend responsibility has no date fields', async () => {
-    service.getGOAreaPerformanceHistory.mockResolvedValueOnce({
+    service.getGOAllAreasPerformanceHistory.mockResolvedValueOnce({
       scope: {},
       results: [row({ responsibility: { id: 1, ga_profile_id: 2 } })],
       next_cursor: null,
@@ -193,11 +241,11 @@ describe('GOAreaPerformanceHistoryPage', () => {
 
     expect(await screen.findByText(/El rango debe ser menor de 24 meses/)).toBeInTheDocument()
     expect(service.getGOAuthorizedAreas).toHaveBeenCalledTimes(1)
-    expect(service.getGOAreaPerformanceHistory).toHaveBeenCalledTimes(1)
+    expect(service.getGOAllAreasPerformanceHistory).toHaveBeenCalledTimes(1)
   })
 
   it('preserves opaque cursors and distinguishes provisional data from definitive N/A rows', async () => {
-    service.getGOAreaPerformanceHistory
+    service.getGOAllAreasPerformanceHistory
       .mockResolvedValueOnce({ scope: {}, results: [row({ kind: 'provisional', state: 'not_applicable', version: null })], next_cursor: 'opaque+/cursor' })
       .mockResolvedValueOnce({ scope: {}, results: [row({ kind: 'definitive', state: 'not_applicable', version: 4 })], next_cursor: null })
     render(<GOAreaPerformanceHistoryPage />)
@@ -206,7 +254,7 @@ describe('GOAreaPerformanceHistoryPage', () => {
     expect(screen.getAllByText('No aplica').length).toBeGreaterThan(0)
     expect(screen.queryByText('0%')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Cargar más' }))
-    await waitFor(() => expect(service.getGOAreaPerformanceHistory).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: 'opaque+/cursor' })))
+    await waitFor(() => expect(service.getGOAllAreasPerformanceHistory).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: 'opaque+/cursor' })))
     expect(screen.queryByRole('columnheader', { name: 'Versión' })).not.toBeInTheDocument()
   })
 
@@ -235,7 +283,7 @@ describe('GOAreaPerformanceHistoryPage', () => {
 
   it('resets occurrence pagination on a different row or close, and preserves page one after a load-more failure', async () => {
     const secondRow = row({ responsibility: { id: 2, starts_on: '2026-02-01', ends_on: null, manager: { display_name: 'Bea Histórica' } } })
-    service.getGOAreaPerformanceHistory.mockResolvedValueOnce({ scope: {}, results: [row(), secondRow], next_cursor: null })
+    service.getGOAllAreasPerformanceHistory.mockResolvedValueOnce({ scope: {}, results: [row(), secondRow], next_cursor: null })
     service.getGOOccurrences
       .mockResolvedValueOnce({ results: [{ id: 'first-row-occurrence', task: { title: 'Evidencia de primera fila' }, origin_date_local: '2026-10-04' }], next_cursor: 'cursor-first-row' })
       .mockRejectedValueOnce(new Error('network'))
@@ -276,7 +324,7 @@ describe('GOAreaPerformanceHistoryPage', () => {
     expect(document.querySelector('.go-area-performance-history')).toHaveAttribute('data-responsive-breakpoints', '375 768 1024 1440')
     expect(screen.getByLabelText('Resultados del historial de rendimiento de áreas')).toHaveAttribute('tabindex', '0')
 
-    service.getGOAreaPerformanceHistory.mockRejectedValueOnce(Object.assign(new Error('forbidden'), { status: 403 }))
+    service.getGOAllAreasPerformanceHistory.mockRejectedValueOnce(Object.assign(new Error('forbidden'), { status: 403 }))
     fireEvent.click(screen.getByRole('button', { name: 'Consultar historial' }))
     expect(await screen.findByText(/El servidor mantiene la autorización/)).toBeInTheDocument()
   })

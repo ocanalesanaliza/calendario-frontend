@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getGOAuthorizedAreas, getGOAreaPerformanceHistory, getGOOccurrenceDetail, getGOOccurrences, getGOResponsibilityGaps } from './goPerformanceHistoryService'
+import { getGOAllAreasPerformanceHistory, getGOAuthorizedAreas, getGOAreaPerformanceHistory, getGOOccurrenceDetail, getGOOccurrences, getGOResponsibilityGaps } from './goPerformanceHistoryService'
 
 const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn() }))
 vi.mock('../../../services/apiClient', () => ({ apiRequest }))
@@ -24,6 +24,14 @@ describe('goPerformanceHistoryService', () => {
 
     await expect(getGOAreaPerformanceHistory({ areaId: 7, businessDate: '2026-10-27', fromMonth: '2026-09', toMonth: '2026-10', cursor: 'opaque+/cursor', limit: 25 })).resolves.toBe(payload)
     expect(apiRequest).toHaveBeenCalledWith('/api/calendar/performance/history/?area_id=7&business_date=2026-10-27&from_month=2026-09&to_month=2026-10&cursor=opaque%2B%2Fcursor&limit=25', { method: 'GET' })
+  })
+
+  it('requests all-Area history only with the accepted parameters and preserves an opaque cursor', async () => {
+    const payload = { scope: { mode: 'all_areas' }, results: [], next_cursor: 'opaque+/all-cursor' }
+    apiRequest.mockResolvedValueOnce(response(payload))
+
+    await expect(getGOAllAreasPerformanceHistory({ businessDate: '2026-10-27', fromMonth: '2026-09', toMonth: '2026-10', cursor: 'opaque+/all-cursor', limit: 25, areaId: 7, responsibilityId: 19, snapshotId: 'ignored' })).resolves.toBe(payload)
+    expect(apiRequest).toHaveBeenCalledWith('/api/calendar/performance/history/all-areas/?business_date=2026-10-27&from_month=2026-09&to_month=2026-10&cursor=opaque%2B%2Fall-cursor&limit=25', { method: 'GET' })
   })
 
   it('normalizes malformed failures to neutral Spanish while retaining authorization status', async () => {
