@@ -43,19 +43,6 @@ function errorMessage(error) {
   return error.message
 }
 
-const PERFORMANCE_FIELDS = [
-  ['area', 'Área'],
-  ['responsibility_id', 'Responsabilidad'],
-  ['month', 'Mes'],
-  ['version', 'Versión'],
-  ['state', 'Estado'],
-  ['weights', 'Pesos'],
-  ['percentage', 'Porcentaje'],
-  ['counts', 'Conteos'],
-  ['closed_at', 'Cerrado el'],
-  ['reason', 'Motivo'],
-]
-
 const FOCUSABLE_SELECTOR = 'a[href], area[href], input:not([type="hidden"]), select, textarea, button, iframe, object, embed, [contenteditable="true"], [tabindex]:not([tabindex="-1"])'
 
 function getFocusableElements(container) {
@@ -69,11 +56,30 @@ function getFocusableElements(container) {
   })
 }
 
-function performanceValue(value) {
-  return typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value)
+function formatMonth(month) {
+  if (!/^\d{4}-\d{2}$/.test(month ?? '')) return month || 'este mes'
+  const [year, value] = month.split('-').map(Number)
+  return new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(year, value - 1, 1)))
 }
 
-function MonthlyPerformancePanel({ loading, performance, error, onRetry }) {
+function areaName(area) {
+  if (typeof area === 'string') return area
+  return area?.name ?? area?.nombre ?? 'Área sin identificar'
+}
+
+function performanceState(snapshot) {
+  if (snapshot.not_applicable === true || snapshot.state === 'not_applicable' || snapshot.percentage === 'not_applicable') return { label: 'No aplica', tone: 'not-applicable' }
+  if (snapshot.state === 'closed' || snapshot.state === 'definitive') return { label: 'Cierre definitivo disponible', tone: 'definitive' }
+  if (snapshot.state === 'provisional') return { label: 'Datos provisionales', tone: 'provisional' }
+  return { label: snapshot.state ? `Estado informado: ${snapshot.state}` : 'Estado informado por el servicio', tone: 'neutral' }
+}
+
+function weightValue(weights, name, fallback) {
+  if (!weights || typeof weights !== 'object') return undefined
+  return weights[name] ?? weights[fallback]
+}
+
+function MonthlyPerformancePanel({ loading, month, performance, error, onRetry }) {
   const notClosed = error?.status === 409
     && (error.detail === 'monthly_performance_not_closed' || error.message === 'monthly_performance_not_closed')
   const denied = error?.status === 403
@@ -83,23 +89,34 @@ function MonthlyPerformancePanel({ loading, performance, error, onRetry }) {
 
   return (
     <section className="monthly-performance" aria-labelledby="monthly-performance-title">
-      <h2 id="monthly-performance-title">Rendimiento mensual</h2>
-      {loading ? <p role="status">Cargando rendimiento mensual...</p>
-        : notClosed ? <p role="status">El rendimiento mensual aún no está cerrado.</p>
-            : denied ? <p role="alert">Acceso denegado para consultar el rendimiento mensual.</p>
-              : error ? <div role="alert">{errorMessage(error)} <button type="button" onClick={onRetry}>Reintentar</button></div>
-              : performances.length === 0 ? <p>No hay rendimiento mensual disponible para este mes.</p>
-                : performances.map((snapshot, index) => {
-                  const fields = PERFORMANCE_FIELDS.filter(([name]) => snapshot[name] !== undefined)
+      <header className="monthly-performance__header">
+        <div><h2 id="monthly-performance-title">Rendimiento mensual</h2><p>Periodo consultado: <strong>{formatMonth(performance?.month ?? month)}</strong></p></div>
+        <p className="monthly-performance__authority">Información reportada por el calendario del área.</p>
+      </header>
+      {loading ? <div className="monthly-performance__loading" role="status" aria-busy="true"><span className="monthly-performance__skeleton" /><span className="monthly-performance__skeleton monthly-performance__skeleton--short" /><span className="sr-only">Cargando rendimiento mensual...</span></div>
+        : notClosed ? <div className="monthly-performance__notice monthly-performance__notice--pending" role="status"><strong>Cierre mensual pendiente</strong><p>El rendimiento definitivo de este mes todavía no está disponible.</p></div>
+          : denied ? <div className="monthly-performance__notice monthly-performance__notice--error" role="alert"><strong>Acceso no disponible</strong><p>Acceso denegado para consultar el rendimiento mensual.</p></div>
+            : error ? <div className="monthly-performance__notice monthly-performance__notice--error" role="alert"><p>{errorMessage(error)}</p><button type="button" className="monthly-performance__retry" onClick={onRetry}>Reintentar</button></div>
+              : performances.length === 0 ? <div className="monthly-performance__notice monthly-performance__notice--empty" role="status"><strong>Sin datos para este periodo</strong><p>No hay rendimiento mensual disponible para este mes.</p></div>
+                : <div className="monthly-performance__segments">{performances.map((snapshot, index) => {
                   const headingId = `monthly-performance-${snapshot.responsibility_id ?? index}-${index}`
+                  const state = performanceState(snapshot)
+                  const expectedWeight = weightValue(snapshot.weights, 'expected', 'total')
+                  const creditedWeight = weightValue(snapshot.weights, 'credited', 'completed')
+                  const isNotApplicable = state.tone === 'not-applicable'
 
-                  return <section key={`${snapshot.responsibility_id ?? 'performance'}-${snapshot.version ?? index}-${index}`} aria-labelledby={headingId}>
-                    <h3 id={headingId}>Responsabilidad {snapshot.responsibility_id ?? 'sin identificar'}</h3>
+                  return <article className="monthly-performance__segment" key={`${snapshot.responsibility_id ?? 'performance'}-${snapshot.version ?? index}-${index}`} aria-labelledby={headingId}>
+                    <header className="monthly-performance__segment-header"><div><h3 id={headingId}>Responsabilidad {snapshot.responsibility_id ?? 'sin identificar'}</h3><p>Área: {areaName(snapshot.area)}</p></div><span className={`monthly-performance__badge monthly-performance__badge--${state.tone}`}>{state.label}</span></header>
                     <dl className="monthly-performance-details">
-                      {fields.map(([name, label]) => <div key={name}><dt>{label}</dt><dd>{performanceValue(snapshot[name])}</dd></div>)}
+                      <div><dt>Periodo</dt><dd>{formatMonth(snapshot.month ?? performance?.month ?? month)}</dd></div>
+                      {expectedWeight !== undefined && <div><dt>Peso esperado</dt><dd>{expectedWeight}</dd></div>}
+                      {creditedWeight !== undefined && <div><dt>Peso acreditado</dt><dd>{creditedWeight}</dd></div>}
+                      {snapshot.percentage !== undefined && <div><dt>Rendimiento</dt><dd>{isNotApplicable ? 'No aplica' : `${snapshot.percentage}%`}</dd></div>}
+                      {snapshot.closed_at && <div><dt>Cerrado el</dt><dd>{snapshot.closed_at}</dd></div>}
+                      {snapshot.reason && <div><dt>Motivo</dt><dd>{snapshot.reason}</dd></div>}
                     </dl>
-                  </section>
-                })}
+                  </article>
+                })}</div>}
     </section>
   )
 }
@@ -322,13 +339,13 @@ export default function CalendarioAreaPage() {
   return (
     <section className="calendario-area-page">
       <div className="page-header"><h1>Calendario del área</h1></div>
-      <MonthlyPerformancePanel loading={performanceLoading} performance={performance} error={performanceError} onRetry={() => loadPerformance()} />
-      {error && <div role="alert">{error} <button type="button" onClick={() => loadMonth()}>Reintentar</button></div>}
-      {absenceError && <div role="alert">No se pudieron cargar las ausencias del área: {absenceError} <button type="button" onClick={() => loadAbsences()}>Reintentar ausencias</button></div>}
-      {loading && <p role="status">Cargando calendario...</p>}
+      <MonthlyPerformancePanel loading={performanceLoading} month={month} performance={performance} error={performanceError} onRetry={() => loadPerformance()} />
+      {error && <div className="calendario-area-state calendario-area-state--error" role="alert"><p>{error}</p><button type="button" onClick={() => loadMonth()}>Reintentar</button></div>}
+      {absenceError && <div className="calendario-area-state calendario-area-state--error" role="alert"><p>No se pudieron cargar las ausencias del área: {absenceError}</p><button type="button" onClick={() => loadAbsences()}>Reintentar ausencias</button></div>}
+      {loading && <div className="calendario-area-state calendario-area-state--loading" role="status" aria-busy="true"><span className="calendario-area-skeleton" aria-hidden="true" /><span className="calendario-area-skeleton calendario-area-skeleton--short" aria-hidden="true" /><span className="sr-only">Cargando calendario...</span></div>}
       <>
-        {!loading && occurrences.length === 0 && <p>No hay tareas programadas para este mes.</p>}
-        <div className="calendario-area-calendar"><FullCalendar plugins={[dayGridPlugin, interactionPlugin, timeGridPlugin, listPlugin, multiMonthPlugin]} headerToolbar={{ start: 'prev,today,next', center: 'title', end: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek,multiMonthYear' }} views={{ listWeek: { buttonText: 'Lista semanal' }, multiMonthYear: { buttonText: 'Año' } }} initialView="dayGridMonth" locale="es" buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día', list: 'Lista', year: 'Año' }} events={[...occurrencesToCalendarEvents(selectVisibleOccurrences(occurrences, absences)), ...absencesToCalendarEvents(absences)]} eventClick={(info) => { if (info.event.extendedProps.calendar_event_type === 'absence') return; triggerRef.current = info.el ?? info.jsEvent?.target; setSelected({ ...info.event.extendedProps, occurrence_id: info.event.extendedProps.occurrence_id, task: info.event.extendedProps.task }) }} datesSet={handleDatesSet} height="auto" /></div>
+        {!loading && occurrences.length === 0 && <div className="calendario-area-state calendario-area-state--empty" role="status"><strong>Mes sin tareas programadas</strong><p>No hay tareas programadas para este mes.</p></div>}
+        <div className="calendario-area-calendar" aria-busy={loading}><div className="calendario-area-calendar__scroll"><FullCalendar plugins={[dayGridPlugin, interactionPlugin, timeGridPlugin, listPlugin, multiMonthPlugin]} headerToolbar={{ start: 'prev,today,next', center: 'title', end: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek,multiMonthYear' }} views={{ listWeek: { buttonText: 'Lista semanal' }, multiMonthYear: { buttonText: 'Año' } }} initialView="dayGridMonth" locale="es" buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día', list: 'Lista', year: 'Año' }} events={[...occurrencesToCalendarEvents(selectVisibleOccurrences(occurrences, absences)), ...absencesToCalendarEvents(absences)]} eventClick={(info) => { if (info.event.extendedProps.calendar_event_type === 'absence') return; triggerRef.current = info.el ?? info.jsEvent?.target; setSelected({ ...info.event.extendedProps, occurrence_id: info.event.extendedProps.occurrence_id, task: info.event.extendedProps.task }) }} datesSet={handleDatesSet} height="auto" /></div></div>
       </>
       {selected && <OccurrenceDialog occurrence={selected} onClose={() => setSelected(null)} onComplete={(id, key) => runCommand(() => completeAreaOccurrence(id, key))} onReschedule={(id, body, key) => runCommand(() => rescheduleAreaOccurrence(id, body, key))} />}
     </section>

@@ -36,7 +36,10 @@ describe('CalendarioAreaPage', () => {
     render(<CalendarioAreaPage />)
 
     expect(screen.getByText('Cargando calendario...')).toBeInTheDocument()
+    expect(screen.getByText('Cargando calendario...').closest('.calendario-area-state--loading')).toBeInTheDocument()
     expect(screen.getByTestId('full-calendar')).toBeInTheDocument()
+    expect(screen.getByTestId('full-calendar').closest('.calendario-area-calendar__scroll')).toBeInTheDocument()
+    expect(screen.getByTestId('full-calendar').closest('.calendario-area-calendar')).toHaveAttribute('aria-busy', 'true')
     expect(await screen.findByText('Auditoría')).toBeInTheDocument()
     expect(screen.getByTestId('full-calendar')).toHaveAttribute('data-read-only', 'true')
   })
@@ -289,12 +292,45 @@ describe('CalendarioAreaPage', () => {
     expect(await screen.findByText('Rendimiento mensual')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Responsabilidad 3' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Responsabilidad 9' })).toBeInTheDocument()
-    expect(screen.getAllByText('{"id":8,"name":"Operaciones"}')).toHaveLength(2)
+    expect(screen.getAllByText('Área: Operaciones')).toHaveLength(2)
     expect(screen.getByText('Cierre mensual')).toBeInTheDocument()
     expect(screen.getByText('Cierre adicional')).toBeInTheDocument()
-    expect(screen.getAllByText('Pesos')).toHaveLength(2)
+    expect(screen.getAllByText('Peso esperado')).toHaveLength(2)
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente mes' }))
     await waitFor(() => expect(getMonthlyAreaPerformance).toHaveBeenLastCalledWith('2026-11'))
+  })
+
+  it('presents separated provisional, definitive, and not-applicable performance segments without aggregation', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+    getMonthlyAreaPerformance.mockResolvedValue({
+      month: '2026-09',
+      performances: [
+        { area: { id: 8, name: 'Operaciones' }, responsibility_id: 3, month: '2026-09', state: 'provisional', weights: { expected: 40, credited: 0 }, percentage: 0 },
+        { area: { id: 8, name: 'Operaciones' }, responsibility_id: 9, month: '2026-09', state: 'closed', weights: { expected: 60, credited: 60 }, percentage: 100 },
+        { area: { id: 8, name: 'Operaciones' }, responsibility_id: 10, month: '2026-09', state: 'not_applicable', weights: { expected: 0, credited: 0 }, percentage: 0 },
+      ],
+    })
+
+    render(<CalendarioAreaPage />)
+
+    expect(await screen.findByText('Datos provisionales')).toBeInTheDocument()
+    expect(screen.getByText('Cierre definitivo disponible')).toBeInTheDocument()
+    expect(screen.getAllByText('No aplica')).toHaveLength(2)
+    expect(screen.getAllByText('Área: Operaciones')).toHaveLength(3)
+    expect(screen.getAllByText('Peso esperado')[0].parentElement).toHaveTextContent('40')
+    expect(screen.getAllByText('Peso acreditado')[1].parentElement).toHaveTextContent('60')
+    expect(screen.queryByText('Rendimiento combinado')).not.toBeInTheDocument()
+  })
+
+  it('renders the pending monthly-close response as intentional guidance rather than a technical error', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+    getMonthlyAreaPerformance.mockRejectedValue(Object.assign(new Error('monthly_performance_not_closed'), { status: 409, detail: 'monthly_performance_not_closed' }))
+
+    render(<CalendarioAreaPage />)
+
+    expect(await screen.findByText('El rendimiento definitivo de este mes todavía no está disponible.')).toBeInTheDocument()
+    expect(document.querySelector('.monthly-performance__notice--pending')).toHaveAttribute('role', 'status')
+    expect(screen.queryByRole('alert', { name: /rendimiento mensual/i })).not.toBeInTheDocument()
   })
 
   it('shows an empty performance state', async () => {
@@ -311,7 +347,7 @@ describe('CalendarioAreaPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Acceso denegado para consultar el rendimiento mensual.')
     expect(screen.queryByRole('button', { name: 'Reintentar' })).not.toBeInTheDocument()
     rerender(<CalendarioAreaPage key="not-closed" />)
-    expect(await screen.findByText('El rendimiento mensual aún no está cerrado.')).toBeInTheDocument()
+    expect(await screen.findByText('El rendimiento definitivo de este mes todavía no está disponible.')).toBeInTheDocument()
   })
 
   it('retries recoverable performance errors and omits absent optional fields', async () => {
