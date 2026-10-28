@@ -44,7 +44,7 @@ function formatMonth(value) {
 
 function formatDate(value) {
   if (!value) return '—'
-  const date = new Date(value)
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00` : value)
   return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('es', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
 }
 
@@ -380,11 +380,11 @@ export default function GOAreaPerformanceHistoryPage() {
           </section>
           <section className="go-evidence-detail-section" aria-labelledby="go-evidence-detail-latest-title">
             <h4 id="go-evidence-detail-latest-title">Última revisión</h4>
-            <dl className="go-evidence-detail-latest"><dt>Estado</dt><dd>{occurrenceDetail?.latest_revision?.status ?? occurrenceDetail?.latest_status ?? '—'}</dd></dl>
+            <dl className="go-evidence-detail-latest"><dt>Estado</dt><dd>{occurrenceDetail?.latest_revision?.status ?? '—'}</dd></dl>
           </section>
           <section className="go-evidence-detail-section" aria-labelledby="go-evidence-detail-history-title">
             <h4 id="go-evidence-detail-history-title">Historial de revisiones</h4>
-            <ul className="go-evidence-revision-list">{(occurrenceDetail?.revisions ?? occurrenceDetail?.revision_history ?? []).map((revision, index) => <li key={`${revision?.created_at ?? 'revision'}-${index}`}><span>{revision?.status ?? 'Revisión registrada'}</span><span>{formatDate(revision?.created_at)}</span></li>)}</ul>
+            <ul className="go-evidence-revision-list">{(occurrenceDetail?.revision_history ?? []).map((revision, index) => <li key={`${revision?.effective_at ?? 'revision'}-${index}`}><span>{revision?.status ?? 'Revisión registrada'}</span><span>{formatDate(revision?.effective_at)}</span></li>)}</ul>
           </section>
         </div> : <EstadoCarga loading={occurrencesLoading || detailLoading} error={occurrencesError || detailError} onRetry={() => { if (detailError) setOccurrenceDetail(null); else openOccurrences(occurrenceModal) }} empty={!occurrencesLoading && !occurrencesError && occurrences.length === 0} emptyText="No hay ocurrencias autorizadas para este segmento.">
           <ul className="go-evidence-list">{occurrences.map((occurrence) => {

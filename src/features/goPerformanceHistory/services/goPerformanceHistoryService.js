@@ -24,6 +24,18 @@ function makeQuery(values, allowedKeys) {
   return query ? `?${query}` : ''
 }
 
+function normalizeGOOccurrenceDetail(response) {
+  const occurrence = response?.occurrence
+  return {
+    task: { title: occurrence?.task_snapshot?.title },
+    origin_date_local: occurrence?.origin_date_local,
+    attribution_month: occurrence?.attribution_month,
+    frozen_weight: occurrence?.frozen_weight,
+    latest_revision: response?.latest_revision ?? null,
+    revision_history: Array.isArray(response?.revision_history) ? response.revision_history : [],
+  }
+}
+
 export async function getGOAuthorizedAreas({ businessDate, fromMonth, toMonth } = {}) {
   const query = makeQuery({ business_date: businessDate, from_month: fromMonth, to_month: toMonth }, ['business_date', 'from_month', 'to_month'])
   return parseResponse(await apiRequest(`${AREAS_ENDPOINT}${query}`, { method: 'GET' }), 'No fue posible cargar las áreas autorizadas para el rango seleccionado.')
@@ -48,7 +60,8 @@ export async function getGOOccurrences({ areaId, responsibilityId, businessDate,
 }
 
 export async function getGOOccurrenceDetail(occurrenceId) {
-  return parseResponse(await apiRequest(`${OCCURRENCES_ENDPOINT}${encodeURIComponent(String(occurrenceId))}/`, { method: 'GET' }), 'No fue posible cargar el detalle de la ocurrencia autorizada.')
+  const response = await parseResponse(await apiRequest(`${OCCURRENCES_ENDPOINT}${encodeURIComponent(String(occurrenceId))}/`, { method: 'GET' }), 'No fue posible cargar el detalle de la ocurrencia autorizada.')
+  return normalizeGOOccurrenceDetail(response)
 }
 
 export async function getGOResponsibilityGaps({ areaId, businessDate, fromDate, toDate, cursor, limit } = {}) {

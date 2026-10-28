@@ -31,7 +31,7 @@ describe('GOAreaPerformanceHistoryPage', () => {
     service.getGOAllAreasPerformanceHistory.mockResolvedValue({ scope: { mode: 'all_areas' }, results: [row()], next_cursor: null })
     service.getGOAreaPerformanceHistory.mockResolvedValue({ scope: {}, results: [row()], next_cursor: null })
     service.getGOOccurrences.mockResolvedValue({ results: [{ id: 'opaque-occurrence-id', task: { title: 'Inventario mensual' }, origin_date_local: '2026-10-04', attribution_month: '2026-10', frozen_weight: '10', latest_status: 'completed' }] })
-    service.getGOOccurrenceDetail.mockResolvedValue({ task: { title: 'Inventario mensual' }, origin_date_local: '2026-10-04', attribution_month: '2026-10', frozen_weight: '10', latest_revision: { status: 'completed', created_at: '2026-10-05T12:00:00Z' }, revisions: [{ status: 'pending', created_at: '2026-10-04T08:00:00Z' }] })
+    service.getGOOccurrenceDetail.mockResolvedValue({ task: { title: 'Inventario mensual' }, origin_date_local: '2026-10-04', attribution_month: '2026-10', frozen_weight: '10', latest_revision: { status: 'completed', effective_at: '2026-10-05T12:00:00Z' }, revision_history: [{ status: 'pending', effective_at: '2026-10-04T08:00:00Z' }] })
     service.getGOResponsibilityGaps.mockResolvedValue({ results: [{ effective_start: '2026-09-12', detected_at: '2026-09-13T08:00:00Z', status: 'open', opening_reason: 'Sin responsabilidad vigente', opening_provenance: 'Asignación histórica' }], next_cursor: null })
   })
 
@@ -182,6 +182,51 @@ describe('GOAreaPerformanceHistoryPage', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(document.activeElement).toBe(trigger)
+  })
+
+  it('renders the normalized canonical occurrence detail without exposing opaque identifiers', async () => {
+    service.getGOOccurrenceDetail.mockResolvedValueOnce({
+      task: { title: 'Occurrence detail task' },
+      origin_date_local: '2026-10-20',
+      attribution_month: '2026-10',
+      frozen_weight: '2.50',
+      latest_revision: { id: 1, status: 'pendiente', effective_at: '2026-10-20T18:00:00Z', reason: null },
+      revision_history: [{ id: 2, status: 'aprobada', effective_at: '2026-10-21T18:00:00Z', reason: null }],
+    })
+    render(<GOAreaPerformanceHistoryPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver evidencia de ocurrencias' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Inventario mensual/ }))
+
+    const dialog = await screen.findByRole('dialog', { name: /Evidencia de ocurrencias/i })
+    expect(await screen.findByRole('heading', { name: 'Occurrence detail task' })).toBeInTheDocument()
+    expect(within(dialog).getByText(/20 oct 2026/)).toBeInTheDocument()
+    expect(within(dialog).getByText('octubre de 2026')).toBeInTheDocument()
+    expect(within(dialog).getByText('2.50')).toBeInTheDocument()
+    expect(within(dialog).getByText('pendiente')).toBeInTheDocument()
+    expect(within(dialog).getByText('aprobada')).toBeInTheDocument()
+    expect(within(dialog).getByText(/21 oct 2026/)).toBeInTheDocument()
+    expect(document.body.textContent).not.toContain('opaque-occurrence-id')
+    expect(window.location.search).toBe('')
+  })
+
+  it('renders safe detail fallbacks for legitimate null or missing optional values', async () => {
+    service.getGOOccurrenceDetail.mockResolvedValueOnce({
+      task: { title: null },
+      origin_date_local: null,
+      attribution_month: undefined,
+      frozen_weight: null,
+      latest_revision: null,
+      revision_history: [],
+    })
+    render(<GOAreaPerformanceHistoryPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver evidencia de ocurrencias' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Inventario mensual/ }))
+
+    expect(await screen.findByText('Tarea sin título disponible')).toBeInTheDocument()
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(4)
+    expect(screen.getByRole('heading', { name: 'Historial de revisiones' })).toBeInTheDocument()
   })
 
   it('presents occurrence evidence as full-width records with separate title and date metadata, while keeping detail metadata responsive and opaque values internal', async () => {

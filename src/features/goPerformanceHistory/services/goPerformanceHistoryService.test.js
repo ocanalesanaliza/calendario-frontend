@@ -52,11 +52,43 @@ describe('goPerformanceHistoryService', () => {
   })
 
   it('uses only a list-issued occurrence identifier for the detail endpoint shape', async () => {
-    const payload = { task: { title: 'Inventario' } }
+    const payload = {
+      occurrence: {
+        id: 123,
+        area_id: 7,
+        responsibility_id: 1,
+        origin_date_local: '2026-10-20',
+        attribution_month: '2026-10',
+        frozen_weight: '2.50',
+        task_snapshot: { id: 55, title: 'Occurrence detail task' },
+      },
+      latest_revision: { id: 1, status: 'pendiente', effective_at: '2026-10-20T18:00:00Z', reason: null },
+      revision_history: [],
+    }
     apiRequest.mockResolvedValueOnce(response(payload))
 
-    await expect(getGOOccurrenceDetail('opaque-listed-occurrence')).resolves.toBe(payload)
+    await expect(getGOOccurrenceDetail('opaque-listed-occurrence')).resolves.toEqual({
+      task: { title: 'Occurrence detail task' },
+      origin_date_local: '2026-10-20',
+      attribution_month: '2026-10',
+      frozen_weight: '2.50',
+      latest_revision: payload.latest_revision,
+      revision_history: [],
+    })
     expect(apiRequest).toHaveBeenCalledWith('/api/calendar/performance/occurrences/opaque-listed-occurrence/', { method: 'GET' })
+  })
+
+  it('keeps legitimate missing or null detail fields safe without inventing values', async () => {
+    apiRequest.mockResolvedValueOnce(response({ occurrence: { task_snapshot: { title: null }, origin_date_local: null }, latest_revision: null, revision_history: null }))
+
+    await expect(getGOOccurrenceDetail('opaque-listed-occurrence')).resolves.toEqual({
+      task: { title: null },
+      origin_date_local: null,
+      attribution_month: undefined,
+      frozen_weight: undefined,
+      latest_revision: null,
+      revision_history: [],
+    })
   })
 
   it('requests responsibility gaps with documented Area/range parameters and preserves an opaque cursor', async () => {
