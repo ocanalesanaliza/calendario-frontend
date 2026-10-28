@@ -58,16 +58,6 @@ function displayValue(value, suffix = '') {
   return value === null || value === undefined || value === '' ? '—' : `${value}${suffix}`
 }
 
-function responsibilityLabel(responsibility) {
-  if (typeof responsibility === 'string') return responsibility || 'Responsabilidad sin fechas disponibles'
-  if (!responsibility || typeof responsibility !== 'object') return 'Responsabilidad sin fechas disponibles'
-
-  const start = typeof responsibility.starts_on === 'string' && responsibility.starts_on ? responsibility.starts_on : null
-  const end = typeof responsibility.ends_on === 'string' && responsibility.ends_on ? responsibility.ends_on : null
-  if (!start && !end) return 'Responsabilidad sin fechas disponibles'
-  return `Desde ${start ?? 'fecha no disponible'} · ${end ? `Hasta ${end}` : 'Vigente'}`
-}
-
 function normalizeError(error, fallback) {
   if (error?.status === 403) return 'No tienes autorización para consultar este historial. El servidor mantiene la autorización para cada Área y rango solicitado.'
   return fallback
@@ -107,22 +97,16 @@ function HistoryRow({ row, onOccurrences }) {
   const performance = row?.performance ?? {}
   const definitive = performance.kind === 'definitive'
   const notApplicable = isNotApplicable(performance)
-  const responsibility = responsibilityLabel(row?.responsibility)
   const state = notApplicable ? 'No aplica' : (performance.state ?? '—')
   const updated = formatDateParts(performance.as_of)
 
   return (
     <tr>
-      <td className="go-performance-area">{areaLabel(row?.area)}</td>
       <td className="go-performance-manager">{managerLabel(row?.responsibility)}</td>
-      <td className="go-performance-responsibility">{responsibility}</td>
       <td className="go-performance-period">{formatMonth(row?.period)}</td>
       <td><span className={`go-performance-state go-performance-state-${definitive ? 'definitive' : 'provisional'}`} aria-label={`${definitive ? 'Definitivo' : 'Provisional'} · ${state}`}><strong>{definitive ? 'Definitivo' : 'Provisional'}</strong><span aria-hidden="true"> · </span><span>{state}</span></span></td>
-      <td className="go-performance-number">{notApplicable ? '0' : displayValue(performance.expected_weight)}</td>
-      <td className="go-performance-number">{notApplicable ? '0' : displayValue(performance.credited_weight)}</td>
       <td className="go-performance-number">{notApplicable ? 'No aplica' : displayValue(performance.percentage, '%')}</td>
       <td className="go-performance-updated">{updated ? <><span>{updated.date}</span><span>{updated.time}</span></> : '—'}</td>
-      <td>{definitive && performance.version !== null && performance.version !== undefined ? `Versión ${performance.version}` : '—'}</td>
       <td><button type="button" className="tuvet-btn tuvet-btn-secondary go-performance-row-action" onClick={() => onOccurrences(row)}>Ver evidencia de ocurrencias</button></td>
     </tr>
   )
@@ -314,16 +298,15 @@ export default function GOAreaPerformanceHistoryPage() {
 
   return (
     <main className="tema-analiza tuvet-page go-area-performance-history" data-responsive-breakpoints="375 768 1024 1440">
-      <PageHeader title="Rendimiento de áreas" description="Consulta de solo lectura para Gerencia de Operaciones. El servidor conserva la autorización histórica para cada Área y rango." />
-      <Aviso tipo="info">Los resultados se mantienen separados por Área, responsabilidad y período. Esta pantalla no permite cambios.</Aviso>
-
+      <PageHeader title="Rendimiento de áreas"  />
+      
       <form className="go-performance-filters" onSubmit={submit} aria-label="Filtros del historial de rendimiento de áreas">
         <div className="go-performance-field">
           <label htmlFor="go-performance-area">Área</label>
           <select id="go-performance-area" value={areaId} onChange={(event) => setAreaId(event.target.value)} disabled={loading || areas.length === 0}>
             {areas.map((area) => <option key={area.id} value={area.id}>{areaLabel(area)}</option>)}
           </select>
-          <small>La lista depende del rango seleccionado. Las áreas inactivas autorizadas conservan su historial.</small>
+          
         </div>
         <div className="go-performance-field"><label htmlFor="go-performance-from">Desde</label><input id="go-performance-from" type="month" value={fromMonth} onChange={(event) => setFromMonth(event.target.value)} /></div>
         <div className="go-performance-field"><label htmlFor="go-performance-to">Hasta</label><input id="go-performance-to" type="month" value={toMonth} onChange={(event) => setToMonth(event.target.value)} /></div>
@@ -338,7 +321,7 @@ export default function GOAreaPerformanceHistoryPage() {
         {areas.length > 0 && rows.length === 0 && !loading ? <div className="go-performance-empty">No hay resultados para el Área y período seleccionados.</div> : (
           <div className="go-performance-table-wrap" tabIndex="0" aria-label="Resultados del historial de rendimiento de áreas">
             <table className="go-performance-table">
-              <thead><tr><th>Área</th><th>Gerente de Área</th><th>Responsabilidad</th><th>Período</th><th>Estado</th><th>Peso esperado</th><th>Peso acreditado</th><th>Porcentaje</th><th>Actualizado</th><th>Versión</th><th>Evidencia</th></tr></thead>
+              <thead><tr><th>Gerente de Área</th><th>Período</th><th>Estado</th><th>Porcentaje</th><th>Actualizado</th><th>Evidencia</th></tr></thead>
               <tbody>{rows.map((row, index) => <HistoryRow key={`${row?.area?.id ?? 'area'}-${row?.responsibility?.id ?? index}-${row?.period ?? 'period'}`} row={row} onOccurrences={openOccurrences} />)}</tbody>
             </table>
           </div>

@@ -36,18 +36,17 @@ describe('GOAreaPerformanceHistoryPage', () => {
   it('uses the range-authorized selector, identifies an inactive Area, and renders segmented read-only history', async () => {
     render(<GOAreaPerformanceHistoryPage />)
 
-    await screen.findByText('Desde 2026-01-15 · Vigente')
+    await screen.findByText('Ana Histórica')
     expect(service.getGOAuthorizedAreas).toHaveBeenCalledWith(expect.objectContaining({ fromMonth: expect.any(String), toMonth: expect.any(String) }))
     expect(screen.getByRole('option', { name: /Área Sur.*Inactiva/ })).toBeInTheDocument()
     expect(screen.getByText('Definitivo')).toBeInTheDocument()
-    expect(screen.getByText('Versión 4')).toBeInTheDocument()
     expect(screen.getByText('75%')).toBeInTheDocument()
     expect(screen.queryByText('never-render-this')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /corregir|aprobar|confirmar|reconocer/i })).not.toBeInTheDocument()
     expect(screen.queryByText(/alerta|recibo|auditoría/i)).not.toBeInTheDocument()
   })
 
-  it('renders backend responsibility date ranges without rendering the raw object', async () => {
+  it('keeps responsibility data internal when the compact history table omits that column', async () => {
     const backendResponsibility = { id: 1, starts_on: '2026-01-15', ends_on: null, manager: { display_name: 'Ana Histórica' } }
     service.getGOAreaPerformanceHistory.mockResolvedValueOnce({
       scope: {},
@@ -57,9 +56,9 @@ describe('GOAreaPerformanceHistoryPage', () => {
 
     expect(() => render(<GOAreaPerformanceHistoryPage />)).not.toThrow()
 
-    expect(await screen.findByText('Desde 2026-01-15 · Vigente')).toBeInTheDocument()
+    expect(await screen.findByText('Ana Histórica')).toBeInTheDocument()
     expect(screen.queryByText('[object Object]')).not.toBeInTheDocument()
-    expect(screen.getAllByText('NORTE · Área Norte')).toHaveLength(2)
+    expect(screen.queryByText('Desde 2026-01-15 · Vigente')).not.toBeInTheDocument()
     expect(screen.getByText('octubre de 2026')).toBeInTheDocument()
     expect(screen.getByText('Definitivo')).toBeInTheDocument()
     expect(screen.getByText('75%')).toBeInTheDocument()
@@ -75,7 +74,7 @@ describe('GOAreaPerformanceHistoryPage', () => {
     expect(await screen.findByRole('columnheader', { name: 'Gerente de Área' })).toBeInTheDocument()
     expect(screen.getByText('Ana Histórica')).toBeInTheDocument()
     expect(screen.getByText('Gerente histórico no disponible')).toBeInTheDocument()
-    expect(screen.getByText('Desde 2026-01-15 · Vigente')).toBeInTheDocument()
+    expect(screen.queryByText('Desde 2026-01-15 · Vigente')).not.toBeInTheDocument()
     expect(document.body.textContent).not.toContain('ga_profile_id')
     expect(document.body.textContent).not.toContain('opaque-occurrence-id')
     expect(window.location.search).toBe('')
@@ -87,14 +86,13 @@ describe('GOAreaPerformanceHistoryPage', () => {
     })
     render(<GOAreaPerformanceHistoryPage />)
 
-    await screen.findByText('Desde 2026-01-15 · Vigente')
-    const areaCell = document.querySelector('.go-performance-table tbody td')
-    const rowElement = areaCell.closest('tr')
-    expect(areaCell).toHaveClass('go-performance-area')
+    await screen.findByText('Ana Histórica')
+    const rowElement = document.querySelector('.go-performance-table tbody tr')
     expect(rowElement).toHaveTextContent('Ana Histórica')
-    expect(rowElement).toHaveTextContent('Desde 2026-01-15 · Vigente')
+    expect(rowElement).not.toHaveTextContent('NORTE · Área Norte')
+    expect(rowElement).not.toHaveTextContent('Desde 2026-01-15 · Vigente')
     expect(screen.getByRole('columnheader', { name: 'Gerente de Área' })).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: 'Responsabilidad' })).toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: 'Responsabilidad' })).not.toBeInTheDocument()
     expect(screen.getByLabelText('Provisional · No aplica')).toBeInTheDocument()
     expect(rowElement.querySelector('.go-performance-updated')).toHaveTextContent('27 oct 2026')
 
@@ -105,6 +103,18 @@ describe('GOAreaPerformanceHistoryPage', () => {
     expect(actionGroup).toContainElement(gapsAction)
     expect(historyAction.compareDocumentPosition(gapsAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Ver evidencia de ocurrencias' })).toBeInTheDocument()
+  })
+
+  it('hides Area, responsibility, weights, and version from the compact history table', async () => {
+    render(<GOAreaPerformanceHistoryPage />)
+
+    await screen.findByText('Ana Histórica')
+    for (const name of ['Área', 'Responsabilidad', 'Peso esperado', 'Peso acreditado', 'Versión']) {
+      expect(screen.queryByRole('columnheader', { name })).not.toBeInTheDocument()
+    }
+    const historyRow = document.querySelector('.go-performance-table tbody tr')
+    expect(historyRow).not.toHaveTextContent('NORTE · Área Norte')
+    expect(historyRow).not.toHaveTextContent('Versión 4')
   })
 
   it('loads list-issued occurrence evidence, detail, back navigation, Escape, and focus restoration without mutation controls', async () => {
@@ -130,7 +140,7 @@ describe('GOAreaPerformanceHistoryPage', () => {
   it('shows occurrence loading, empty and authorization error states', async () => {
     service.getGOOccurrences.mockResolvedValueOnce({ results: [] }).mockRejectedValueOnce(Object.assign(new Error('forbidden'), { status: 403 }))
     render(<GOAreaPerformanceHistoryPage />)
-    await screen.findByText('Desde 2026-01-15 · Vigente')
+    await screen.findByText('Ana Histórica')
     fireEvent.click(screen.getByRole('button', { name: 'Ver evidencia de ocurrencias' }))
     expect(await screen.findByText(/No hay ocurrencias autorizadas/)).toBeInTheDocument()
     fireEvent.click(screen.getAllByRole('button', { name: 'Cerrar' }).at(-1))
@@ -141,7 +151,7 @@ describe('GOAreaPerformanceHistoryPage', () => {
   it('keeps gap evidence separate from performance, converts inclusive months to dates, preserves opaque pagination, and restores focus', async () => {
     service.getGOResponsibilityGaps.mockResolvedValueOnce({ results: [{ effective_start: '2026-09-12', detected_at: '2026-09-13T08:00:00Z', status: 'open', opening_reason: 'Sin responsabilidad vigente', opening_provenance: 'Asignación histórica' }], next_cursor: 'opaque-gap-cursor' }).mockResolvedValueOnce({ results: [], next_cursor: null })
     render(<GOAreaPerformanceHistoryPage />)
-    await screen.findByText('Desde 2026-01-15 · Vigente')
+    await screen.findByText('Ana Histórica')
     fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2026-09' } })
     fireEvent.change(screen.getByLabelText('Hasta'), { target: { value: '2026-10' } })
     fireEvent.click(screen.getByRole('button', { name: 'Consultar historial' }))
@@ -170,13 +180,13 @@ describe('GOAreaPerformanceHistoryPage', () => {
 
     expect(() => render(<GOAreaPerformanceHistoryPage />)).not.toThrow()
 
-    expect(await screen.findByText('Responsabilidad sin fechas disponibles')).toBeInTheDocument()
+    expect(await screen.findByText('Gerente histórico no disponible')).toBeInTheDocument()
     expect(screen.queryByText('[object Object]')).not.toBeInTheDocument()
   })
 
   it('validates an invalid month range before requesting either the selector or history again', async () => {
     render(<GOAreaPerformanceHistoryPage />)
-    await screen.findByText('Desde 2026-01-15 · Vigente')
+    await screen.findByText('Ana Histórica')
     fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2024-01' } })
     fireEvent.change(screen.getByLabelText('Hasta'), { target: { value: '2026-01' } })
     fireEvent.click(screen.getByRole('button', { name: 'Consultar historial' }))
@@ -197,7 +207,7 @@ describe('GOAreaPerformanceHistoryPage', () => {
     expect(screen.queryByText('0%')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Cargar más' }))
     await waitFor(() => expect(service.getGOAreaPerformanceHistory).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: 'opaque+/cursor' })))
-    expect(screen.getByText('Versión 4')).toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: 'Versión' })).not.toBeInTheDocument()
   })
 
   it('paginates occurrence evidence with the selected segment, appends unique rows, and keeps opaque values internal', async () => {
@@ -261,7 +271,7 @@ describe('GOAreaPerformanceHistoryPage', () => {
     expect(screen.getByRole('status', { name: 'Cargando' })).toBeInTheDocument()
     await waitFor(() => expect(resolveAreas).toEqual(expect.any(Function)))
     resolveAreas({ scope: {}, results: areas })
-    await screen.findByText('Desde 2026-01-15 · Vigente')
+    await screen.findByText('Ana Histórica')
     expect(document.querySelector('.go-area-performance-history')).toHaveClass('tema-analiza')
     expect(document.querySelector('.go-area-performance-history')).toHaveAttribute('data-responsive-breakpoints', '375 768 1024 1440')
     expect(screen.getByLabelText('Resultados del historial de rendimiento de áreas')).toHaveAttribute('tabindex', '0')
