@@ -105,7 +105,7 @@
   display: block;
   min-height: 1rem;
   border-radius: var(--tv-radius-sm);
-  background: linear-gradient(90deg, var(--tv-sunken), var(--tv-surface), var(--tv-sunken));
+  background: linear-gradient(90deg, var(--tv-surface-sunken), var(--tv-surface), var(--tv-surface-sunken));
   background-size: 200% 100%;
   animation: calendario-area-loading 1.4s var(--tv-ease) infinite;
 }
@@ -212,7 +212,7 @@
 
 .monthly-performance__badge--not-applicable,
 .monthly-performance__badge--neutral {
-  background: var(--tv-sunken);
+  background: var(--tv-surface-sunken);
   color: var(--tv-muted);
 }
 
@@ -439,6 +439,28 @@
   transition:
     filter 0.15s ease,
     transform 0.1s ease;
+}
+
+.calendario-area-calendar .calendario-area-event-chip {
+  display: block;
+  width: 100%;
+  margin: 0 0 0.25rem;
+  padding: 0.25rem 0.5rem;
+  overflow: hidden;
+  border: 1px solid var(--tv-primary);
+  border-radius: var(--tv-radius-sm);
+  background: var(--tv-primary);
+  color: var(--tv-surface);
+  font-weight: 700;
+  line-height: 1.35;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendario-area-calendar .calendario-area-event-chip--occurrence:focus-visible {
+  outline: 2px solid var(--tv-primary-accent);
+  outline-offset: 2px;
 }
 
 .calendario-area-calendar .fc-event:hover {

@@ -7,10 +7,12 @@ let datesSetHandler
 
 vi.mock('../services/calendarioAreaService', () => ({ completeAreaOccurrence, getMonthlyAreaAbsences, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, rescheduleAreaOccurrence }))
 vi.mock('@fullcalendar/react', () => ({
-  default: ({ events, datesSet, eventClick }) => {
+  default: ({ events, datesSet, eventClick, eventClassNames }) => {
     datesSetHandler = datesSet
     return <div data-testid="full-calendar" data-read-only={String(events.every((event) => event.editable === false))}>
-      {events.map((event) => <button type="button" key={event.id} onClick={(click) => eventClick({ event: { ...event, extendedProps: event.extendedProps }, jsEvent: click.nativeEvent })}>{event.title}</button>)}
+      <div className="fc-col-header" data-testid="calendar-weekday-header" />
+      <div className="fc-daygrid-day fc-day-today" data-testid="calendar-current-day" />
+      {events.map((event) => <button type="button" className={eventClassNames?.({ event })} key={event.id} onClick={(click) => eventClick({ event: { ...event, extendedProps: event.extendedProps }, jsEvent: click.nativeEvent })}>{event.title}</button>)}
       <button type="button" onClick={() => datesSet({ view: { currentStart: new Date(2026, 9, 1) } })}>Mes anterior</button>
       <button type="button" onClick={() => datesSet({ view: { currentStart: new Date(2026, 10, 1) } })}>Siguiente mes</button>
     </div>
@@ -298,6 +300,20 @@ describe('CalendarioAreaPage', () => {
     expect(screen.getAllByText('Peso esperado')).toHaveLength(2)
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente mes' }))
     await waitFor(() => expect(getMonthlyAreaPerformance).toHaveBeenLastCalledWith('2026-11'))
+  })
+
+  it('applies the Analiza token scope and distinct event-chip structure to calendar occurrences', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [occurrence, { ...occurrence, occurrence_id: 5, task: 'Inventario' }] })
+
+    render(<CalendarioAreaPage />)
+
+    expect(await screen.findByText('Auditoría')).toHaveClass('calendario-area-event-chip')
+    expect(screen.getByText('Inventario')).toHaveClass('calendario-area-event-chip')
+    expect(screen.getByText('Auditoría')).toHaveClass('calendario-area-event-chip--occurrence')
+    expect(screen.getByText('Auditoría').closest('.tema-analiza')).toHaveAttribute('data-responsive-breakpoints', '375 768 1024 1440')
+    expect(screen.getByTestId('full-calendar').closest('.calendario-area-calendar__surface')).toBeInTheDocument()
+    expect(screen.getByTestId('calendar-weekday-header')).toBeInTheDocument()
+    expect(screen.getByTestId('calendar-current-day')).toBeInTheDocument()
   })
 
   it('presents separated provisional, definitive, and not-applicable performance segments without aggregation', async () => {

@@ -16,6 +16,7 @@ import {
   rescheduleAreaOccurrence,
 } from '../services/calendarioAreaService'
 import { createIdempotencyKey } from '../../calendarArea/services/calendarAreaApi'
+import '../../tuvet/tuvet.css'
 import './CalendarioAreaPage.css'
 
 const STATUS_LABELS = {
@@ -337,7 +338,7 @@ export default function CalendarioAreaPage() {
   }
 
   return (
-    <section className="calendario-area-page">
+    <section className="tema-analiza tuvet-page calendario-area-page" data-responsive-breakpoints="375 768 1024 1440">
       <div className="page-header"><h1>Calendario del área</h1></div>
       <MonthlyPerformancePanel loading={performanceLoading} month={month} performance={performance} error={performanceError} onRetry={() => loadPerformance()} />
       {error && <div className="calendario-area-state calendario-area-state--error" role="alert"><p>{error}</p><button type="button" onClick={() => loadMonth()}>Reintentar</button></div>}
@@ -345,7 +346,7 @@ export default function CalendarioAreaPage() {
       {loading && <div className="calendario-area-state calendario-area-state--loading" role="status" aria-busy="true"><span className="calendario-area-skeleton" aria-hidden="true" /><span className="calendario-area-skeleton calendario-area-skeleton--short" aria-hidden="true" /><span className="sr-only">Cargando calendario...</span></div>}
       <>
         {!loading && occurrences.length === 0 && <div className="calendario-area-state calendario-area-state--empty" role="status"><strong>Mes sin tareas programadas</strong><p>No hay tareas programadas para este mes.</p></div>}
-        <div className="calendario-area-calendar" aria-busy={loading}><div className="calendario-area-calendar__scroll"><FullCalendar plugins={[dayGridPlugin, interactionPlugin, timeGridPlugin, listPlugin, multiMonthPlugin]} headerToolbar={{ start: 'prev,today,next', center: 'title', end: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek,multiMonthYear' }} views={{ listWeek: { buttonText: 'Lista semanal' }, multiMonthYear: { buttonText: 'Año' } }} initialView="dayGridMonth" locale="es" buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día', list: 'Lista', year: 'Año' }} events={[...occurrencesToCalendarEvents(selectVisibleOccurrences(occurrences, absences)), ...absencesToCalendarEvents(absences)]} eventClick={(info) => { if (info.event.extendedProps.calendar_event_type === 'absence') return; triggerRef.current = info.el ?? info.jsEvent?.target; setSelected({ ...info.event.extendedProps, occurrence_id: info.event.extendedProps.occurrence_id, task: info.event.extendedProps.task }) }} datesSet={handleDatesSet} height="auto" /></div></div>
+        <div className="calendario-area-calendar calendario-area-calendar__surface" aria-busy={loading}><div className="calendario-area-calendar__scroll"><FullCalendar plugins={[dayGridPlugin, interactionPlugin, timeGridPlugin, listPlugin, multiMonthPlugin]} headerToolbar={{ start: 'prev,today,next', center: 'title', end: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek,multiMonthYear' }} views={{ listWeek: { buttonText: 'Lista semanal' }, multiMonthYear: { buttonText: 'Año' } }} initialView="dayGridMonth" locale="es" buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día', list: 'Lista', year: 'Año' }} events={[...occurrencesToCalendarEvents(selectVisibleOccurrences(occurrences, absences)), ...absencesToCalendarEvents(absences)]} eventClassNames={(info) => info.event.extendedProps.calendar_event_type === 'absence' ? 'calendario-area-event-chip calendario-area-event-chip--absence' : 'calendario-area-event-chip calendario-area-event-chip--occurrence'} eventClick={(info) => { if (info.event.extendedProps.calendar_event_type === 'absence') return; triggerRef.current = info.el ?? info.jsEvent?.target; setSelected({ ...info.event.extendedProps, occurrence_id: info.event.extendedProps.occurrence_id, task: info.event.extendedProps.task }) }} datesSet={handleDatesSet} height="auto" /></div></div>
       </>
       {selected && <OccurrenceDialog occurrence={selected} onClose={() => setSelected(null)} onComplete={(id, key) => runCommand(() => completeAreaOccurrence(id, key))} onReschedule={(id, body, key) => runCommand(() => rescheduleAreaOccurrence(id, body, key))} />}
     </section>
