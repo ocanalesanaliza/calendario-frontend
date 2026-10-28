@@ -41,6 +41,7 @@
 .go-area-performance-history .go-performance-load-more { margin-top: 1rem; }
 .go-area-performance-history .go-performance-row-action { min-height: var(--tv-target); white-space: nowrap; }
 .go-area-performance-history .go-evidence-list, .go-area-performance-history .go-gap-list { display: grid; gap: .75rem; margin: 0; padding: 0; list-style: none; }
+.go-area-performance-history .go-evidence-pagination { display: grid; justify-items: start; gap: .75rem; margin-top: 1rem; }
 .go-area-performance-history .go-evidence-meta { color: var(--tv-muted); font-weight: 400; }
 .go-area-performance-history .go-evidence-detail dl, .go-area-performance-history .go-gap-list dl { display: grid; grid-template-columns: minmax(10rem, 1fr) 2fr; gap: .5rem 1rem; margin: 1rem 0; }
 .go-area-performance-history .go-evidence-detail dt, .go-area-performance-history .go-gap-list dt { color: var(--tv-muted); font-weight: 700; }

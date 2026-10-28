@@ -200,6 +200,59 @@ describe('GOAreaPerformanceHistoryPage', () => {
     expect(screen.getByText('Versión 4')).toBeInTheDocument()
   })
 
+  it('paginates occurrence evidence with the selected segment, appends unique rows, and keeps opaque values internal', async () => {
+    const firstOccurrence = { id: 'opaque-occurrence-one', task: { title: 'Primera ocurrencia' }, origin_date_local: '2026-10-04' }
+    const duplicateOccurrence = { id: 'opaque-occurrence-one', task: { title: 'Primera ocurrencia' }, origin_date_local: '2026-10-04' }
+    const secondOccurrence = { id: 'opaque-occurrence-two', task: { title: 'Segunda ocurrencia' }, origin_date_local: '2026-10-05' }
+    service.getGOOccurrences
+      .mockResolvedValueOnce({ results: [firstOccurrence], next_cursor: 'opaque-next-occurrence-cursor' })
+      .mockResolvedValueOnce({ results: [duplicateOccurrence, secondOccurrence], next_cursor: null })
+    render(<GOAreaPerformanceHistoryPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver evidencia de ocurrencias' }))
+    expect(await screen.findByRole('button', { name: /Primera ocurrencia/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cargar más ocurrencias' })).toBeInTheDocument()
+    expect(document.body.textContent).not.toContain('opaque-occurrence-one')
+    expect(document.body.textContent).not.toContain('opaque-next-occurrence-cursor')
+    expect(window.location.search).toBe('')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cargar más ocurrencias' }))
+    await waitFor(() => expect(service.getGOOccurrences).toHaveBeenLastCalledWith({ areaId: 7, responsibilityId: 1, fromMonth: '2026-10', toMonth: '2026-10', cursor: 'opaque-next-occurrence-cursor', limit: 25 }))
+    expect(await screen.findByRole('button', { name: /Segunda ocurrencia/ })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /Primera ocurrencia/ })).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: 'Cargar más ocurrencias' })).not.toBeInTheDocument()
+  })
+
+  it('resets occurrence pagination on a different row or close, and preserves page one after a load-more failure', async () => {
+    const secondRow = row({ responsibility: { id: 2, starts_on: '2026-02-01', ends_on: null, manager: { display_name: 'Bea Histórica' } } })
+    service.getGOAreaPerformanceHistory.mockResolvedValueOnce({ scope: {}, results: [row(), secondRow], next_cursor: null })
+    service.getGOOccurrences
+      .mockResolvedValueOnce({ results: [{ id: 'first-row-occurrence', task: { title: 'Evidencia de primera fila' }, origin_date_local: '2026-10-04' }], next_cursor: 'cursor-first-row' })
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce({ results: [{ id: 'second-row-occurrence', task: { title: 'Evidencia de segunda fila' }, origin_date_local: '2026-10-05' }], next_cursor: null })
+      .mockResolvedValueOnce({ results: [{ id: 'reopened-occurrence', task: { title: 'Evidencia reabierta' }, origin_date_local: '2026-10-06' }], next_cursor: null })
+    render(<GOAreaPerformanceHistoryPage />)
+
+    const triggers = await screen.findAllByRole('button', { name: 'Ver evidencia de ocurrencias' })
+    fireEvent.click(triggers[0])
+    expect(await screen.findByRole('button', { name: /Evidencia de primera fila/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cargar más ocurrencias' }))
+    expect(await screen.findByText('No fue posible cargar más ocurrencias.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Evidencia de primera fila/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reintentar cargar más ocurrencias' })).toBeInTheDocument()
+
+    fireEvent.click(triggers[1])
+    expect(await screen.findByRole('button', { name: /Evidencia de segunda fila/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Evidencia de primera fila/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cargar más ocurrencias' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Cerrar' }).at(-1))
+    fireEvent.click(triggers[0])
+    expect(await screen.findByRole('button', { name: /Evidencia reabierta/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Evidencia de segunda fila/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cargar más ocurrencias' })).not.toBeInTheDocument()
+  })
+
   it('provides loading, empty, neutral authorization error, keyboard focus and responsive reduced-motion structure', async () => {
     let resolveAreas
     service.getGOAuthorizedAreas.mockImplementationOnce(() => new Promise((resolve) => { resolveAreas = resolve }))

@@ -88,6 +88,21 @@ function occurrenceItems(data) {
   return Array.isArray(data?.results) ? data.results : (Array.isArray(data?.occurrences) ? data.occurrences : [])
 }
 
+function occurrenceId(occurrence) {
+  const id = occurrence?.id
+  return id === null || id === undefined || id === '' ? null : String(id)
+}
+
+function uniqueOccurrences(items, existing = []) {
+  const knownIds = new Set(existing.map(occurrenceId).filter(Boolean))
+  return [...existing, ...items.filter((item) => {
+    const id = occurrenceId(item)
+    if (!id || knownIds.has(id)) return false
+    knownIds.add(id)
+    return true
+  })]
+}
+
 function HistoryRow({ row, onOccurrences }) {
   const performance = row?.performance ?? {}
   const definitive = performance.kind === 'definitive'
@@ -127,8 +142,11 @@ export default function GOAreaPerformanceHistoryPage() {
   const [rangeError, setRangeError] = useState('')
   const [occurrenceModal, setOccurrenceModal] = useState(null)
   const [occurrences, setOccurrences] = useState([])
+  const [occurrenceCursor, setOccurrenceCursor] = useState(null)
   const [occurrencesLoading, setOccurrencesLoading] = useState(false)
+  const [occurrencesLoadingMore, setOccurrencesLoadingMore] = useState(false)
   const [occurrencesError, setOccurrencesError] = useState('')
+  const [occurrencesLoadMoreError, setOccurrencesLoadMoreError] = useState('')
   const [occurrenceDetail, setOccurrenceDetail] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState('')
@@ -139,6 +157,7 @@ export default function GOAreaPerformanceHistoryPage() {
   const [gapsLoading, setGapsLoading] = useState(false)
   const [gapsError, setGapsError] = useState('')
   const latestRequest = useRef(0)
+  const latestOccurrencesRequest = useRef(0)
 
   async function loadRange({ requestedAreaId = areaId, cursor, append = false, explicit = false } = {}) {
     const invalid = rangeMessage(fromMonth, toMonth)
@@ -199,23 +218,55 @@ export default function GOAreaPerformanceHistoryPage() {
     loadRange({ explicit: true })
   }
 
-  async function openOccurrences(row) {
-    setOccurrenceModal(row)
+  function resetOccurrences() {
     setOccurrences([])
+    setOccurrenceCursor(null)
     setOccurrenceDetail(null)
     setOccurrencesError('')
+    setOccurrencesLoadMoreError('')
     setDetailError('')
-    setOccurrencesLoading(true)
-    try {
-      const data = await getGOOccurrences({ areaId: row?.area?.id, responsibilityId: row?.responsibility?.id, fromMonth: row?.period, toMonth: row?.period, limit: PAGE_SIZE })
-      const items = occurrenceItems(data)
-      setOccurrences(items)
-      setIssuedOccurrenceIds(new Set(items.map((item) => String(item?.id)).filter(Boolean)))
-    } catch (error) {
-      setOccurrencesError(normalizeError(error, 'No fue posible cargar la evidencia de ocurrencias autorizadas.'))
-    } finally {
-      setOccurrencesLoading(false)
+    setOccurrencesLoading(false)
+    setOccurrencesLoadingMore(false)
+    setIssuedOccurrenceIds(new Set())
+  }
+
+  async function loadOccurrences(row, { cursor, append = false } = {}) {
+    const requestId = ++latestOccurrencesRequest.current
+    if (append) {
+      setOccurrencesLoadingMore(true)
+      setOccurrencesLoadMoreError('')
+    } else {
+      setOccurrencesLoading(true)
+      setOccurrencesError('')
     }
+
+    try {
+      const data = await getGOOccurrences({ areaId: row?.area?.id, responsibilityId: row?.responsibility?.id, fromMonth: row?.period, toMonth: row?.period, cursor, limit: PAGE_SIZE })
+      if (requestId !== latestOccurrencesRequest.current) return
+      const nextOccurrences = append ? uniqueOccurrences(occurrenceItems(data), occurrences) : uniqueOccurrences(occurrenceItems(data))
+      setOccurrences(nextOccurrences)
+      setIssuedOccurrenceIds(new Set(nextOccurrences.map(occurrenceId).filter(Boolean)))
+      setOccurrenceCursor(data?.next_cursor ?? null)
+    } catch (error) {
+      if (requestId !== latestOccurrencesRequest.current) return
+      if (append) setOccurrencesLoadMoreError('No fue posible cargar más ocurrencias.')
+      else setOccurrencesError(normalizeError(error, 'No fue posible cargar la evidencia de ocurrencias autorizadas.'))
+    } finally {
+      if (requestId === latestOccurrencesRequest.current) {
+        if (append) setOccurrencesLoadingMore(false)
+        else setOccurrencesLoading(false)
+      }
+    }
+  }
+
+  function openOccurrences(row) {
+    resetOccurrences()
+    setOccurrenceModal(row)
+    void loadOccurrences(row)
+  }
+
+  function retryMoreOccurrences() {
+    if (occurrenceModal && occurrenceCursor) void loadOccurrences(occurrenceModal, { cursor: occurrenceCursor, append: true })
   }
 
   async function openOccurrenceDetail(occurrence) {
@@ -233,8 +284,9 @@ export default function GOAreaPerformanceHistoryPage() {
   }
 
   function closeOccurrences() {
+    latestOccurrencesRequest.current += 1
+    resetOccurrences()
     setOccurrenceModal(null)
-    setOccurrenceDetail(null)
   }
 
   async function loadGaps({ cursor, append = false } = {}) {
@@ -300,8 +352,12 @@ export default function GOAreaPerformanceHistoryPage() {
           <dl><dt>Fecha de origen</dt><dd>{formatDate(occurrenceDetail?.origin_date_local)}</dd><dt>Mes de atribución</dt><dd>{formatMonth(occurrenceDetail?.attribution_month)}</dd><dt>Peso congelado</dt><dd>{displayValue(occurrenceDetail?.frozen_weight)}</dd><dt>Última revisión</dt><dd>{occurrenceDetail?.latest_revision?.status ?? occurrenceDetail?.latest_status ?? '—'}</dd></dl>
           <h3>Historial de revisiones</h3>
           <ul>{(occurrenceDetail?.revisions ?? occurrenceDetail?.revision_history ?? []).map((revision, index) => <li key={`${revision?.created_at ?? 'revision'}-${index}`}>{revision?.status ?? 'Revisión registrada'} · {formatDate(revision?.created_at)}</li>)}</ul>
-        </div> : <EstadoCarga loading={occurrencesLoading || detailLoading} error={occurrencesError || detailError} onRetry={() => { if (detailError) setOccurrenceDetail(null); else void openOccurrences(occurrenceModal) }} empty={!occurrencesLoading && !occurrencesError && occurrences.length === 0} emptyText="No hay ocurrencias autorizadas para este segmento.">
-          <ul className="go-evidence-list">{occurrences.map((occurrence, index) => <li key={`${occurrence?.origin_date_local ?? 'occurrence'}-${index}`}><button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => void openOccurrenceDetail(occurrence)}>{occurrence?.task?.title ?? 'Ocurrencia autorizada'} <span className="go-evidence-meta">· {formatDate(occurrence?.origin_date_local)}</span></button></li>)}</ul>
+        </div> : <EstadoCarga loading={occurrencesLoading || detailLoading} error={occurrencesError || detailError} onRetry={() => { if (detailError) setOccurrenceDetail(null); else openOccurrences(occurrenceModal) }} empty={!occurrencesLoading && !occurrencesError && occurrences.length === 0} emptyText="No hay ocurrencias autorizadas para este segmento.">
+          <ul className="go-evidence-list">{occurrences.map((occurrence) => <li key={occurrenceId(occurrence)}><button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => void openOccurrenceDetail(occurrence)}>{occurrence?.task?.title ?? 'Ocurrencia autorizada'} <span className="go-evidence-meta">· {formatDate(occurrence?.origin_date_local)}</span></button></li>)}</ul>
+          {occurrenceCursor && <div className="go-evidence-pagination">
+            {occurrencesLoadMoreError && <Aviso tipo="warning">{occurrencesLoadMoreError}</Aviso>}
+            <button type="button" className="tuvet-btn tuvet-btn-secondary go-performance-load-more" onClick={retryMoreOccurrences} disabled={occurrencesLoadingMore}>{occurrencesLoadingMore ? 'Cargando más…' : (occurrencesLoadMoreError ? 'Reintentar cargar más ocurrencias' : 'Cargar más ocurrencias')}</button>
+          </div>}
         </EstadoCarga>}
       </Modal>}
       {gapModalOpen && <Modal title="Brechas de responsabilidad del Área" subtitle="Evidencia operativa independiente del rendimiento." icon="alerta" tone="primary" wide onClose={() => setGapModalOpen(false)} footer={<button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => setGapModalOpen(false)}>Cerrar</button>}>
