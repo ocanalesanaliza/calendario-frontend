@@ -466,7 +466,7 @@
 .calendario-area-calendar .calendario-area-event-chip__content {
   display: flex;
   min-width: 0;
-  align-items: baseline;
+  align-items: center;
   gap: 0.375rem;
 }
 
@@ -477,11 +477,10 @@
   white-space: nowrap;
 }
 
-.calendario-area-calendar .calendario-area-event-chip__status {
+.calendario-area-calendar .calendario-area-event-chip__marker {
   flex: 0 0 auto;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  white-space: nowrap;
+  width: 1rem;
+  height: 1rem;
 }
 
 .calendario-area-calendar .calendar-occurrence--pendiente {
@@ -492,26 +491,26 @@
 
 .calendario-area-calendar .calendar-occurrence--completada {
   border-color: var(--tv-success-text) !important;
-  background: var(--tv-success-soft) !important;
-  color: var(--tv-success-text) !important;
+  background: var(--tv-success-text) !important;
+  color: var(--tv-surface) !important;
 }
 
 .calendario-area-calendar .calendar-occurrence--vencida {
-  border-color: var(--tv-danger-text) !important;
-  background: var(--tv-danger-soft) !important;
-  color: var(--tv-danger-text) !important;
+  border-color: var(--tv-danger) !important;
+  background: var(--tv-danger) !important;
+  color: var(--tv-surface) !important;
 }
 
 .calendario-area-calendar .calendar-occurrence--justificada {
   border-color: var(--tv-warning-text) !important;
-  background: var(--tv-warning-soft) !important;
-  color: var(--tv-warning-text) !important;
+  background: var(--tv-warning-text) !important;
+  color: var(--tv-surface) !important;
 }
 
 .calendario-area-calendar .calendar-occurrence--diferida {
-  border-color: var(--tv-primary-border) !important;
-  background: var(--tv-primary-softer) !important;
-  color: var(--tv-primary-text) !important;
+  border-color: var(--tv-primary-hover) !important;
+  background: var(--tv-primary-hover) !important;
+  color: var(--tv-surface) !important;
 }
 
 .calendario-area-calendar .fc-event:hover {

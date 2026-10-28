@@ -16,11 +16,11 @@ const TYPE_LABELS = {
 }
 
 const OCCURRENCE_STATUS_PRESENTATIONS = {
-  pendiente: { className: 'calendar-occurrence--pendiente', label: 'Pendiente' },
-  completada: { className: 'calendar-occurrence--completada', label: 'Completada' },
-  vencida: { className: 'calendar-occurrence--vencida', label: 'Vencida' },
-  justificada: { className: 'calendar-occurrence--justificada', label: 'Justificada' },
-  diferida: { className: 'calendar-occurrence--diferida', label: 'Diferida' },
+  pendiente: { className: 'calendar-occurrence--pendiente', label: 'Pendiente', marker: 'pending' },
+  completada: { className: 'calendar-occurrence--completada', label: 'Completada', marker: 'complete' },
+  vencida: { className: 'calendar-occurrence--vencida', label: 'Vencida', marker: 'overdue' },
+  justificada: { className: 'calendar-occurrence--justificada', label: 'Justificada', marker: 'justified' },
+  diferida: { className: 'calendar-occurrence--diferida', label: 'Diferida', marker: 'deferred' },
 }
 
 const MONTHLY_PERFORMANCE_STATES = new Set(['provisional', 'closed', 'corrected', 'not_applicable'])
@@ -34,7 +34,7 @@ function safeUnknownStatusLabel(status) {
 export function occurrenceStatusPresentation(status) {
   if (OCCURRENCE_STATUS_PRESENTATIONS[status]) return OCCURRENCE_STATUS_PRESENTATIONS[status]
   const safeLabel = MONTHLY_PERFORMANCE_STATES.has(status) ? null : safeUnknownStatusLabel(status)
-  return { className: 'calendar-occurrence--pendiente', label: safeLabel ?? 'Pendiente' }
+  return { className: 'calendar-occurrence--pendiente', label: safeLabel ?? 'Pendiente', marker: 'pending' }
 }
 
 function absenceDate(absence) {
@@ -117,10 +117,11 @@ export function selectVisibleOccurrences(occurrences = [], absences = []) {
 export function occurrenceToCalendarEvent(occurrence) {
   const occurrenceId = occurrence.occurrence_id ?? occurrence.id
   const statusPresentation = occurrenceStatusPresentation(occurrence.status)
+  const title = taskTitle(occurrence.task, occurrenceId)
 
   return {
     id: String(occurrenceId),
-    title: taskTitle(occurrence.task, occurrenceId),
+    title,
     start: occurrence.effective_date,
     allDay: occurrence.all_day,
     editable: false,
@@ -130,6 +131,8 @@ export function occurrenceToCalendarEvent(occurrence) {
       status: occurrence.status,
       status_class: statusPresentation.className,
       status_label: statusPresentation.label,
+      status_marker: statusPresentation.marker,
+      aria_label: `${title} · ${statusPresentation.label}`,
       template: occurrence.template,
       template_version: occurrence.template_version,
       coverage_snapshot: occurrence.coverage_snapshot,
