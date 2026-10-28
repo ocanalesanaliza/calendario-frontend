@@ -40,15 +40,32 @@
 .go-area-performance-history .go-performance-load-more { margin-top: 1rem; }
 .go-area-performance-history .go-performance-row-action { min-height: var(--tv-target); white-space: nowrap; }
 .go-area-performance-history .go-evidence-list, .go-area-performance-history .go-gap-list { display: grid; gap: .75rem; margin: 0; padding: 0; list-style: none; }
+.go-area-performance-history .go-evidence-list li { min-width: 0; }
+.go-area-performance-history .go-evidence-record { display: grid; width: 100%; min-height: calc(var(--tv-target) * 1.5); gap: .5rem; padding: .875rem 1rem; color: var(--tv-text); text-align: left; white-space: normal; background: var(--tv-surface); border: 1px solid var(--tv-border); border-radius: var(--tv-radius); box-shadow: var(--tv-shadow-sm); transition: background var(--tv-dur-fast) var(--tv-ease), border-color var(--tv-dur-fast) var(--tv-ease), box-shadow var(--tv-dur-fast) var(--tv-ease); }
+.go-area-performance-history .go-evidence-record:hover { background: var(--tv-primary-softer); border-color: var(--tv-primary-border); box-shadow: var(--tv-shadow); }
+.go-area-performance-history .go-evidence-record:focus-visible { outline: 2px solid var(--tv-primary-accent); outline-offset: 2px; box-shadow: 0 0 0 3px var(--tv-ring); }
+.go-area-performance-history .go-evidence-record-title { color: var(--tv-fg); font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
+.go-area-performance-history .go-evidence-record-meta { display: flex; flex-wrap: wrap; gap: .25rem .5rem; color: var(--tv-muted); font-size: .875rem; line-height: 1.5; }
+.go-area-performance-history .go-evidence-record-meta > span { font-weight: 700; }
+.go-area-performance-history .go-evidence-record-date { color: inherit; font-variant-numeric: tabular-nums; }
 .go-area-performance-history .go-evidence-pagination { display: grid; justify-items: start; gap: .75rem; margin-top: 1rem; }
-.go-area-performance-history .go-evidence-meta { color: var(--tv-muted); font-weight: 400; }
-.go-area-performance-history .go-evidence-detail dl, .go-area-performance-history .go-gap-list dl { display: grid; grid-template-columns: minmax(10rem, 1fr) 2fr; gap: .5rem 1rem; margin: 1rem 0; }
+.go-area-performance-history .go-evidence-detail { display: grid; gap: 1rem; }
+.go-area-performance-history .go-evidence-detail-header { padding-bottom: .75rem; border-bottom: 1px solid var(--tv-border); }
+.go-area-performance-history .go-evidence-detail-header h3, .go-area-performance-history .go-evidence-detail-section h4 { margin: 0; color: var(--tv-fg); }
+.go-area-performance-history .go-evidence-detail-header h3 { font-size: 1.125rem; line-height: 1.4; overflow-wrap: anywhere; }
+.go-area-performance-history .go-evidence-detail-section { display: grid; gap: .75rem; padding: 1rem; background: var(--tv-surface); border: 1px solid var(--tv-border); border-radius: var(--tv-radius); }
+.go-area-performance-history .go-evidence-detail-section h4 { font-size: .9375rem; }
+.go-area-performance-history .go-evidence-detail-metadata, .go-area-performance-history .go-evidence-detail-latest, .go-area-performance-history .go-gap-list dl { display: grid; grid-template-columns: minmax(10rem, 1fr) 2fr; gap: .5rem 1rem; margin: 0; }
 .go-area-performance-history .go-evidence-detail dt, .go-area-performance-history .go-gap-list dt { color: var(--tv-muted); font-weight: 700; }
 .go-area-performance-history .go-evidence-detail dd, .go-area-performance-history .go-gap-list dd { margin: 0; }
+.go-area-performance-history .go-evidence-revision-list { display: grid; gap: .5rem; margin: 0; padding: 0; list-style: none; }
+.go-area-performance-history .go-evidence-revision-list li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .25rem 1rem; padding-top: .5rem; border-top: 1px solid var(--tv-border); color: var(--tv-text); }
+.go-area-performance-history .go-evidence-revision-list li:first-child { padding-top: 0; border-top: 0; }
+.go-area-performance-history .go-evidence-revision-list li span:last-child { color: var(--tv-muted); font-variant-numeric: tabular-nums; }
 .go-area-performance-history .go-gap-list li { padding: 1rem; border: 1px solid var(--tv-border); border-radius: var(--tv-radius-sm); background: var(--tv-surface); }
 .go-area-performance-history .go-performance-empty { padding: 1rem; background: var(--tv-surface); border: 1px solid var(--tv-border); border-radius: var(--tv-radius); color: var(--tv-muted); }
 .go-area-performance-history .go-performance-helper { margin: -.5rem 0 1rem; color: var(--tv-muted); }
 
 @media (max-width: 1100px) { .go-area-performance-history .go-performance-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .go-area-performance-history .go-performance-actions { grid-column: 1 / -1; justify-content: start; } }
-@media (max-width: 640px) { .go-area-performance-history .go-performance-filters { grid-template-columns: 1fr; } .go-area-performance-history .go-performance-actions { grid-template-columns: 1fr; } .go-area-performance-history .go-performance-filters .tuvet-btn { width: 100%; min-height: 44px; } }
+@media (max-width: 640px) { .go-area-performance-history .go-performance-filters { grid-template-columns: 1fr; } .go-area-performance-history .go-performance-actions { grid-template-columns: 1fr; } .go-area-performance-history .go-performance-filters .tuvet-btn { width: 100%; min-height: 44px; } .go-area-performance-history .go-evidence-record { min-height: 44px; } .go-area-performance-history .go-evidence-detail-metadata, .go-area-performance-history .go-evidence-detail-latest { grid-template-columns: 1fr; gap: .25rem; } .go-area-performance-history .go-evidence-detail-metadata dd, .go-area-performance-history .go-evidence-detail-latest dd { margin-bottom: .5rem; } }
 @media (prefers-reduced-motion: reduce) { .go-area-performance-history *, .go-area-performance-history *::before, .go-area-performance-history *::after { scroll-behavior: auto; transition-duration: .01ms; animation-duration: .01ms; } }

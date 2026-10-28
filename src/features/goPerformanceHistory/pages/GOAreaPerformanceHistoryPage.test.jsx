@@ -184,6 +184,23 @@ describe('GOAreaPerformanceHistoryPage', () => {
     expect(document.activeElement).toBe(trigger)
   })
 
+  it('presents occurrence evidence as full-width records with separate title and date metadata, while keeping detail metadata responsive and opaque values internal', async () => {
+    render(<GOAreaPerformanceHistoryPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver evidencia de ocurrencias' }))
+
+    const evidenceRecord = await screen.findByRole('button', { name: /Inventario mensual/ })
+    expect(evidenceRecord).toHaveClass('go-evidence-record')
+    expect(evidenceRecord.querySelector('.go-evidence-record-title')).toHaveTextContent('Inventario mensual')
+    expect(evidenceRecord.querySelector('time.go-evidence-record-date')).toBeInTheDocument()
+    expect(document.body.textContent).not.toContain('opaque-occurrence-id')
+    expect(window.location.search).toBe('')
+
+    fireEvent.click(evidenceRecord)
+    expect(await screen.findByText('Historial de revisiones')).toBeInTheDocument()
+    expect(document.querySelector('.go-evidence-detail-metadata')).toBeInTheDocument()
+    expect(document.querySelector('.go-evidence-detail-section')).toBeInTheDocument()
+  })
+
   it('shows occurrence loading, empty and authorization error states', async () => {
     service.getGOOccurrences.mockResolvedValueOnce({ results: [] }).mockRejectedValueOnce(Object.assign(new Error('forbidden'), { status: 403 }))
     render(<GOAreaPerformanceHistoryPage />)

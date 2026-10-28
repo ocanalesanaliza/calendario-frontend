@@ -362,12 +362,21 @@ export default function GOAreaPerformanceHistoryPage() {
       {occurrenceModal && <Modal title="Evidencia de ocurrencias" subtitle="Consulta de solo lectura autorizada para el segmento seleccionado." icon="archivo" wide onClose={closeOccurrences} footer={<button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={closeOccurrences}>Cerrar</button>}>
         {occurrenceDetail ? <div className="go-evidence-detail">
           <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => { setOccurrenceDetail(null); setDetailError('') }}>Volver a la lista</button>
-          <h3>{occurrenceDetail?.task?.title ?? 'Tarea sin título disponible'}</h3>
-          <dl><dt>Fecha de origen</dt><dd>{formatDate(occurrenceDetail?.origin_date_local)}</dd><dt>Mes de atribución</dt><dd>{formatMonth(occurrenceDetail?.attribution_month)}</dd><dt>Peso congelado</dt><dd>{displayValue(occurrenceDetail?.frozen_weight)}</dd><dt>Última revisión</dt><dd>{occurrenceDetail?.latest_revision?.status ?? occurrenceDetail?.latest_status ?? '—'}</dd></dl>
-          <h3>Historial de revisiones</h3>
-          <ul>{(occurrenceDetail?.revisions ?? occurrenceDetail?.revision_history ?? []).map((revision, index) => <li key={`${revision?.created_at ?? 'revision'}-${index}`}>{revision?.status ?? 'Revisión registrada'} · {formatDate(revision?.created_at)}</li>)}</ul>
+          <header className="go-evidence-detail-header"><h3>{occurrenceDetail?.task?.title ?? 'Tarea sin título disponible'}</h3></header>
+          <section className="go-evidence-detail-section" aria-labelledby="go-evidence-detail-metadata-title">
+            <h4 id="go-evidence-detail-metadata-title">Información de la ocurrencia</h4>
+            <dl className="go-evidence-detail-metadata"><dt>Fecha de origen</dt><dd>{formatDate(occurrenceDetail?.origin_date_local)}</dd><dt>Mes de atribución</dt><dd>{formatMonth(occurrenceDetail?.attribution_month)}</dd><dt>Peso congelado</dt><dd>{displayValue(occurrenceDetail?.frozen_weight)}</dd></dl>
+          </section>
+          <section className="go-evidence-detail-section" aria-labelledby="go-evidence-detail-latest-title">
+            <h4 id="go-evidence-detail-latest-title">Última revisión</h4>
+            <dl className="go-evidence-detail-latest"><dt>Estado</dt><dd>{occurrenceDetail?.latest_revision?.status ?? occurrenceDetail?.latest_status ?? '—'}</dd></dl>
+          </section>
+          <section className="go-evidence-detail-section" aria-labelledby="go-evidence-detail-history-title">
+            <h4 id="go-evidence-detail-history-title">Historial de revisiones</h4>
+            <ul className="go-evidence-revision-list">{(occurrenceDetail?.revisions ?? occurrenceDetail?.revision_history ?? []).map((revision, index) => <li key={`${revision?.created_at ?? 'revision'}-${index}`}><span>{revision?.status ?? 'Revisión registrada'}</span><span>{formatDate(revision?.created_at)}</span></li>)}</ul>
+          </section>
         </div> : <EstadoCarga loading={occurrencesLoading || detailLoading} error={occurrencesError || detailError} onRetry={() => { if (detailError) setOccurrenceDetail(null); else openOccurrences(occurrenceModal) }} empty={!occurrencesLoading && !occurrencesError && occurrences.length === 0} emptyText="No hay ocurrencias autorizadas para este segmento.">
-          <ul className="go-evidence-list">{occurrences.map((occurrence) => <li key={occurrenceId(occurrence)}><button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => void openOccurrenceDetail(occurrence)}>{occurrence?.task?.title ?? 'Ocurrencia autorizada'} <span className="go-evidence-meta">· {formatDate(occurrence?.origin_date_local)}</span></button></li>)}</ul>
+          <ul className="go-evidence-list">{occurrences.map((occurrence) => <li key={occurrenceId(occurrence)}><button type="button" className="tuvet-btn tuvet-btn-secondary go-evidence-record" onClick={() => void openOccurrenceDetail(occurrence)}><span className="go-evidence-record-title">{occurrence?.task?.title ?? 'Ocurrencia autorizada'}</span><span className="go-evidence-record-meta"><span>Fecha de origen</span><time className="go-evidence-record-date" dateTime={occurrence?.origin_date_local ?? undefined}>{formatDate(occurrence?.origin_date_local)}</time></span></button></li>)}</ul>
           {occurrenceCursor && <div className="go-evidence-pagination">
             {occurrencesLoadMoreError && <Aviso tipo="warning">{occurrencesLoadMoreError}</Aviso>}
             <button type="button" className="tuvet-btn tuvet-btn-secondary go-performance-load-more" onClick={retryMoreOccurrences} disabled={occurrencesLoadingMore}>{occurrencesLoadingMore ? 'Cargando más…' : (occurrencesLoadMoreError ? 'Reintentar cargar más ocurrencias' : 'Cargar más ocurrencias')}</button>
