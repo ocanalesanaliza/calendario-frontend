@@ -40,6 +40,16 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('es', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
 }
 
+function formatDateParts(value) {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return {
+    date: new Intl.DateTimeFormat('es', { dateStyle: 'medium' }).format(date),
+    time: new Intl.DateTimeFormat('es', { timeStyle: 'short' }).format(date),
+  }
+}
+
 function isNotApplicable(performance) {
   return performance?.state === 'not_applicable'
 }
@@ -84,18 +94,19 @@ function HistoryRow({ row, onOccurrences }) {
   const notApplicable = isNotApplicable(performance)
   const responsibility = responsibilityLabel(row?.responsibility)
   const state = notApplicable ? 'No aplica' : (performance.state ?? '—')
+  const updated = formatDateParts(performance.as_of)
 
   return (
     <tr>
-      <td>{areaLabel(row?.area)}</td>
-      <td>{managerLabel(row?.responsibility)}</td>
-      <td>{responsibility}</td>
-      <td>{formatMonth(row?.period)}</td>
-      <td><span className={`go-performance-state go-performance-state-${definitive ? 'definitive' : 'provisional'}`}><strong>{definitive ? 'Definitivo' : 'Provisional'}</strong><span aria-hidden="true"> · </span>{state}</span></td>
+      <td className="go-performance-area">{areaLabel(row?.area)}</td>
+      <td className="go-performance-manager">{managerLabel(row?.responsibility)}</td>
+      <td className="go-performance-responsibility">{responsibility}</td>
+      <td className="go-performance-period">{formatMonth(row?.period)}</td>
+      <td><span className={`go-performance-state go-performance-state-${definitive ? 'definitive' : 'provisional'}`} aria-label={`${definitive ? 'Definitivo' : 'Provisional'} · ${state}`}><strong>{definitive ? 'Definitivo' : 'Provisional'}</strong><span aria-hidden="true"> · </span><span>{state}</span></span></td>
       <td className="go-performance-number">{notApplicable ? '0' : displayValue(performance.expected_weight)}</td>
       <td className="go-performance-number">{notApplicable ? '0' : displayValue(performance.credited_weight)}</td>
       <td className="go-performance-number">{notApplicable ? 'No aplica' : displayValue(performance.percentage, '%')}</td>
-      <td>{formatDate(performance.as_of)}</td>
+      <td className="go-performance-updated">{updated ? <><span>{updated.date}</span><span>{updated.time}</span></> : '—'}</td>
       <td>{definitive && performance.version !== null && performance.version !== undefined ? `Versión ${performance.version}` : '—'}</td>
       <td><button type="button" className="tuvet-btn tuvet-btn-secondary go-performance-row-action" onClick={() => onOccurrences(row)}>Ver evidencia de ocurrencias</button></td>
     </tr>
@@ -264,8 +275,10 @@ export default function GOAreaPerformanceHistoryPage() {
         </div>
         <div className="go-performance-field"><label htmlFor="go-performance-from">Desde</label><input id="go-performance-from" type="month" value={fromMonth} onChange={(event) => setFromMonth(event.target.value)} /></div>
         <div className="go-performance-field"><label htmlFor="go-performance-to">Hasta</label><input id="go-performance-to" type="month" value={toMonth} onChange={(event) => setToMonth(event.target.value)} /></div>
-        <button type="submit" className="tuvet-btn" disabled={loading}>Consultar historial</button>
-        <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={openGaps} disabled={loading || !areaId}>Consultar brechas de responsabilidad del Área</button>
+        <div className="go-performance-actions" role="group" aria-label="Consultas del historial seleccionado">
+          <button type="submit" className="tuvet-btn" disabled={loading}>Consultar historial</button>
+          <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={openGaps} disabled={loading || !areaId}>Consultar brechas de responsabilidad del Área</button>
+        </div>
       </form>
       {rangeError && <Aviso tipo="warning">{rangeError}</Aviso>}
 

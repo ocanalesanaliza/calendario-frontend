@@ -81,6 +81,32 @@ describe('GOAreaPerformanceHistoryPage', () => {
     expect(window.location.search).toBe('')
   })
 
+  it('keeps the history table readable and groups the read-only actions in visual keyboard order', async () => {
+    service.getGOAreaPerformanceHistory.mockResolvedValueOnce({
+      scope: {}, results: [row({ kind: 'provisional', state: 'not_applicable' })], next_cursor: null,
+    })
+    render(<GOAreaPerformanceHistoryPage />)
+
+    await screen.findByText('Desde 2026-01-15 · Vigente')
+    const areaCell = document.querySelector('.go-performance-table tbody td')
+    const rowElement = areaCell.closest('tr')
+    expect(areaCell).toHaveClass('go-performance-area')
+    expect(rowElement).toHaveTextContent('Ana Histórica')
+    expect(rowElement).toHaveTextContent('Desde 2026-01-15 · Vigente')
+    expect(screen.getByRole('columnheader', { name: 'Gerente de Área' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Responsabilidad' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Provisional · No aplica')).toBeInTheDocument()
+    expect(rowElement.querySelector('.go-performance-updated')).toHaveTextContent('27 oct 2026')
+
+    const actionGroup = screen.getByRole('group', { name: 'Consultas del historial seleccionado' })
+    const historyAction = within(actionGroup).getByRole('button', { name: 'Consultar historial' })
+    const gapsAction = within(actionGroup).getByRole('button', { name: 'Consultar brechas de responsabilidad del Área' })
+    expect(actionGroup).toContainElement(historyAction)
+    expect(actionGroup).toContainElement(gapsAction)
+    expect(historyAction.compareDocumentPosition(gapsAction) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ver evidencia de ocurrencias' })).toBeInTheDocument()
+  })
+
   it('loads list-issued occurrence evidence, detail, back navigation, Escape, and focus restoration without mutation controls', async () => {
     render(<GOAreaPerformanceHistoryPage />)
     const trigger = await screen.findByRole('button', { name: 'Ver evidencia de ocurrencias' })
