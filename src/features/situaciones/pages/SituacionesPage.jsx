@@ -7,6 +7,7 @@ import '../../tuvet/tuvet.css'
 import './SituacionesPage.css'
 
 const PAGE_SIZE = 15
+const ESTADOS = { todas: 'Todas', activas: 'Activas', inactivas: 'Inactivas' }
 
 function porcentajeTipo(codigo) {
   return codigo === 'no_aprobada_ga' ? 0 : 100
@@ -173,12 +174,19 @@ export default function SituacionesPage() {
       </div>
 
       <div className="situaciones-toolbar">
-        <label className="situaciones-filter-label" htmlFor="situaciones-filtro-estado">Estado</label>
-        <select id="situaciones-filtro-estado" className="tuvet-input situaciones-filter" value={filtroActiva} onChange={(e) => { setFiltroActiva(e.target.value); setPage(1) }}>
-          <option value="activas">Situaciones activas</option>
-          <option value="inactivas">Situaciones inactivas</option>
-          <option value="todas">Todas las situaciones</option>
-        </select>
+        <div className="tuvet-filtros situaciones-filter-pills" role="group" aria-label="Filtrar por estado">
+          {Object.entries(ESTADOS).map(([clave, etiqueta]) => (
+            <button
+              key={clave}
+              type="button"
+              className={`tuvet-chip ${filtroActiva === clave ? 'active' : ''}`}
+              aria-pressed={filtroActiva === clave}
+              onClick={() => { setFiltroActiva(clave); setPage(1) }}
+            >
+              {etiqueta}
+            </button>
+          ))}
+        </div>
       </div>
 
       <section id="situaciones-panel" className="situaciones-panel" role="tabpanel" aria-labelledby={`situaciones-tab-${apartado}`}>

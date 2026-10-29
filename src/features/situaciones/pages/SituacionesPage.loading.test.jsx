@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import SituacionesPage from './SituacionesPage'
 
@@ -63,6 +63,30 @@ describe('SituacionesPage: cargas y recuperación', () => {
     fireEvent.keyDown(tabs, { key: 'ArrowRight' })
     expect(programadas).toHaveAttribute('aria-selected', 'true')
     expect(programadas).toHaveFocus()
+  })
+
+  it('expone píldoras de estado y reinicia la página al aplicar un filtro', async () => {
+    apiRequest.mockImplementation(async (path) => path.startsWith(`${base}?`)
+      ? response({ results: [], total_pages: 2 })
+      : defaultRequest(path))
+    render(<SituacionesPage />)
+    await screen.findByText('No hay situaciones especiales registradas.')
+
+    const filtros = screen.getByRole('group', { name: 'Filtrar por estado' })
+    const todas = within(filtros).getByRole('button', { name: 'Todas' })
+    const activas = within(filtros).getByRole('button', { name: 'Activas' })
+    const inactivas = within(filtros).getByRole('button', { name: 'Inactivas' })
+    expect(activas).toHaveAttribute('aria-pressed', 'true')
+    expect(todas).toHaveAttribute('aria-pressed', 'false')
+    expect(inactivas).toHaveAttribute('aria-pressed', 'false')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
+    await screen.findByText('Página 2 de 2')
+    fireEvent.click(inactivas)
+
+    await waitFor(() => expect(apiRequest).toHaveBeenCalledWith(`${base}?activa=false&page=1&page_size=15`))
+    expect(inactivas).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('Página 1 de 2')).toBeInTheDocument()
   })
 
   it('bloquea el registro mientras carga el catálogo y permite reintentar si falla', async () => {

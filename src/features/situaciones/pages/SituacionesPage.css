@@ -13,15 +13,7 @@
   gap: .6rem;
 }
 
-.situaciones-kit .situaciones-filter-label {
-  color: var(--tv-fg);
-  font-size: .85rem;
-  font-weight: 600;
-}
-
-.situaciones-kit .situaciones-filter {
-  width: min(100%, 240px);
-}
+.situaciones-kit .situaciones-filter-pills { min-width: 0; }
 
 .situaciones-kit .situaciones-panel { min-width: 0; }
 .situaciones-kit .situaciones-table-card { padding: 0; overflow: hidden; }
@@ -203,8 +195,6 @@
 .situaciones-kit .dias-rango-info { margin: -.25rem 0 0; color: var(--tv-primary-text); font-size: .82rem; font-weight: 600; }
 
 @media (max-width: 640px) {
-  .situaciones-kit .situaciones-filter { width: 100%; }
-  .situaciones-kit .situaciones-filter-label { width: 100%; }
   .situaciones-kit .situaciones-pagination { justify-content: stretch; }
   .situaciones-kit .situaciones-pagination .tuvet-btn { flex: 1; }
   .situaciones-kit .situaciones-pagination-info { width: 100%; text-align: center; }
