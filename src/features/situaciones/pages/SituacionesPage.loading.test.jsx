@@ -51,6 +51,20 @@ describe('SituacionesPage: cargas y recuperación', () => {
     apiRequest.mockReset().mockImplementation(async (path) => defaultRequest(path))
   })
 
+  it('expone pestañas seleccionables con semántica y navegación por flechas', async () => {
+    render(<SituacionesPage />)
+    await screen.findByText('No hay situaciones especiales registradas.')
+
+    const tabs = screen.getByRole('tablist', { name: 'Situaciones especiales' })
+    const todas = screen.getByRole('tab', { name: 'Todas' })
+    const programadas = screen.getByRole('tab', { name: 'Vacaciones programadas' })
+
+    expect(todas).toHaveAttribute('aria-selected', 'true')
+    fireEvent.keyDown(tabs, { key: 'ArrowRight' })
+    expect(programadas).toHaveAttribute('aria-selected', 'true')
+    expect(programadas).toHaveFocus()
+  })
+
   it('bloquea el registro mientras carga el catálogo y permite reintentar si falla', async () => {
     const carga = deferred()
     let reintento = false
@@ -199,7 +213,7 @@ describe('SituacionesPage: cargas y recuperación', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Situaciones no disponibles')
     expect(screen.queryByText('No hay situaciones especiales registradas.')).not.toBeInTheDocument()
     falla = false
-    fireEvent.click(screen.getByRole('button', { name: 'Reintentar situaciones' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
     await screen.findByText('No hay situaciones especiales registradas.')
   })
 })
