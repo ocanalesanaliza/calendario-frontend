@@ -22,7 +22,7 @@ function deferred() {
 describe('OrganizacionPage', () => {
   beforeEach(() => {
     Object.values(service).forEach((mock) => mock.mockReset())
-    service.getCompanies.mockResolvedValue([{ id: 1, name: 'Analiza' }])
+    service.getCompanies.mockResolvedValue([{ id: 1, name: 'Analiza', modulo_calendario: 'tareas' }])
     service.getRegions.mockResolvedValue([{ id: 2, name: 'Centroamérica' }])
     service.getCountries.mockResolvedValue([{ id: 3, name: 'Honduras' }])
     service.createCompany.mockResolvedValue({ id: 4, name: 'Nueva compañía' })
@@ -41,12 +41,36 @@ describe('OrganizacionPage', () => {
     expect(await screen.findByText('Honduras')).toBeInTheDocument()
   })
 
+  it('filters companies by module and clears the dependent hierarchy when it changes', async () => {
+    service.getCompanies.mockResolvedValue([
+      { id: 1, name: 'Analiza', modulo_calendario: 'tareas' },
+      { id: 2, name: 'Tuvet', modulo_calendario: 'tuvet' },
+    ])
+    render(<OrganizacionPage />)
+
+    const company = await screen.findByLabelText('Compañía')
+    expect(screen.getByRole('option', { name: 'Analiza' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Tuvet' })).not.toBeInTheDocument()
+    fireEvent.change(company, { target: { value: '1' } })
+    await waitFor(() => expect(service.getRegions).toHaveBeenCalledWith('1'))
+
+    fireEvent.change(screen.getByLabelText('Módulo de la jerarquía'), { target: { value: 'tuvet' } })
+
+    expect(screen.getByRole('option', { name: 'Tuvet' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Analiza' })).not.toBeInTheDocument()
+    expect(company).toHaveValue('')
+    expect(screen.getByText('Selecciona una compañía para cargar sus regiones.')).toBeInTheDocument()
+  })
+
   it('creates each level with the confirmed POST bodies', async () => {
     render(<OrganizacionPage />)
     await screen.findByLabelText('Compañía')
     fireEvent.change(screen.getByLabelText('Nueva compañía'), { target: { value: 'Nueva compañía' } })
     fireEvent.click(screen.getByRole('button', { name: 'Crear compañía' }))
-    await waitFor(() => expect(service.createCompany).toHaveBeenCalledWith({ name: 'Nueva compañía' }))
+    await waitFor(() => expect(service.createCompany).toHaveBeenCalledWith({
+      name: 'Nueva compañía',
+      modulo_calendario: 'tareas',
+    }))
 
     fireEvent.change(screen.getByLabelText('Compañía'), { target: { value: '1' } })
     const region = await screen.findByLabelText('Región')
@@ -59,6 +83,20 @@ describe('OrganizacionPage', () => {
     fireEvent.change(screen.getByLabelText('Nuevo país'), { target: { value: 'Nuevo país' } })
     fireEvent.click(screen.getByRole('button', { name: 'Crear país' }))
     await waitFor(() => expect(service.createCountry).toHaveBeenCalledWith({ region_id: 2, name: 'Nuevo país' }))
+  })
+
+  it('creates a company in the hierarchy module without a redundant module field', async () => {
+    render(<OrganizacionPage />)
+    await screen.findByLabelText('Compañía')
+    expect(screen.queryByLabelText('Módulo', { exact: true })).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Módulo de la jerarquía'), { target: { value: 'tuvet' } })
+    fireEvent.change(screen.getByLabelText('Nueva compañía'), { target: { value: 'Tuvet nueva' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Crear compañía' }))
+
+    await waitFor(() => expect(service.createCompany).toHaveBeenCalledWith({
+      name: 'Tuvet nueva',
+      modulo_calendario: 'tuvet',
+    }))
   })
 
   it('shows explicit conflict and unavailable-parent errors', async () => {
@@ -106,7 +144,10 @@ describe('OrganizacionPage', () => {
     const secondRegions = deferred()
     const firstCountries = deferred()
     const secondCountries = deferred()
-    service.getCompanies.mockResolvedValue([{ id: 1, name: 'Analiza' }, { id: 2, name: 'Global' }])
+    service.getCompanies.mockResolvedValue([
+      { id: 1, name: 'Analiza', modulo_calendario: 'tareas' },
+      { id: 2, name: 'Global', modulo_calendario: 'tareas' },
+    ])
     service.getRegions
       .mockImplementationOnce(() => firstRegions.promise)
       .mockImplementationOnce(() => secondRegions.promise)

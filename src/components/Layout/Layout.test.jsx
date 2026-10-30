@@ -291,21 +291,21 @@ describe('Layout Mis tareas navigation', () => {
     expect(document.querySelector('.sidebar-toggle')).toBeNull()
   })
 
-  it('no muestra Calendario Tuvet en el menú y ofrece Cambiar de empresa a Sistemas', async () => {
+  it('no muestra Calendario Tuvet en el menú y ofrece cambiar todo el contexto a Sistemas', async () => {
     useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true, nombre: 'Sistemas' }, logout: vi.fn() })
     render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
 
     expect(screen.queryByRole('link', { name: 'Calendario Tuvet' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Menú de Sistemas' }))
-    expect(screen.getByRole('menuitem', { name: 'Cambiar de empresa' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Cambiar módulo, organización o país' })).toBeInTheDocument()
   })
 
-  it('no ofrece Cambiar de empresa a perfiles que no son de Sistemas', () => {
+  it('no ofrece cambiar el contexto a perfiles que no son de Sistemas', () => {
     useAuth.mockReturnValue({ perfil: { type: 'gerente_area', nombre: 'Gerente' }, logout: vi.fn() })
     render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
 
     fireEvent.click(screen.getByRole('button', { name: 'Menú de Gerente' }))
-    expect(screen.queryByRole('menuitem', { name: 'Cambiar de empresa' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Cambiar módulo, organización o país' })).not.toBeInTheDocument()
   })
 
   it.each([

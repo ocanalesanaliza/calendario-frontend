@@ -6,6 +6,7 @@ import { getCoberturas } from '../../features/coberturas/services/coberturasServ
 import { getSolicitudesVacacion } from '../../features/vacacionesProgramadas/services/vacacionesProgramadasService'
 import { getProfileCapabilities } from '../../features/auth/profilePolicies'
 import { useApariencia } from '../../features/apariencia/AparienciaContext'
+import { clearOrganizationContext } from '../../services/organizationContext'
 import './Layout.css'
 
 const NAV_CATEGORY_KEYS = ['dia-a-dia', 'gestion', 'personas', 'analitica', 'administracion']
@@ -654,14 +655,14 @@ function Layout() {
                   Perfil
                 </button>
                 {isSystemsAccount && (
-                  <button type="button" role="menuitem" className="dropdown-item" onClick={() => { setDropdownOpen(false); navigate('/empresas') }}>
+                  <button type="button" role="menuitem" className="dropdown-item" onClick={() => { clearOrganizationContext(); setDropdownOpen(false); navigate('/empresas') }}>
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <polyline points="17 1 21 5 17 9" />
                       <path d="M3 11V9a4 4 0 0 1 4-4h14" />
                       <polyline points="7 23 3 19 7 15" />
                       <path d="M21 13v2a4 4 0 0 1-4 4H3" />
                     </svg>
-                    Cambiar de empresa
+                    Cambiar módulo, organización o país
                   </button>
                 )}
                 <div className="dropdown-separator" role="separator" />

@@ -7,6 +7,7 @@ import {
   getCountries,
   getRegions,
 } from '../services/organizacionService'
+import { getOrganizationContext } from '../../../services/organizationContext'
 import './OrganizacionPage.css'
 
 const items = (data) => Array.isArray(data) ? data : data?.results || []
@@ -25,6 +26,7 @@ function HierarchySection({ title, children }) {
 }
 
 export default function OrganizacionPage() {
+  const initialModule = getOrganizationContext()?.modulo_calendario ?? 'tareas'
   const [companies, setCompanies] = useState([])
   const [regions, setRegions] = useState([])
   const [countries, setCountries] = useState([])
@@ -37,6 +39,7 @@ export default function OrganizacionPage() {
   const [regionsError, setRegionsError] = useState('')
   const [countriesError, setCountriesError] = useState('')
   const [companyName, setCompanyName] = useState('')
+  const [moduleFilter, setModuleFilter] = useState(initialModule)
   const [regionName, setRegionName] = useState('')
   const [countryName, setCountryName] = useState('')
   const [saving, setSaving] = useState('')
@@ -101,6 +104,11 @@ export default function OrganizacionPage() {
     if (id) void loadRegions(id)
   }
 
+  function selectModule(module) {
+    setModuleFilter(module)
+    selectCompany('')
+  }
+
   function selectRegion(id) {
     ++countriesRequest.current
     setRegionId(id)
@@ -115,8 +123,9 @@ export default function OrganizacionPage() {
     if (!name) { setFormError('El nombre de la compañía es obligatorio.'); return }
     setSaving('company'); setFormError(''); setNotice('')
     try {
-      const created = await createCompany({ name })
+      const created = await createCompany({ name, modulo_calendario: moduleFilter })
       await loadCompanies()
+      setModuleFilter(created.modulo_calendario ?? moduleFilter)
       selectCompany(String(entityId(created)))
       setCompanyName('')
       setNotice('Compañía creada correctamente.')
@@ -150,13 +159,18 @@ export default function OrganizacionPage() {
     } catch (error) { setFormError(errorMessage(error, 'país', 'La región')) } finally { setSaving('') }
   }
 
+  const visibleCompanies = companies.filter(
+    (company) => company.modulo_calendario === moduleFilter,
+  )
+
   return <div className="organizacion-page">
     <div className="organizacion-page-header"><div><h1>Organización</h1><p>Administra la jerarquía de compañías, regiones y países.</p></div></div>
     {notice && <p className="organizacion-notice" role="status">{notice}</p>}
     {formError && <p className="organizacion-form-error" role="alert">{formError}</p>}
     <div className="organizacion-hierarchy">
       <HierarchySection title="Compañías">
-        {companiesLoading ? <p className="organizacion-state" role="status">Cargando compañías...</p> : companiesError ? <div className="organizacion-error-state" role="alert"><p>{companiesError}</p><button type="button" className="organizacion-button organizacion-button-secondary" onClick={loadCompanies}>Reintentar</button></div> : <label className="organizacion-field">Compañía<select value={companyId} onChange={(event) => selectCompany(event.target.value)}><option value="">Seleccionar compañía</option>{companies.map((company) => <option key={entityId(company)} value={entityId(company)}>{entityName(company)}</option>)}</select></label>}
+        <label className="organizacion-field">Módulo de la jerarquía<select value={moduleFilter} onChange={(event) => selectModule(event.target.value)}><option value="tareas">Calendario de tareas</option><option value="tuvet">Calendario Tuvet</option></select></label>
+        {companiesLoading ? <p className="organizacion-state" role="status">Cargando compañías...</p> : companiesError ? <div className="organizacion-error-state" role="alert"><p>{companiesError}</p><button type="button" className="organizacion-button organizacion-button-secondary" onClick={loadCompanies}>Reintentar</button></div> : <label className="organizacion-field">Compañía<select value={companyId} onChange={(event) => selectCompany(event.target.value)}><option value="">Seleccionar compañía</option>{visibleCompanies.map((company) => <option key={entityId(company)} value={entityId(company)}>{entityName(company)}</option>)}</select></label>}
         <form className="organizacion-form" onSubmit={submitCompany}><label className="organizacion-field">Nueva compañía<input value={companyName} onChange={(event) => setCompanyName(event.target.value)} disabled={saving === 'company'} required /></label><button className="organizacion-button" disabled={saving === 'company'}>{saving === 'company' ? 'Creando...' : 'Crear compañía'}</button></form>
       </HierarchySection>
       <HierarchySection title="Regiones">

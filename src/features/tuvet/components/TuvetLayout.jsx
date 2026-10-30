@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/context/AuthContext'
+import { clearOrganizationContext } from '../../../services/organizationContext'
 import { getTuvetCapabilities, tuvetRoleLabel } from '../tuvetPolicies'
 import { useApariencia } from '../../apariencia/AparienciaContext'
 import '../../../components/Layout/Layout.css'
@@ -88,9 +89,9 @@ export default function TuvetLayout() {
             {menuAbierto && (
               <div className="dropdown-menu" role="menu">
                 {capacidades.isSystemsAccount && (
-                  <button type="button" role="menuitem" className="dropdown-item" onClick={() => { setMenuAbierto(false); navigate('/empresas') }}>
+                  <button type="button" role="menuitem" className="dropdown-item" onClick={() => { clearOrganizationContext(); setMenuAbierto(false); navigate('/empresas') }}>
                     <Icono nombre="cambiar" />
-                    Cambiar de empresa
+                    Cambiar módulo, organización o país
                   </button>
                 )}
                 <button type="button" role="menuitem" className="dropdown-item danger" onClick={cerrarSesion}>Cerrar sesión</button>
@@ -119,7 +120,7 @@ export default function TuvetLayout() {
                 <div className="nav-group-items">
                   <NavLink to="/empresas" className="nav-item">
                     <Icono nombre="cambiar" />
-                    <span className="nav-item-label">Cambiar de empresa</span>
+                    <span className="nav-item-label">Cambiar módulo, organización o país</span>
                   </NavLink>
                 </div>
               </div>
