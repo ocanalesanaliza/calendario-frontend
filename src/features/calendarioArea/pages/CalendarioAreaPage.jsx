@@ -146,7 +146,8 @@ function OccurrenceDialog({ occurrence, onClose, onComplete, onReschedule }) {
   const commandKeyRef = useRef(null)
   const titleId = 'occurrence-dialog-title'
   const descriptionId = 'occurrence-dialog-description'
-  const pending = occurrence.status === 'pendiente'
+  const canComplete = occurrence.status === 'pendiente' || occurrence.status === 'diferida'
+  const canReschedule = occurrence.status === 'pendiente'
 
   useEffect(() => {
     closeButton.current?.focus()
@@ -212,18 +213,18 @@ function OccurrenceDialog({ occurrence, onClose, onComplete, onReschedule }) {
           {coverage?.aplica_ambas_jornadas !== undefined && <><dt>Cobertura</dt><dd>{coverage.aplica_ambas_jornadas ? 'Ambas jornadas' : 'Una jornada'}</dd></>}
         </dl>
         {error && <p className="calendar-modal__error" role="alert">{error}</p>}
-        {pending && !mode && <div className="calendar-modal__actions">
+        {canComplete && !mode && <div className="calendar-modal__actions">
           <button type="button" className="calendar-modal__button calendar-modal__button--primary" onClick={() => selectMode('complete')}>Completar</button>
-          <button type="button" className="calendar-modal__button calendar-modal__button--primary" onClick={() => selectMode('reschedule')}>Reprogramar</button>
+          {canReschedule && <button type="button" className="calendar-modal__button calendar-modal__button--primary" onClick={() => selectMode('reschedule')}>Reprogramar</button>}
         </div>}
-        {pending && mode === 'complete' && <form className="calendar-modal__form" onSubmit={submit}>
+        {canComplete && mode === 'complete' && <form className="calendar-modal__form" onSubmit={submit}>
           <p className="calendar-modal__confirmation">¿Confirmas que deseas completar esta ocurrencia?</p>
           <div className="calendar-modal__footer">
             <button type="button" className="calendar-modal__button calendar-modal__button--secondary" disabled={submitting} onClick={() => setMode(null)}>Cancelar</button>
             <button type="submit" className="calendar-modal__button calendar-modal__button--primary" disabled={submitting}>{submitting ? 'Completando...' : 'Confirmar completar'}</button>
           </div>
         </form>}
-        {pending && mode === 'reschedule' && <form className="calendar-modal__form" onSubmit={submit}>
+        {canReschedule && mode === 'reschedule' && <form className="calendar-modal__form" onSubmit={submit}>
           <div className="calendar-modal__field">
             <label className="calendar-modal__label" htmlFor="occurrence-target-date">Nueva fecha</label>
             <input className="calendar-modal__control" id="occurrence-target-date" type="date" required value={targetDate} disabled={submitting} onChange={(event) => setTargetDate(event.target.value)} />

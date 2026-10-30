@@ -196,6 +196,16 @@ describe('CalendarioAreaPage', () => {
     expect(screen.getByRole('button', { name: 'Reprogramar' })).toBeInTheDocument()
   })
 
+  it('allows completing a deferred occurrence without allowing it to be rescheduled again', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [{ ...occurrence, status: 'diferida' }] })
+    render(<CalendarioAreaPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Auditoría/ }))
+
+    expect(screen.getByRole('button', { name: 'Completar' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reprogramar' })).not.toBeInTheDocument()
+  })
+
   it('does not expose commands for a non-pending occurrence', async () => {
     getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [{ ...occurrence, status: 'scheduled', coverage_snapshot: undefined, template: undefined, template_version: undefined }] })
     render(<CalendarioAreaPage />)
