@@ -1,4 +1,5 @@
 import { clearTokens, getAccessToken, getRefreshToken, setAccessToken } from './tokenStorage'
+import { getOrganizationContext } from './organizationContext'
 
 const BASE_URL = import.meta.env.VITE_API_URL
 
@@ -57,10 +58,15 @@ async function doRefresh() {
 
 export async function apiRequest(path, options = {}) {
   const access = getAccessToken()
+  const organizationContext = getOrganizationContext()
 
   const headers = {
     'Content-Type': 'application/json',
     ...(access ? { Authorization: `Bearer ${access}` } : {}),
+    ...(organizationContext ? {
+      'X-Calendar-Company-ID': String(organizationContext.company_id),
+      'X-Calendar-Country-ID': String(organizationContext.country_id),
+    } : {}),
     ...options.headers,
   }
 

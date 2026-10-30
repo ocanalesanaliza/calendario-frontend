@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/context/AuthContext'
-import { getCompanies } from '../../organizacion/services/organizacionService'
+import { getCompanies, getCountries, getRegions } from '../../organizacion/services/organizacionService'
+import { clearOrganizationContext, setOrganizationContext } from '../../../services/organizationContext'
 import './SelectorEmpresaPage.css'
 
-// Destino y presentación de cada módulo de calendario.
 const MODULOS = {
   tareas: {
     destino: '/calendario',
@@ -18,26 +18,18 @@ const MODULOS = {
   },
 }
 
-// Tarjeta de respaldo por módulo. Analiza es el calendario legado: sus usuarios no tienen
-// empresa registrada (sin OrganizationIdentity cuentan como módulo "tareas"), así que puede
-// no existir como fila en organization_company y aun así debe ofrecerse.
-const EMPRESAS_POR_DEFECTO = [
-  { id: 'tareas', name: 'Analiza', modulo_calendario: 'tareas' },
-  { id: 'tuvet', name: 'Tuvet', modulo_calendario: 'tuvet' },
-]
-
 const lista = (data) => (Array.isArray(data) ? data : data?.results ?? [])
 
-// Empresas registradas + una tarjeta de respaldo por cada módulo que no tenga ninguna.
-function empresasConModulo(registradas) {
-  const conModulo = registradas.filter((empresa) => MODULOS[empresa.modulo_calendario])
-  const faltantes = EMPRESAS_POR_DEFECTO.filter(
-    (respaldo) => !conModulo.some((empresa) => empresa.modulo_calendario === respaldo.modulo_calendario),
-  )
-  const orden = Object.keys(MODULOS)
-  return [...conModulo, ...faltantes].sort(
-    (a, b) => orden.indexOf(a.modulo_calendario) - orden.indexOf(b.modulo_calendario),
-  )
+async function empresasConPaises(registradas) {
+  return Promise.all(registradas.filter(
+    (empresa) => MODULOS[empresa.modulo_calendario],
+  ).map(async (empresa) => {
+    const regiones = lista(await getRegions(empresa.id))
+    const paises = (await Promise.all(
+      regiones.map((region) => getCountries(region.id).then(lista)),
+    )).flat()
+    return { ...empresa, paises }
+  }))
 }
 
 function IconoModulo({ modulo }) {
@@ -55,22 +47,26 @@ function IconoModulo({ modulo }) {
 }
 
 export default function SelectorEmpresaPage() {
-  const { perfil, logout } = useAuth()
+  const { perfil, logout, refreshProfile } = useAuth()
   const navigate = useNavigate()
   const [empresas, setEmpresas] = useState(null)
+  const [moduloSeleccionado, setModuloSeleccionado] = useState('')
+  const [empresaSeleccionadaId, setEmpresaSeleccionadaId] = useState('')
   const [aviso, setAviso] = useState('')
+  const [entrando, setEntrando] = useState(false)
 
   useEffect(() => {
     let cancelado = false
+    clearOrganizationContext()
     getCompanies()
+      .then((data) => empresasConPaises(lista(data)))
       .then((data) => {
-        if (cancelado) return
-        setEmpresas(empresasConModulo(lista(data)))
+        if (!cancelado) setEmpresas(data)
       })
       .catch(() => {
         if (cancelado) return
-        setEmpresas(EMPRESAS_POR_DEFECTO)
-        setAviso('No se pudo cargar la lista de empresas; se muestran los calendarios disponibles.')
+        setEmpresas([])
+        setAviso('No se pudo cargar la jerarquía de empresas y países.')
       })
     return () => { cancelado = true }
   }, [])
@@ -80,7 +76,42 @@ export default function SelectorEmpresaPage() {
     navigate('/Login')
   }
 
+  async function entrar(empresa, pais) {
+    setEntrando(true)
+    setAviso('')
+    setOrganizationContext({
+      company_id: empresa.id,
+      country_id: pais.id,
+      company_name: empresa.name ?? empresa.nombre,
+      country_name: pais.name ?? pais.nombre,
+      modulo_calendario: empresa.modulo_calendario,
+    })
+    try {
+      const perfilActualizado = await refreshProfile()
+      if (perfilActualizado?.modulo_calendario !== empresa.modulo_calendario) {
+        throw new Error('El backend no confirmó el módulo seleccionado.')
+      }
+      navigate(MODULOS[empresa.modulo_calendario].destino)
+    } catch {
+      clearOrganizationContext()
+      setAviso('No se pudo activar el módulo, la organización y el país seleccionados. Intenta nuevamente.')
+    } finally {
+      setEntrando(false)
+    }
+  }
+
   const nombre = perfil?.nombre?.split(' ')[0]
+  const empresasDelModulo = empresas?.filter(
+    (empresa) => empresa.modulo_calendario === moduloSeleccionado,
+  ) ?? []
+  const empresaSeleccionada = empresasDelModulo.find(
+    (empresa) => String(empresa.id) === empresaSeleccionadaId,
+  ) ?? null
+
+  function seleccionarModulo(modulo) {
+    setModuloSeleccionado(modulo)
+    setEmpresaSeleccionadaId('')
+  }
 
   return (
     <div className="selector-empresa">
@@ -92,8 +123,8 @@ export default function SelectorEmpresaPage() {
       <main className="selector-empresa-contenido" id="contenido-principal">
         <div className="selector-empresa-encabezado">
           <p className="selector-empresa-rol">Cuenta de Sistemas</p>
-          <h1>{nombre ? `Hola, ${nombre}.` : 'Hola.'} ¿A qué empresa quieres entrar?</h1>
-          <p>Elige el calendario que vas a administrar. Podrás cambiar de empresa en cualquier momento desde el menú de usuario.</p>
+          <h1>{nombre ? `Hola, ${nombre}.` : 'Hola.'} Elige módulo, organización y país</h1>
+          <p>Las tres selecciones definen el módulo que abrirás y limitan todas las consultas y cambios al ámbito elegido.</p>
         </div>
 
         {aviso && <p className="selector-empresa-aviso" role="status">{aviso}</p>}
@@ -103,33 +134,91 @@ export default function SelectorEmpresaPage() {
             <div className="selector-empresa-esqueleto" />
             <div className="selector-empresa-esqueleto" />
           </div>
+        ) : empresas.length === 0 ? (
+          <div className="selector-empresa-aviso">
+            <p>No hay empresas configuradas. Crea primero la jerarquía organizacional.</p>
+            <button type="button" className="selector-empresa-configurar" onClick={() => navigate('/organizacion')}>Administrar organización</button>
+          </div>
         ) : (
-          <ul className="selector-empresa-tarjetas">
-            {empresas.map((empresa) => {
-              const modulo = MODULOS[empresa.modulo_calendario]
-              const nombreEmpresa = empresa.name ?? empresa.nombre
-              return (
-                <li key={empresa.id}>
-                  <Link
-                    to={modulo.destino}
-                    className={`selector-empresa-tarjeta selector-empresa-${empresa.modulo_calendario}`}
-                    aria-label={`Entrar a ${nombreEmpresa}: ${modulo.etiqueta}`}
-                  >
-                    <span className="selector-empresa-icono"><IconoModulo modulo={empresa.modulo_calendario} /></span>
-                    <span className="selector-empresa-texto">
-                      <span className="selector-empresa-nombre">{nombreEmpresa}</span>
-                      <span className="selector-empresa-modulo">{modulo.etiqueta}</span>
-                      <span className="selector-empresa-descripcion">{modulo.descripcion}</span>
-                    </span>
-                    <span className="selector-empresa-entrar" aria-hidden="true">
-                      Entrar
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
-                    </span>
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
+          <div className="selector-contexto">
+            <section className="selector-contexto-paso" aria-labelledby="selector-modulo-titulo">
+              <div className="selector-contexto-titulo">
+                <span>1</span>
+                <div><h2 id="selector-modulo-titulo">Módulo</h2><p>Selecciona el calendario que deseas administrar.</p></div>
+              </div>
+              <div className="selector-modulos">
+                {Object.entries(MODULOS).map(([clave, modulo]) => {
+                  const cantidad = empresas.filter((empresa) => empresa.modulo_calendario === clave).length
+                  return (
+                    <button
+                      key={clave}
+                      type="button"
+                      className={`selector-modulo selector-empresa-${clave}${moduloSeleccionado === clave ? ' seleccionado' : ''}`}
+                      aria-pressed={moduloSeleccionado === clave}
+                      onClick={() => seleccionarModulo(clave)}
+                    >
+                      <span className="selector-empresa-icono"><IconoModulo modulo={clave} /></span>
+                      <span className="selector-empresa-texto">
+                        <span className="selector-empresa-modulo">{modulo.etiqueta}</span>
+                        <span className="selector-empresa-descripcion">{modulo.descripcion}</span>
+                        <span className="selector-modulo-cantidad">{cantidad} {cantidad === 1 ? 'organización' : 'organizaciones'}</span>
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
+
+            <section className="selector-contexto-paso" aria-labelledby="selector-organizacion-titulo">
+              <div className="selector-contexto-titulo">
+                <span>2</span>
+                <div><h2 id="selector-organizacion-titulo">Organización</h2><p>Solo aparecen organizaciones configuradas para el módulo elegido.</p></div>
+              </div>
+              {!moduloSeleccionado ? (
+                <p className="selector-contexto-pendiente">Selecciona primero un módulo.</p>
+              ) : empresasDelModulo.length === 0 ? (
+                <div className="selector-contexto-pendiente">
+                  <p>No hay organizaciones configuradas para {MODULOS[moduloSeleccionado].etiqueta}.</p>
+                  <button type="button" className="selector-empresa-configurar" onClick={() => navigate('/organizacion')}>Administrar organización</button>
+                </div>
+              ) : (
+                <label className="selector-organizacion-campo">
+                  Organización
+                  <select value={empresaSeleccionadaId} onChange={(event) => setEmpresaSeleccionadaId(event.target.value)}>
+                    <option value="">Seleccionar organización</option>
+                    {empresasDelModulo.map((empresa) => (
+                      <option key={empresa.id} value={empresa.id}>{empresa.name ?? empresa.nombre}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </section>
+
+            <section className="selector-contexto-paso" aria-labelledby="selector-pais-titulo">
+              <div className="selector-contexto-titulo">
+                <span>3</span>
+                <div><h2 id="selector-pais-titulo">País</h2><p>Entrarás únicamente al territorio seleccionado.</p></div>
+              </div>
+              {!empresaSeleccionada ? (
+                <p className="selector-contexto-pendiente">Selecciona primero una organización.</p>
+              ) : empresaSeleccionada.paises.length ? (
+                <div className={`selector-paises selector-empresa-${moduloSeleccionado}`}>
+                  {empresaSeleccionada.paises.map((pais) => (
+                    <button
+                      key={pais.id}
+                      type="button"
+                      className="selector-empresa-entrar"
+                      disabled={entrando}
+                      onClick={() => entrar(empresaSeleccionada, pais)}
+                    >
+                      {entrando ? 'Activando contexto...' : `Entrar en ${pais.name ?? pais.nombre}`}
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
+                    </button>
+                  ))}
+                </div>
+              ) : <span className="selector-empresa-sin-pais">Configura al menos un país para entrar.</span>}
+            </section>
+          </div>
         )}
       </main>
     </div>

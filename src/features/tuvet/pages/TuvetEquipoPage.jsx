@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../auth/context/AuthContext'
 import { getCompanies } from '../../organizacion/services/organizacionService'
+import { getOrganizationContext } from '../../../services/organizationContext'
 import {
   Avatar,
   Aviso,
@@ -103,8 +104,11 @@ function useEmpresasTuvet(enabled) {
     getCompanies()
       .then((data) => {
         const lista = listItems(data)
-        const tuvet = lista.filter((empresa) => empresa.modulo_calendario === 'tuvet')
-        setEmpresas(tuvet.length ? tuvet : lista)
+        const context = getOrganizationContext()
+        setEmpresas(lista.filter(
+          (empresa) => empresa.modulo_calendario === 'tuvet'
+            && Number(empresa.id) === Number(context?.company_id),
+        ))
       })
       .catch(() => setEmpresas([]))
   }, [enabled])

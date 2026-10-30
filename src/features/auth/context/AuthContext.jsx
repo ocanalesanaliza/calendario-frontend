@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { getCurrentProfile } from '../services/authService'
 import { clearTokens, getAccessToken, setTokens } from '../../../services/tokenStorage'
+import { clearOrganizationContext } from '../../../services/organizationContext'
 
 const AuthContext = createContext(null)
 
@@ -33,7 +34,14 @@ export function AuthProvider({ children }) {
     }
   }, [accessToken])
 
+  async function refreshProfile() {
+    const currentProfile = await getCurrentProfile()
+    setPerfil(currentProfile)
+    return currentProfile
+  }
+
   function setAuthData(access, refresh, remember) {
+    clearOrganizationContext()
     setTokens(access, refresh, remember)
     setPerfil(null)
     setPerfilLoading(true)
@@ -48,13 +56,14 @@ export function AuthProvider({ children }) {
   }
 
   function logout() {
+    clearOrganizationContext()
     clearTokens()
     setPerfil(null)
     setAccessToken(null)
   }
 
   return (
-    <AuthContext.Provider value={{ perfil, perfilLoading, setAuthData, revokeMyTasksAccess, logout }}>
+    <AuthContext.Provider value={{ perfil, perfilLoading, refreshProfile, setAuthData, revokeMyTasksAccess, logout }}>
       {children}
     </AuthContext.Provider>
   )
