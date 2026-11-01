@@ -5,13 +5,14 @@ import MisTareasPage from './MisTareasPage'
 import MisTareasV2Page from './MisTareasV2Page'
 import { MisTareasRoute } from '../../../App'
 
-const { getMisTareas, registrarTarea, registrarTareasLote, getTrabajosCampo, aceptarTrabajoCampo, rechazarTrabajoCampo, getRevisionGuardia, guardarRevisionGuardia } = vi.hoisted(() => ({ getMisTareas: vi.fn(), registrarTarea: vi.fn(), registrarTareasLote: vi.fn(), getTrabajosCampo: vi.fn(), aceptarTrabajoCampo: vi.fn(), rechazarTrabajoCampo: vi.fn(), getRevisionGuardia: vi.fn(), guardarRevisionGuardia: vi.fn() }))
+const { getMisTareas, registrarTarea, registrarTareasLote, getTrabajosCampo, aceptarTrabajoCampo, rechazarTrabajoCampo, getRevisionGuardia, guardarRevisionGuardia, openDepositReport } = vi.hoisted(() => ({ getMisTareas: vi.fn(), registrarTarea: vi.fn(), registrarTareasLote: vi.fn(), getTrabajosCampo: vi.fn(), aceptarTrabajoCampo: vi.fn(), rechazarTrabajoCampo: vi.fn(), getRevisionGuardia: vi.fn(), guardarRevisionGuardia: vi.fn(), openDepositReport: vi.fn() }))
 let perfil = { type: 'gerente_sucursal', sucursal: { nombre: 'Sucursal Norte' } }
 const revokeMyTasksAccess = vi.fn()
 
 vi.mock('../services/operacionService', () => ({ getMisTareas, registrarTarea, registrarTareasLote }))
 vi.mock('../../trabajosCampo/services/trabajosCampoService', () => ({ getTrabajosCampo, aceptarTrabajoCampo, rechazarTrabajoCampo }))
 vi.mock('../services/revisionesGuardiaService', () => ({ getRevisionGuardia, guardarRevisionGuardia }))
+vi.mock('../services/depositService', () => ({ openDepositReport }))
 vi.mock('../../auth/context/AuthContext', () => ({ useAuth: () => ({ perfil, revokeMyTasksAccess }) }))
 
 const taskResponse = { meta: { fecha_consultada: '2026-09-05', fecha_servidor: '2026-09-05', hora_servidor: '10:00', jornada_servidor: 'manana' }, resumen: { total: 1, disponibles: 1, registradas: 0, cerradas: 0, bloqueadas: 0, manana: { total: 1 }, tarde: { total: 0 } }, results: [{ id_sucursal_tarea: 44, jornada: 'manana', hora: '09:00', hora_fin_registro: '18:00', disponible_para_registro: true, estado_ui: 'disponible', estado_ui_label: 'Disponible', tarea: { id_tarea: 18, nombre: 'Envio de deposito de Sucursal.' } }] }
@@ -41,25 +42,53 @@ function renderProtectedMisTareasRoutes(entries = ['/mis-tareas'], initialIndex)
 }
 
 describe('MisTareasPage deposit demonstrations', () => {
-  beforeEach(() => { perfil = { type: 'gerente_sucursal', can_access_my_tasks: true, sucursal: { nombre: 'Sucursal Norte' } }; getMisTareas.mockReset().mockResolvedValue(taskResponse); getTrabajosCampo.mockReset().mockResolvedValue({ results: [] }); registrarTarea.mockReset(); registrarTareasLote.mockReset(); aceptarTrabajoCampo.mockReset(); rechazarTrabajoCampo.mockReset(); getRevisionGuardia.mockReset(); guardarRevisionGuardia.mockReset(); revokeMyTasksAccess.mockReset() })
+  beforeEach(() => { perfil = { type: 'gerente_sucursal', can_access_my_tasks: true, sucursal: { nombre: 'Sucursal Norte' } }; getMisTareas.mockReset().mockResolvedValue(taskResponse); getTrabajosCampo.mockReset().mockResolvedValue({ results: [] }); registrarTarea.mockReset(); registrarTareasLote.mockReset(); aceptarTrabajoCampo.mockReset(); rechazarTrabajoCampo.mockReset(); getRevisionGuardia.mockReset(); guardarRevisionGuardia.mockReset(); openDepositReport.mockReset().mockResolvedValue({ report: { id: 'opaque-report-id', state: 'draft', optimistic_version: 1, occurrence: { execution_date: '2026-09-05', scheduled_shift: 'manana', branch_code: 'NORTE' }, closures: [], receipts: [], submission: null } }); revokeMyTasksAccess.mockReset() })
 
-  it('uses the standard confirmation flow for the branch deposit task', async () => {
-    registrarTarea.mockResolvedValue({})
+  it('opens the real deposit report flow for a GS deposit task', async () => {
+    getMisTareas.mockResolvedValue({
+      ...taskResponse,
+      results: [{ ...taskResponse.results[0], tarea: { ...taskResponse.results[0].tarea, modo_cumplimiento: 'deposit' } }],
+    })
 
     render(<MemoryRouter><MisTareasPage /></MemoryRouter>)
     const checkbox = await screen.findByRole('checkbox', { name: /Seleccionar Envio de deposito/i })
     fireEvent.click(checkbox)
     fireEvent.click(screen.getByRole('button', { name: /Registrar 1 tarea/i }))
-    expect(await screen.findByRole('button', { name: 'Confirmar' })).toBeInTheDocument()
-    expect(screen.queryByRole('dialog', { name: 'Registrar depósito' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: 'Registrar depósito' })).toBeInTheDocument()
+    expect(openDepositReport).toHaveBeenCalledWith({ sucursal_tarea_id: 44 })
+    expect(registrarTarea).not.toHaveBeenCalled()
+  })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
+  it('does not send deposit tasks through the generic bulk endpoint', async () => {
+    getMisTareas.mockResolvedValue({
+      ...taskResponse,
+      results: [{ ...taskResponse.results[0], tarea: { ...taskResponse.results[0].tarea, modo_cumplimiento: 'deposit' } }],
+    })
+    render(<MemoryRouter><MisTareasPage /></MemoryRouter>)
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Seleccionar Envio de deposito/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Registrar 1 tarea/i }))
 
-    await waitFor(() => expect(registrarTarea).toHaveBeenCalledWith({
-      id_tarea: 18,
-      fecha: '2026-09-05',
-      notas: undefined,
-    }))
+    expect(await screen.findByRole('dialog', { name: 'Registrar depósito' })).toBeInTheDocument()
+    expect(registrarTareasLote).not.toHaveBeenCalled()
+    expect(registrarTarea).not.toHaveBeenCalled()
+  })
+
+  it('blocks a mixed bulk selection containing a deposit task', async () => {
+    getMisTareas.mockResolvedValue({
+      ...taskResponse,
+      resumen: { ...taskResponse.resumen, total: 2, disponibles: 2, manana: { total: 2 } },
+      results: [
+        { ...taskResponse.results[0], tarea: { ...taskResponse.results[0].tarea, modo_cumplimiento: 'deposit' } },
+        { ...taskResponse.results[0], id_sucursal_tarea: 45, tarea: { id_tarea: 19, nombre: 'Tarea ordinaria' } },
+      ],
+    })
+    render(<MemoryRouter><MisTareasPage /></MemoryRouter>)
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Seleccionar Envio de deposito/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Seleccionar Tarea ordinaria' }))
+
+    expect(screen.getByText(/Los depósitos se registran individualmente/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Registrar 2 tareas/i })).toBeDisabled()
+    expect(registrarTareasLote).not.toHaveBeenCalled()
   })
 
   it('renders the compact task overview with an explicit active jornada', async () => {

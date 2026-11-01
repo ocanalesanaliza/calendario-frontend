@@ -296,6 +296,11 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
       setRevisionGuardiaTask(tarea)
       return
     }
+    if (tarea.tarea?.modo_cumplimiento === 'deposit') {
+      setSeleccionadas([])
+      setDepositTask(tarea)
+      return
+    }
     setRegistrando(tarea.id_sucursal_tarea)
     setRegError('')
   }
@@ -309,6 +314,10 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
   async function handleRegistrarSeleccionadas() {
     const isCurrentAction = getActionContext()
     const tareas = tareasFiltradas.filter((t) => seleccionadas.includes(t.id_sucursal_tarea))
+    if (tareas.some((tarea) => tarea.tarea?.modo_cumplimiento === 'deposit')) {
+      setLoteError('Los depósitos se registran individualmente desde su flujo estructurado.')
+      return
+    }
     setRegistrandoLote(true)
     setLoteError('')
     let accessRevoked = false
@@ -352,6 +361,8 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
     [availableFilterActive, availableFilterVariant, tareasDeJornada],
   )
   const resumen = data?.resumen
+  const selectedTasks = tareasFiltradas.filter((tarea) => seleccionadas.includes(tarea.id_sucursal_tarea))
+  const mixedSelectionHasDeposit = selectedTasks.length > 1 && selectedTasks.some((tarea) => tarea.tarea?.modo_cumplimiento === 'deposit')
 
   function clearHiddenSelections(tasks) {
     const visibleTaskIds = new Set(
@@ -647,6 +658,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
           ) : (
             <>
               {loteError && <p className="reg-error">{loteError}</p>}
+              {mixedSelectionHasDeposit && <p className="reg-error" role="status">Los depósitos se registran individualmente desde su flujo estructurado.</p>}
               <div className="seleccion-actions">
                 <button className="btn-secondary-sm" onClick={() => setSeleccionadas([])} disabled={busy}>
                   Cancelar selección
@@ -660,7 +672,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
                       handleRegistrarSeleccionadas()
                     }
                   }}
-                  disabled={busy}
+                  disabled={busy || mixedSelectionHasDeposit}
                 >
                   {registrandoLote ? 'Registrando...' : `Registrar ${seleccionadas.length} ${seleccionadas.length === 1 ? 'tarea' : 'tareas'}`}
                 </button>
