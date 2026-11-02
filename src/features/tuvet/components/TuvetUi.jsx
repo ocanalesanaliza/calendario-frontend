@@ -94,7 +94,7 @@ export function EstadoCarga({ loading, error, onRetry, empty, emptyText, emptyAc
 const pilaModales = []
 const FOCUSABLES = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-export function Modal({ title, subtitle, icon, tone = 'primary', onClose, children, footer, wide = false, role = 'dialog' }) {
+export function Modal({ title, subtitle, icon, tone = 'primary', onClose, children, footer, wide = false, role = 'dialog', className = '' }) {
   const titleId = useId()
   const dialogRef = useRef(null)
   const onCloseRef = useRef(onClose)
@@ -143,7 +143,7 @@ export function Modal({ title, subtitle, icon, tone = 'primary', onClose, childr
 
   return (
     <div className="tuvet-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onCloseRef.current() }}>
-      <div ref={dialogRef} tabIndex={-1} className={`tuvet-modal ${wide ? 'tuvet-modal-wide' : ''}`} role={role} aria-modal="true" aria-labelledby={titleId}>
+      <div ref={dialogRef} tabIndex={-1} className={`tuvet-modal ${wide ? 'tuvet-modal-wide' : ''} ${className}`.trim()} role={role} aria-modal="true" aria-labelledby={titleId}>
         <div className="tuvet-modal-header">
           <div className="tuvet-modal-heading">
             {icon && <span className={`tuvet-modal-icon tuvet-modal-icon-${tone}`}><Icono nombre={icon} /></span>}

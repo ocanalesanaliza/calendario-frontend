@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
 import { Aviso, EstadoCarga, Field, FormSection, Modal } from '../../tuvet/components/TuvetUi'
+import '../../tuvet/tuvet.css'
 import { addDepositReceipt, allocateDepositReceipt, captureDepositClosure, declareNoDepositado, getDepositReport, openDepositReport, submitDepositReport } from '../services/depositService'
 import './DepositDemo.css'
 
@@ -18,7 +19,11 @@ function reportFrom(response) {
 function messageFor(error) {
   if (error?.detail === 'deposit_api_disabled') return 'El registro de depósitos no está habilitado actualmente. No se realizó ningún cambio.'
   if (error?.status === 409) return 'El reporte cambió o ya no admite esta acción. Actualizamos la información para que puedas continuar.'
-  return error?.message || 'No fue posible completar la acción. Inténtalo de nuevo.'
+  const detail = String(error?.detail ?? '').toLowerCase()
+  if (detail.includes('all presented closures require captured sales')) return 'Captura las ventas de todos los cierres presentados antes de declarar un cierre como no depositado o asignar comprobantes.'
+  if (detail.includes('no_depositado_reason') || (detail.includes('reason') && (detail.includes('blank') || detail.includes('required')))) return 'Escribe un motivo para declarar el cierre como no depositado.'
+  if (detail.includes('submitted') || detail.includes('draft-only') || detail.includes('draft only') || detail.includes('only draft')) return 'Este reporte ya fue enviado y no admite más cambios.'
+  return 'No se pudo completar la acción. Revisa los datos e inténtalo de nuevo.'
 }
 
 export function DepositDemoModal({ tarea, fecha, sucursal, onClose }) {
@@ -30,6 +35,7 @@ export function DepositDemoModal({ tarea, fecha, sucursal, onClose }) {
   const [receipt, setReceipt] = useState(emptyReceipt)
   const [allocations, setAllocations] = useState({})
   const [reasons, setReasons] = useState({})
+  const [declarationsOpen, setDeclarationsOpen] = useState({})
   const [fieldErrors, setFieldErrors] = useState({})
   const [focusTarget, setFocusTarget] = useState('')
   const [focusAttempt, setFocusAttempt] = useState(0)
@@ -177,9 +183,10 @@ export function DepositDemoModal({ tarea, fecha, sucursal, onClose }) {
   }
 
   const footer = <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={onClose} disabled={Boolean(saving)}>Cerrar</button>
+  const allSalesCaptured = (report?.closures ?? []).every((closure) => closure.sales_captured === true)
 
-  return <Modal title="Registrar depósito" subtitle={tarea.tarea?.nombre} icon="archivo" wide onClose={onClose} footer={footer}>
-    <div className="deposit-flow tema-analiza">
+  return <Modal title="Registrar depósito" subtitle={tarea.tarea?.nombre} icon="archivo" wide className="tema-analiza" onClose={onClose} footer={footer}>
+    <div className="deposit-flow">
       <div className="deposit-flow-context" aria-label="Datos de la tarea">
         <span>Sucursal: <strong>{sucursal}</strong></span><span>Fecha: <strong>{fecha || 'No disponible'}</strong></span>
       </div>
@@ -187,20 +194,23 @@ export function DepositDemoModal({ tarea, fecha, sucursal, onClose }) {
         {error && report && <Aviso tipo="error">{error} <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={recoverReport} disabled={Boolean(saving)}>Actualizar reporte</button></Aviso>}
         {report?.state === 'submitted' ? <Aviso tipo="success">El reporte fue enviado correctamente.</Aviso> : <>
           <FormSection title="Cierres" description="Registra solo los cierres proporcionados por el reporte.">
+            {!allSalesCaptured && <p className="deposit-flow-notice" role="status">Capture sales for every presented closure before declaring a closure as not deposited.</p>}
             <div className="deposit-flow-list">
               {(report?.closures ?? []).map((closure) => <article className="deposit-flow-card" key={closure.id}>
                 <h3>Cierre del {closure.closure_date}</h3>
-                {closure.sales_captured ? <p role="status">Ventas capturadas: {formatAmount(closure.total_sales)}. Efectivo: {formatAmount(closure.cash_sales)}. Tarjeta: {formatAmount(closure.card_sales)}.</p> : closure.no_depositado_reason ? <p role="status">No depositado: {closure.no_depositado_reason}</p> : <>
+                {closure.sales_captured && <p role="status">Ventas capturadas: {formatAmount(closure.total_sales)}. Efectivo: {formatAmount(closure.cash_sales)}. Tarjeta: {formatAmount(closure.card_sales)}.</p>}
+                {closure.no_depositado_reason ? <p role="status">No depositado: {closure.no_depositado_reason}</p> : <>
+                  {!closure.sales_captured &&
                   <form onSubmit={(event) => submitSales(event, closure)} className="deposit-flow-form" noValidate>
                     <Field label="Ventas totales" required error={fieldErrors[`total-sales-${closure.id}`]}><input name={`total-sales-${closure.id}`} type="number" min="0" step="0.01" inputMode="decimal" value={(sales[closure.id] ?? emptySales).total_sales} onChange={(event) => updateSales(closure.id, 'total_sales', event.target.value)} /></Field>
                     <Field label="Ventas en efectivo" required error={fieldErrors[`cash-sales-${closure.id}`]}><input name={`cash-sales-${closure.id}`} type="number" min="0" step="0.01" inputMode="decimal" value={(sales[closure.id] ?? emptySales).cash_sales} onChange={(event) => updateSales(closure.id, 'cash_sales', event.target.value)} /></Field>
                     <Field label="Ventas con tarjeta" required error={fieldErrors[`card-sales-${closure.id}`]}><input name={`card-sales-${closure.id}`} type="number" min="0" step="0.01" inputMode="decimal" value={(sales[closure.id] ?? emptySales).card_sales} onChange={(event) => updateSales(closure.id, 'card_sales', event.target.value)} /></Field>
                     <button type="submit" className="tuvet-btn" disabled={Boolean(saving)} aria-busy={saving === `capture-${closure.id}`}>{saving === `capture-${closure.id}` ? 'Guardando ventas…' : 'Capturar ventas'}</button>
-                  </form>
-                  <form onSubmit={(event) => submitNoDepositado(event, closure)} className="deposit-flow-inline" noValidate>
+                  </form>}
+                  {declarationsOpen[closure.id] ? <form onSubmit={(event) => submitNoDepositado(event, closure)} className="deposit-flow-inline" noValidate>
                     <Field label="Motivo de no depositado" required error={fieldErrors[`no-deposit-reason-${closure.id}`]}><input name={`no-deposit-reason-${closure.id}`} type="text" value={reasons[closure.id] ?? ''} onChange={(event) => { setReasons((current) => ({ ...current, [closure.id]: event.target.value })); if (event.target.value.trim()) clearFieldError(`no-deposit-reason-${closure.id}`) }} /></Field>
-                    <button type="submit" className="tuvet-btn tuvet-btn-secondary" disabled={Boolean(saving)} aria-busy={saving === `no-deposit-${closure.id}`}>Declarar no depositado</button>
-                  </form>
+                    <button type="submit" className="tuvet-btn tuvet-btn-secondary" disabled={Boolean(saving)} aria-busy={saving === `no-deposit-${closure.id}`}>{saving === `no-deposit-${closure.id}` ? 'Guardando declaración…' : 'Guardar declaración'}</button>
+                  </form> : <button type="button" className="tuvet-btn tuvet-btn-secondary" disabled={!allSalesCaptured || Boolean(saving)} onClick={() => setDeclarationsOpen((current) => ({ ...current, [closure.id]: true }))}>Declarar no depositado</button>}
                 </>}
               </article>)}
             </div>
