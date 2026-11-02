@@ -1,5 +1,5 @@
-import { DepositReviewDemo } from '../components/DepositDemoModal'
+import { Navigate } from 'react-router-dom'
 
 export default function DepositosPendientesPage() {
-  return <DepositReviewDemo />
+  return <Navigate to="/calendario-area" replace />
 }

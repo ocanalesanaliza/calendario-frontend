@@ -12,7 +12,7 @@ describe('monthly area occurrence contract', () => {
       scheduled_date: '2026-09-12',
       effective_date: '2026-09-15',
       area: { id: 4, name: 'Operaciones' },
-      task: { id: 8, name: 'Inventario' },
+      task: { id: 8, name: 'Inventario', mode: 'deposit_review', ignored: 'value' },
       weight: 30,
       all_day: true,
       justification: 'must not become part of the contract',
@@ -27,7 +27,7 @@ describe('monthly area occurrence contract', () => {
       scheduled_date: '2026-09-12',
       effective_date: '2026-09-15',
       area: { id: 4, name: 'Operaciones' },
-      task: { id: 8, name: 'Inventario' },
+      task: { id: 8, name: 'Inventario', mode: 'deposit_review' },
       weight: 30,
       all_day: true,
     })

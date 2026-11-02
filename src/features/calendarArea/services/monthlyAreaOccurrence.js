@@ -21,7 +21,6 @@ export function normalizeMonthlyAreaOccurrence(occurrence = {}) {
     'scheduled_date',
     'effective_date',
     'area',
-    'task',
     'weight',
     'all_day',
   ]
@@ -33,10 +32,14 @@ export function normalizeMonthlyAreaOccurrence(occurrence = {}) {
   const template = optionalObject(occurrence.template, ['id', 'name'])
   const templateVersion = optionalObject(occurrence.template_version, ['id', 'number'])
   const coverageSnapshot = optionalObject(occurrence.coverage_snapshot, ['jornada', 'aplica_ambas_jornadas', 'known'])
+  const task = typeof occurrence.task === 'string'
+    ? occurrence.task
+    : optionalObject(occurrence.task, ['id', 'name', 'mode'])
 
   if (template) normalized.template = template
   if (templateVersion) normalized.template_version = templateVersion
   if (coverageSnapshot) normalized.coverage_snapshot = coverageSnapshot
+  if (task !== undefined) normalized.task = task
 
   return normalized
 }

@@ -15,7 +15,6 @@ const newIdempotencyKey = () => globalThis.crypto?.randomUUID?.() ?? `deposit-${
 function reportFrom(response) {
   return response?.report ?? null
 }
-
 function messageFor(error) {
   if (error?.detail === 'deposit_api_disabled') return 'El registro de depósitos no está habilitado actualmente. No se realizó ningún cambio.'
   if (error?.status === 409) return 'El reporte cambió o ya no admite esta acción. Actualizamos la información para que puedas continuar.'
@@ -226,78 +225,4 @@ export function DepositDemoModal({ tarea, fecha, sucursal, onClose }) {
       </EstadoCarga>
     </div>
   </Modal>
-}
-
-const pendingDeposits = [
-  {
-    branch: 'Sucursal Tres Caminos',
-    reconciliationDate: '2026-09-05',
-    deadline: '18:00',
-    manager: 'María González',
-    totalSales: 12500,
-    cashSales: 7800,
-    depositedCash: 7600,
-    reference: 'DEP-20260905-001',
-  },
-  {
-    branch: 'Sucursal Morazán',
-    reconciliationDate: '2026-09-05',
-    deadline: '18:30',
-    manager: 'Carlos Hernández',
-    totalSales: 9800,
-    cashSales: 6150,
-    depositedCash: 6150,
-    reference: 'DEP-20260905-002',
-  },
-]
-
-export function DepositReviewDemo() {
-  const [selectedDeposit, setSelectedDeposit] = useState(null)
-  const [correction, setCorrection] = useState(false)
-  const [comment, setComment] = useState('')
-  const [feedback, setFeedback] = useState('')
-  const difference = selectedDeposit ? selectedDeposit.cashSales - selectedDeposit.depositedCash : 0
-
-  function openReview(deposit) {
-    setSelectedDeposit(deposit)
-    setCorrection(false)
-    setComment('')
-    setFeedback('')
-  }
-
-  function closeReview() {
-    setSelectedDeposit(null)
-  }
-
-  function requestCorrection() {
-    if (!comment.trim()) return
-    setFeedback('La solicitud de corrección fue enviada al gerente de sucursal.')
-  }
-
-  return (
-    <div className="deposit-review-page">
-      <div className="page-header">
-        <div><h1>Depósitos pendientes</h1><p>Revisión demostrativa de depósitos pendientes del día.</p></div>
-      </div>
-      {pendingDeposits.map((deposit, index) => (
-        <div key={deposit.reference} className="deposit-review-card">
-          <div><span className="badge badge-yellow">Pendiente de revisión</span><h2>Revisión de depósito de sucursal</h2><p>{deposit.branch} · {deposit.reconciliationDate} · Límite {deposit.deadline}</p></div>
-          <button className="btn-primary-sm" aria-label={index === 0 ? undefined : `Revisar depósito de ${deposit.branch}`} onClick={() => openReview(deposit)}>Revisar depósito</button>
-        </div>
-      ))}
-      {selectedDeposit && (
-        <div className="deposit-demo-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && closeReview()}>
-          <section className="deposit-demo-modal" role="dialog" aria-modal="true" aria-labelledby="review-demo-title">
-            <header><div><h2 id="review-demo-title">Revisar depósito pendiente</h2></div><button type="button" className="deposit-demo-close" aria-label="Cerrar" onClick={closeReview}>×</button></header>
-            <dl className="deposit-review-details">
-              <div><dt>Sucursal</dt><dd>{selectedDeposit.branch}</dd></div><div><dt>Fecha de conciliación</dt><dd>{selectedDeposit.reconciliationDate}</dd></div><div><dt>Gerente de sucursal responsable</dt><dd>{selectedDeposit.manager}</dd></div><div><dt>Ventas totales</dt><dd>{formatAmount(selectedDeposit.totalSales)}</dd></div><div><dt>Ventas en efectivo</dt><dd>{formatAmount(selectedDeposit.cashSales)}</dd></div><div><dt>Efectivo depositado</dt><dd>{formatAmount(selectedDeposit.depositedCash)}</dd></div><div><dt>Diferencia</dt><dd>{formatAmount(difference)}</dd></div><div><dt>Referencia</dt><dd>{selectedDeposit.reference}</dd></div><div><dt>Previsualización de puntaje</dt><dd>50 / 100 (sujeto a aprobación)</dd></div>
-            </dl>
-            {feedback && <p className="deposit-demo-success" role="alert">{feedback}</p>}
-            {correction && <div className="deposit-correction"><label htmlFor="correction-comment">Comentario de corrección</label><textarea id="correction-comment" value={comment} onChange={(event) => setComment(event.target.value)} required />{!comment.trim() && <p className="deposit-demo-error">El comentario es obligatorio para solicitar corrección.</p>}<button className="deposit-demo-secondary" onClick={requestCorrection} disabled={!comment.trim()}>Enviar solicitud de corrección</button></div>}
-            <footer><button type="button" className="deposit-demo-secondary" onClick={() => setCorrection(true)}>Solicitar corrección</button><button type="button" className="deposit-demo-primary" onClick={() => setFeedback('El depósito fue aprobado.')}>Aprobar</button></footer>
-          </section>
-        </div>
-      )}
-    </div>
-  )
 }
