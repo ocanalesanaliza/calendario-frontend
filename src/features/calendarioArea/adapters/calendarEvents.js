@@ -115,19 +115,20 @@ export function selectVisibleOccurrences(occurrences = [], absences = []) {
 }
 
 export function occurrenceToCalendarEvent(occurrence) {
-  const occurrenceId = occurrence.occurrence_id ?? occurrence.id
+  const internalOccurrenceId = occurrence.occurrence_id ?? occurrence.id
+  const calendarEventId = occurrence.id ?? internalOccurrenceId
   const statusPresentation = occurrenceStatusPresentation(occurrence.status)
-  const title = taskTitle(occurrence.task, occurrenceId)
+  const title = taskTitle(occurrence.task, internalOccurrenceId)
 
   return {
-    id: String(occurrenceId),
+    id: String(calendarEventId),
     title,
     start: occurrence.effective_date,
     allDay: occurrence.all_day,
     editable: false,
     classNames: [statusPresentation.className],
     extendedProps: {
-      occurrence_id: occurrenceId,
+      occurrence_id: internalOccurrenceId,
       status: occurrence.status,
       status_class: statusPresentation.className,
       status_label: statusPresentation.label,

@@ -159,8 +159,8 @@ describe('CalendarioAreaPage', () => {
     expect(screen.getByRole('button', { name: 'Cerrar detalle de la ocurrencia' })).toHaveFocus()
   })
 
-  it('opens a deposit-review worklist using the calendar occurrence opaque id instead of the ordinary dialog', async () => {
-    const depositOccurrence = { ...occurrence, id: 'occurrence-signed-opaque', occurrence_id: undefined, task: { id: 123, name: 'Deposit review', mode: 'deposit_review' } }
+  it('opens a deposit-review worklist using the calendar virtual id instead of the internal occurrence id', async () => {
+    const depositOccurrence = { ...occurrence, id: 'occurrence-signed-opaque', occurrence_id: 117, task: { id: 123, name: 'Deposit review', mode: 'deposit_review' } }
     getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [depositOccurrence] })
     getDepositReviewWorklist.mockResolvedValue({
       id: 'occurrence-signed-opaque',
@@ -177,6 +177,7 @@ describe('CalendarioAreaPage', () => {
     expect(await screen.findByRole('dialog', { name: 'Revisión de depósitos' })).toHaveTextContent('BRANCH-007')
     expect(screen.getByRole('dialog')).toHaveTextContent('2026-09-02')
     expect(getDepositReviewWorklist).toHaveBeenCalledWith('occurrence-signed-opaque')
+    expect(getDepositReviewWorklist).not.toHaveBeenCalledWith(117)
     expect(screen.queryByRole('button', { name: 'Completar' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Sin registro revisado para BRANCH-007' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Conforme para BRANCH-007' })).toBeInTheDocument()
@@ -350,6 +351,7 @@ describe('CalendarioAreaPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar completar' }))
     fireEvent.click(screen.getByRole('button', { name: 'Completando...' }))
     expect(completeAreaOccurrence).toHaveBeenCalledTimes(1)
+    expect(completeAreaOccurrence).toHaveBeenCalledWith(4, expect.any(String))
     resolveCommand({})
     await waitFor(() => expect(getMonthlyAreaOccurrences).toHaveBeenCalledTimes(2))
   })

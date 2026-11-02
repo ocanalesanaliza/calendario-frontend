@@ -79,6 +79,15 @@ describe('calendar event adapter', () => {
     })
   })
 
+  it('uses the opaque calendar virtual id while preserving the internal occurrence id', () => {
+    const occurrence = { id: 'occurrence-signed-opaque', occurrence_id: 117, task: 'Revisión', effective_date: '2026-09-01', all_day: false }
+
+    expect(occurrenceToCalendarEvent(occurrence)).toMatchObject({
+      id: 'occurrence-signed-opaque',
+      extendedProps: { occurrence_id: 117 },
+    })
+  })
+
   it('adapts every occurrence without mutating the input', () => {
     const occurrences = [{ id: 1, task: { nombre: 'Revisión' }, effective_date: '2026-09-01', scheduled_date: '2026-09-01', weight: 10, all_day: false }]
 
