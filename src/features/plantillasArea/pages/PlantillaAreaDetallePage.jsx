@@ -13,6 +13,7 @@ const jornadaLabel = (task) => task?.aplica_ambas_jornadas ? 'Ambas jornadas' : 
 
 function message(error, fallback) {
   if (error?.status === 403) return 'No tienes permisos para gestionar plantillas de área.'
+  if (error?.fields?.assignment === 'future_assignment_occurrences_conflict' || error?.fields?.code === 'future_assignment_occurrences_conflict' || error?.detail?.code === 'future_assignment_occurrences_conflict') return 'No se puede cambiar o cancelar este reemplazo porque ya existen ocurrencias con evidencia terminal. Conserva o revisa esa evidencia antes de modificar la asignación.'
   if (error?.status === 409) return error.message || 'La plantilla no puede archivarse porque tiene asignaciones vigentes o futuras.'
   return error?.message || fallback
 }
@@ -39,6 +40,8 @@ function Modal({ title, children, onClose }) {
 }
 
 function PublishModal({ template, onClose, onPublished }) {
+  const templateData = template?.template ?? template
+  const templateName = templateData?.name ?? templateData?.nombre ?? 'esta plantilla'
   const [catalog, setCatalog] = useState([])
   const [rows, setRows] = useState([{ task_id: '', jornada: 'manana', aplica_ambas_jornadas: false }])
   const [loading, setLoading] = useState(true)
@@ -60,9 +63,9 @@ function PublishModal({ template, onClose, onPublished }) {
       await onPublished({ tasks: rows.map((row) => ({ task_id: Number(row.task_id), jornada: row.jornada, aplica_ambas_jornadas: row.aplica_ambas_jornadas })) })
     } catch (requestError) { setError(message(requestError, 'No se pudo publicar la nueva versión.')); setSaving(false) }
   }
-  return <Modal title={`Publicar nueva versión de ${template.name ?? template.nombre}`} onClose={onClose}>
+  return <Modal title={`Publicar nueva versión de ${templateName}`} onClose={onClose}>
     <form onSubmit={submit} className="plantilla-area-detail-form">
-      <p>La publicación crea una versión completa. Las tareas de versiones anteriores no se editan.</p>
+      <p>La publicación crea una nueva versión completa. Las versiones anteriores no se modifican. Publicar no reasigna Áreas automáticamente. La asignación o el reemplazo se realiza explícitamente desde el Área y con su fecha efectiva.</p>
       {loading ? <p role="status">Cargando tareas de área...</p> : <fieldset disabled={saving}><legend>Tareas de la nueva versión</legend>{rows.map((row, index) => <div className="version-task-row" key={index}>
         <label>Tarea<select aria-label={`Tarea ${index + 1}`} data-autofocus={index === 0 || undefined} value={row.task_id} onChange={(event) => update(index, 'task_id', event.target.value)} required><option value="">Seleccionar tarea</option>{catalog.map((task) => <option key={taskIdOf(task)} value={taskIdOf(task)}>{taskName(task)}</option>)}</select></label>
         <label>Jornada<select aria-label={`Jornada ${index + 1}`} value={row.aplica_ambas_jornadas ? 'ambas' : row.jornada} onChange={(event) => { const ambas = event.target.value === 'ambas'; update(index, 'aplica_ambas_jornadas', ambas); update(index, 'jornada', ambas ? 'manana' : event.target.value) }}><option value="manana">Mañana</option><option value="tarde">Tarde</option><option value="ambas">Ambas</option></select></label>
