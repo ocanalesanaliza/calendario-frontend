@@ -221,6 +221,10 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
       if (!busy) setRevisionGuardiaTask(tarea)
       return
     }
+    if (tarea.tarea?.modo_cumplimiento === 'deposit') {
+      if (tarea.disponible_para_registro && !busy) setDepositTask(tarea)
+      return
+    }
     if (!tarea.disponible_para_registro || busy) return
 
     const clickedInteractiveElement = event.target.closest(
@@ -383,12 +387,14 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
 
   function renderTaskCard(t) {
     const isRevisionGuardiaTask = esRevisionGuardia(t)
+    const isDepositTask = t.tarea?.modo_cumplimiento === 'deposit'
+    const isDirectOpenTask = isRevisionGuardiaTask || isDepositTask
     const isSelectable = (t.disponible_para_registro || isRevisionGuardiaTask) && !busy
     const isSelected = seleccionadas.includes(t.id_sucursal_tarea)
     const taskName = t.tarea?.nombre || `Tarea #${t.id_sucursal_tarea}`
     const checkboxId = `mis-tareas-task-${t.id_sucursal_tarea}`
     const Card = selectionUxVariant && isSelectable
-      ? (isRevisionGuardiaTask ? 'button' : 'label')
+      ? (isDirectOpenTask ? 'button' : 'label')
       : 'div'
     const taskSchedule = <>{t.hora}{t.hora_fin_registro && ` - ${t.hora_fin_registro}`}</>
     const statusBadge = <span className={`badge ${ESTADO_BADGE[t.estado_ui] ?? 'badge-tipo'}`}>{t.estado_ui_label}</span>
@@ -412,12 +418,18 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
                   onClick: () => setRevisionGuardiaTask(t),
                   'aria-label': `Abrir revisión de guardia: ${taskName}`,
                 }
-              : { htmlFor: checkboxId })
+              : isDepositTask
+                ? {
+                    type: 'button',
+                    onClick: () => setDepositTask(t),
+                    'aria-label': `Abrir registro de depósito: ${taskName}`,
+                  }
+                : { htmlFor: checkboxId })
           : { onClick: (event) => handleCardClick(event, t) })}
       >
         {scanabilityVariant ? (
           <div className="tarea-card-top tarea-card-top--scanable">
-            {t.disponible_para_registro && !esRevisionGuardia(t) && (
+            {t.disponible_para_registro && !isDirectOpenTask && (
               <input
                 id={checkboxId}
                 type="checkbox"
@@ -446,7 +458,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
           </div>
         ) : (
           <div className="tarea-card-top">
-            {t.disponible_para_registro && !esRevisionGuardia(t) && (
+            {t.disponible_para_registro && !isDirectOpenTask && (
               <input
                 id={checkboxId}
                 type="checkbox"
@@ -471,7 +483,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
           </div>
         )}
 
-        {selectionUxVariant && isSelected && t.disponible_para_registro && !esRevisionGuardia(t) && (
+        {selectionUxVariant && isSelected && t.disponible_para_registro && !isDirectOpenTask && (
           <span className="tarea-selection-cue" aria-hidden="true">
             Seleccionada
           </span>
