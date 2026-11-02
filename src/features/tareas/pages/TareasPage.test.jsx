@@ -2,16 +2,17 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import TareasPage from './TareasPage'
 
-const { getTareas, createTarea, desactivarTarea } = vi.hoisted(() => ({
+const { getTareas, createTarea, updateTarea, desactivarTarea } = vi.hoisted(() => ({
   getTareas: vi.fn(),
   createTarea: vi.fn(),
+  updateTarea: vi.fn(),
   desactivarTarea: vi.fn(),
 }))
 
 vi.mock('../services/tareasService', () => ({
   getTareas,
   createTarea,
-  updateTarea: vi.fn(),
+  updateTarea,
   desactivarTarea,
   getSubtareas: vi.fn(),
   createSubtarea: vi.fn(),
@@ -36,7 +37,111 @@ describe('TareasPage: catálogo', () => {
   beforeEach(() => {
     getTareas.mockReset().mockResolvedValue([])
     createTarea.mockReset().mockResolvedValue({})
+    updateTarea.mockReset().mockResolvedValue({})
     desactivarTarea.mockReset().mockResolvedValue({})
+  })
+
+  async function abrirModalCrear() {
+    render(<TareasPage />)
+    await screen.findByText(/Todavía no hay tareas en el catálogo/)
+    fireEvent.click(screen.getByRole('button', { name: '+ Nueva tarea' }))
+  }
+
+  function completarFormulario(nombre = 'Cierre diario') {
+    fireEvent.change(screen.getByLabelText(/^Nombre/), { target: { value: nombre } })
+  }
+
+  it('inicia la creación con el modo de cumplimiento simple y muestra su guía prospectiva', async () => {
+    await abrirModalCrear()
+
+    expect(screen.getByRole('radio', { name: /Checklist simple/ })).toBeChecked()
+    expect(screen.getByText(/aplica prospectivamente/)).toBeInTheDocument()
+    expect(screen.getByText(/no modifica el historial ni convierte ocurrencias existentes/i)).toBeInTheDocument()
+    expect(screen.getByText(/no activa un flujo de usuario ni una bandera/i)).toBeInTheDocument()
+  })
+
+  it('muestra el modo devuelto por el servidor al editar', async () => {
+    getTareas.mockResolvedValue([tarea({ modo_cumplimiento: 'deposit' })])
+    render(<TareasPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar' }))
+
+    expect(screen.getByRole('radio', { name: /Depósito/ })).toBeChecked()
+  })
+
+  it('usa simple al editar una respuesta heredada sin modo de cumplimiento', async () => {
+    getTareas.mockResolvedValue([tarea()])
+    render(<TareasPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar' }))
+
+    expect(screen.getByRole('radio', { name: /Checklist simple/ })).toBeChecked()
+  })
+
+  it('ofrece solo simple y depósito para Sucursal', async () => {
+    await abrirModalCrear()
+
+    expect(screen.getByRole('radio', { name: /Checklist simple/ })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /^Depósito/ })).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: /Revisión de depósito/ })).not.toBeInTheDocument()
+  })
+
+  it('ofrece solo simple y revisión de depósito para Área', async () => {
+    await abrirModalCrear()
+    fireEvent.click(screen.getByRole('radio', { name: /^Área/ }))
+
+    expect(screen.getByRole('radio', { name: /Checklist simple/ })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /Revisión de depósito/ })).toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: /^Depósito/ })).not.toBeInTheDocument()
+  })
+
+  it('restablece depósito a simple al cambiar de Sucursal a Área', async () => {
+    await abrirModalCrear()
+    fireEvent.click(screen.getByRole('radio', { name: /^Depósito/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /^Área/ }))
+
+    expect(screen.getByRole('radio', { name: /Checklist simple/ })).toBeChecked()
+  })
+
+  it('restablece revisión de depósito a simple al cambiar de Área a Sucursal', async () => {
+    await abrirModalCrear()
+    fireEvent.click(screen.getByRole('radio', { name: /^Área/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /Revisión de depósito/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /^Sucursal/ }))
+
+    expect(screen.getByRole('radio', { name: /Checklist simple/ })).toBeChecked()
+  })
+
+  it('envía modo_cumplimiento en el POST existente', async () => {
+    await abrirModalCrear()
+    completarFormulario()
+    fireEvent.click(screen.getByRole('radio', { name: /^Depósito/ }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Crear tarea' }))
+
+    await waitFor(() => expect(createTarea).toHaveBeenCalledWith(expect.objectContaining({
+      ambito: 'sucursal',
+      modo_cumplimiento: 'deposit',
+    })))
+  })
+
+  it('envía modo_cumplimiento en el PATCH existente', async () => {
+    getTareas.mockResolvedValue([tarea({ modo_cumplimiento: 'deposit_review', ambito: 'area' })])
+    render(<TareasPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Guardar cambios' }))
+
+    await waitFor(() => expect(updateTarea).toHaveBeenCalledWith(7, expect.objectContaining({
+      ambito: 'area',
+      modo_cumplimiento: 'deposit_review',
+    })))
+  })
+
+  it('muestra una falla de autorización o validación sin confirmar éxito', async () => {
+    createTarea.mockRejectedValue(new Error('No tienes autorización para gestionar el catálogo.'))
+    await abrirModalCrear()
+    completarFormulario()
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Crear tarea' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('No tienes autorización para gestionar el catálogo.')
+    expect(screen.queryByText(/Tarea “Cierre diario” creada/)).not.toBeInTheDocument()
   })
 
   it('envía los días semanales seleccionados sin usar un campo de texto libre', async () => {

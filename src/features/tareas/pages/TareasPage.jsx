@@ -29,6 +29,16 @@ import './TareasCatalogo.css'
 const AMBITO_LABEL = { sucursal: 'Sucursal', area: 'Área' }
 const TIPOS_FILTRO_RECURRENCIA = [...TIPOS_CATALOGO, 'variable']
 const ESTADOS = { todos: 'Todas', activa: 'Activas', inactiva: 'Inactivas' }
+const MODOS_CUMPLIMIENTO_POR_AMBITO = {
+  sucursal: [
+    { value: 'simple', label: 'Checklist simple', description: 'Mantiene el cumplimiento habitual de la tarea.' },
+    { value: 'deposit', label: 'Depósito', description: 'Requiere el registro estructurado de un depósito en la sucursal.' },
+  ],
+  area: [
+    { value: 'simple', label: 'Checklist simple', description: 'Mantiene el cumplimiento habitual de la tarea.' },
+    { value: 'deposit_review', label: 'Revisión de depósito', description: 'Permite al área revisar los depósitos enviados por sucursales.' },
+  ],
+}
 
 const normalizar = (texto) => String(texto ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 
@@ -276,6 +286,7 @@ function TareaModal({ inicial, onSubmit, onClose }) {
     peso:                     inicial?.peso ?? '1.00',
     es_recordatorio:          inicial?.es_recordatorio ?? false,
     bloquea_jornada_posterior: inicial?.bloquea_jornada_posterior ?? false,
+    modo_cumplimiento:        inicial?.modo_cumplimiento ?? 'simple',
   })
   const [errores, setErrores] = useState({})
   const [errorGeneral, setErrorGeneral] = useState('')
@@ -294,6 +305,17 @@ function TareaModal({ inicial, onSubmit, onClose }) {
       valor_recurrencia: tipo === actual.tipo_recurrencia ? actual.valor_recurrencia : '',
     }))
     setErrores((actual) => ({ ...actual, recurrencia: undefined }))
+  }
+
+  function handleAmbitoChange(ambito) {
+    setForm((actual) => {
+      const modosValidos = MODOS_CUMPLIMIENTO_POR_AMBITO[ambito].map(({ value }) => value)
+      return {
+        ...actual,
+        ambito,
+        modo_cumplimiento: modosValidos.includes(actual.modo_cumplimiento) ? actual.modo_cumplimiento : 'simple',
+      }
+    })
   }
 
   async function handleSubmit(event) {
@@ -347,13 +369,29 @@ function TareaModal({ inicial, onSubmit, onClose }) {
               name="ambito"
               label="Ámbito"
               value={form.ambito}
-              onChange={(valor) => set('ambito', valor)}
+              onChange={handleAmbitoChange}
               options={[
                 { value: 'sucursal', label: 'Sucursal', description: 'La realizan los gerentes de sucursal.' },
                 { value: 'area', label: 'Área', description: 'La realizan los gerentes de área.' },
               ]}
             />
           </div>
+        </FormSection>
+
+        <FormSection
+          title="Modo de cumplimiento"
+          description="Define cómo se cumplirá esta tarea en las nuevas asignaciones."
+        >
+          <OptionCards
+            name="modo_cumplimiento"
+            label="Modo de cumplimiento"
+            value={form.modo_cumplimiento}
+            onChange={(valor) => set('modo_cumplimiento', valor)}
+            options={MODOS_CUMPLIMIENTO_POR_AMBITO[form.ambito]}
+          />
+          <Aviso tipo="info">
+            Este cambio aplica prospectivamente: no modifica el historial ni convierte ocurrencias existentes, y no activa un flujo de usuario ni una bandera.
+          </Aviso>
         </FormSection>
 
         <FormSection title="¿Cuándo se repite?">
