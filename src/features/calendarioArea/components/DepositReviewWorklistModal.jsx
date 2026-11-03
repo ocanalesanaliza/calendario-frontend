@@ -16,7 +16,7 @@ const decisionLabels = {
 }
 
 function formatAmount(value) {
-  return new Intl.NumberFormat('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value ?? 0))
+  return `L ${new Intl.NumberFormat('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value ?? 0))}`
 }
 
 function isTerminal(worklist) {
@@ -56,6 +56,7 @@ function HistoricalContext({ worklist }) {
 function DepositDetailModal({ detail, loading, error, onClose, onRetry }) {
   const closure = detail?.closure
   const caseItem = detail?.case
+  const branchName = caseItem?.branch_name || caseItem?.branch_code
   return (
     <Modal
       title="Detalle del depósito"
@@ -69,22 +70,46 @@ function DepositDetailModal({ detail, loading, error, onClose, onRetry }) {
         {loading && <div role="status" aria-busy="true"><span className="tuvet-skeleton" /><span className="sr-only">Cargando detalle del depósito...</span></div>}
         {error && <Aviso tipo="error">{error} <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={onRetry}>Reintentar detalle del depósito</button></Aviso>}
         {!loading && !error && detail && <>
-          <dl>
-            <div><dt>Sucursal</dt><dd>{caseItem?.branch_code}</dd></div>
-            <div><dt>Fecha de cierre</dt><dd>{caseItem?.closure_date}</dd></div>
+          <header className="deposit-review-worklist__detail-heading">
+            <h3>{branchName}</h3>
+            <p>{caseItem?.branch_code} · Cierre {caseItem?.closure_date}</p>
+          </header>
+          <section aria-labelledby="deposit-review-summary-title">
+            <h3 id="deposit-review-summary-title">Resumen del cierre</h3>
+            <dl className="deposit-review-worklist__detail-summary">
             <div><dt>Ventas totales</dt><dd>{formatAmount(closure?.total_sales)}</dd></div>
             <div><dt>Ventas en efectivo</dt><dd>{formatAmount(closure?.cash_sales)}</dd></div>
             <div><dt>Ventas con tarjeta</dt><dd>{formatAmount(closure?.card_sales)}</dd></div>
-            <div><dt>Monto aplicado</dt><dd>{formatAmount(closure?.deposited_amount)}</dd></div>
-            <div><dt>Diferencia pendiente</dt><dd>{formatAmount(closure?.outstanding_amount)}</dd></div>
-            {closure?.no_depositado_reason && <div><dt>Motivo de no depósito</dt><dd>{closure.no_depositado_reason}</dd></div>}
-          </dl>
+              <div><dt>Monto aplicado</dt><dd>{formatAmount(closure?.deposited_amount)}</dd></div>
+              <div className="deposit-review-worklist__outstanding"><dt>Diferencia pendiente</dt><dd>{formatAmount(closure?.outstanding_amount)}</dd></div>
+              {closure?.no_depositado_reason && <div><dt>Motivo de no depósito</dt><dd>{closure.no_depositado_reason}</dd></div>}
+            </dl>
+          </section>
           <section aria-labelledby="deposit-review-receipts-title">
             <h3 id="deposit-review-receipts-title">Comprobantes aplicables</h3>
-            {detail.receipts?.length ? <ul>{detail.receipts.map((receipt) => <li key={`${receipt.reference}-${receipt.deposited_on}`}><strong>{receipt.reference}</strong> · {receipt.deposited_on} · Monto aplicado: {formatAmount(receipt.allocated_amount)}</li>)}</ul> : <p>No hay comprobantes aplicables para este cierre.</p>}
+            {detail.receipts?.length ? <ul className="deposit-review-worklist__receipts">{detail.receipts.map((receipt) => <li key={`${receipt.reference}-${receipt.deposited_on}`}><dl><div><dt>Referencia</dt><dd>{receipt.reference}</dd></div><div><dt>Fecha de depósito</dt><dd>{receipt.deposited_on}</dd></div><div><dt>Monto aplicado a este cierre</dt><dd>{formatAmount(receipt.allocated_amount)}</dd></div></dl></li>)}</ul> : <p>No hay comprobantes aplicables para este cierre.</p>}
           </section>
         </>}
       </div>
+    </Modal>
+  )
+}
+
+function CommentDecisionModal({ caseItem, comment, commentError, saving, commentRef, onChange, onCancel, onSubmit }) {
+  const isObservation = caseItem.classification === 'report_available'
+  const title = isObservation ? 'Registrar observación' : 'Sin registro revisado'
+  const description = isObservation
+    ? `Describe la observación para ${caseItem.branch_code}.`
+    : `Describe la ausencia de registro para ${caseItem.branch_code}.`
+  return (
+    <Modal title={title} subtitle="El comentario es obligatorio." icon="info" onClose={onCancel} footer={<><button type="button" className="tuvet-btn tuvet-btn-secondary" disabled={saving} onClick={onCancel}>Cancelar</button><button type="submit" form="deposit-review-comment-form" className="tuvet-btn" disabled={saving} aria-busy={saving}>{saving ? 'Guardando...' : isObservation ? 'Guardar observación' : 'Guardar decisión'}</button></>}>
+      <form id="deposit-review-comment-form" className="deposit-review-worklist__comment" onSubmit={onSubmit}>
+        <FormSection title="Comentario de revisión" description={description}>
+          <Field label="Comentario" required error={commentError} hint="Este comentario queda asociado a la decisión.">
+            <textarea id="deposit-review-comment" ref={commentRef} value={comment} disabled={saving} onChange={onChange} />
+          </Field>
+        </FormSection>
+      </form>
     </Modal>
   )
 }
@@ -183,10 +208,13 @@ export default function DepositReviewWorklistModal({ occurrenceVirtualId, onClos
     event.preventDefault()
     const trimmedComment = comment.trim()
     if (!trimmedComment) {
-      setCommentError('El comentario es obligatorio para registrar que no hay un depósito revisado.')
+      setCommentError(commentCase.classification === 'report_available'
+        ? 'El comentario es obligatorio para registrar una observación.'
+        : 'El comentario es obligatorio para registrar que no hay un depósito revisado.')
       return
     }
-    void saveDecision(commentCase, 'sin_registro_revisado', trimmedComment)
+    const decision = commentCase.classification === 'report_available' ? 'con_observacion' : 'sin_registro_revisado'
+    void saveDecision(commentCase, decision, trimmedComment)
   }
 
   return (
@@ -204,20 +232,13 @@ export default function DepositReviewWorklistModal({ occurrenceVirtualId, onClos
                 <header><h3>{caseItem.branch_code}</h3><p>Cierre: {caseItem.closure_date}</p></header>
                 <dl><div><dt>Clasificación</dt><dd>{classificationLabels[caseItem.classification] ?? 'No disponible'}</dd></div><div><dt>Decisión</dt><dd>{caseItem.decision ? (decisionLabels[caseItem.decision] ?? 'No disponible') : 'Pendiente'}</dd></div></dl>
                 {!caseItem.decision && <div className="deposit-review-worklist__actions">
-                  {caseItem.classification === 'report_available' && <><button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => openDetail(caseItem)} aria-label={`Ver depósito para ${caseItem.branch_code}`}>Ver depósito</button><button type="button" className="tuvet-btn" disabled={Boolean(savingCaseId)} onClick={() => void saveDecision(caseItem, 'conforme')} aria-label={`Conforme para ${caseItem.branch_code}`}>Conforme</button><button type="button" className="tuvet-btn tuvet-btn-secondary" disabled={Boolean(savingCaseId)} onClick={() => void saveDecision(caseItem, 'con_observacion')} aria-label={`Con observación para ${caseItem.branch_code}`}>Con observación</button></>}
+                  {caseItem.classification === 'report_available' && <><button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => openDetail(caseItem)} aria-label={`Ver depósito para ${caseItem.branch_code}`}>Ver depósito</button><button type="button" className="tuvet-btn" disabled={Boolean(savingCaseId)} onClick={() => void saveDecision(caseItem, 'conforme')} aria-label={`Conforme para ${caseItem.branch_code}`}>Conforme</button><button type="button" className="tuvet-btn tuvet-btn-secondary" disabled={Boolean(savingCaseId)} onClick={() => openComment(caseItem)} aria-label={`Con observación para ${caseItem.branch_code}`}>Con observación</button></>}
                   {caseItem.classification === 'sin_registro' && <button type="button" className="tuvet-btn tuvet-btn-secondary" disabled={Boolean(savingCaseId)} onClick={() => openComment(caseItem)} aria-label={`Sin registro revisado para ${caseItem.branch_code}`}>Sin registro revisado</button>}
                 </div>}
               </article>)}
             </div>
           )}
-          {commentCase && <form className="deposit-review-worklist__comment" onSubmit={submitComment}>
-            <FormSection title="Comentario de revisión" description={`Describe la ausencia de registro para ${commentCase.branch_code}.`}>
-              <Field label="Comentario" required error={commentError} hint="Este comentario queda asociado a la decisión.">
-                <textarea id="deposit-review-comment" ref={commentRef} value={comment} disabled={Boolean(savingCaseId)} onChange={(event) => { setComment(event.target.value); setCommentError('') }} />
-              </Field>
-            </FormSection>
-            <div className="deposit-review-worklist__actions"><button type="button" className="tuvet-btn tuvet-btn-secondary" disabled={Boolean(savingCaseId)} onClick={() => setCommentCase(null)}>Cancelar</button><button type="submit" className="tuvet-btn" disabled={Boolean(savingCaseId)} aria-busy={Boolean(savingCaseId)}>{savingCaseId ? 'Guardando...' : 'Guardar decisión'}</button></div>
-          </form>}
+          {commentCase && <CommentDecisionModal caseItem={commentCase} comment={comment} commentError={commentError} saving={Boolean(savingCaseId)} commentRef={commentRef} onChange={(event) => { setComment(event.target.value); setCommentError('') }} onCancel={() => setCommentCase(null)} onSubmit={submitComment} />}
           {detailCase && <DepositDetailModal detail={detail} loading={detailLoading} error={detailError} onClose={closeDetail} onRetry={() => void loadDetail(detailCase)} />}
         </>}
       </div>
