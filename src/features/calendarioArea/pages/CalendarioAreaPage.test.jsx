@@ -196,8 +196,9 @@ describe('CalendarioAreaPage', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /Deposit review/ }))
 
-    expect(await screen.findByRole('button', { name: 'Conforme para BRANCH-007' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Con observación para BRANCH-007' })).toBeInTheDocument()
+    expect(await screen.findByText('Pendiente de envío')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Conforme para BRANCH-007' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Con observación para BRANCH-007' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Sin registro revisado para BRANCH-007' })).not.toBeInTheDocument()
   })
 
