@@ -268,6 +268,33 @@
   font-weight: 700;
 }
 
+.deposit-review-worklist__sales-discrepancy {
+  padding: 0.875rem;
+  border: 1px solid var(--tv-warning-text);
+  border-radius: var(--tv-radius-sm);
+  background: var(--tv-warning-soft);
+}
+
+.deposit-review-worklist__sales-discrepancy h3 {
+  color: var(--tv-warning-text);
+}
+
+.deposit-review-worklist__sales-discrepancy dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0.75rem 0 0;
+}
+
+.deposit-review-worklist__sales-discrepancy dl > div {
+  display: grid;
+  gap: 0.125rem;
+}
+
+.deposit-review-worklist__sales-discrepancy dd {
+  color: var(--tv-warning-text);
+}
+
 .deposit-review-worklist__receipts {
   display: grid;
   gap: 0.75rem;
@@ -285,7 +312,8 @@
 
 @media (max-width: 640px) {
   .deposit-review-worklist__detail-summary,
-  .deposit-review-worklist__receipts dl {
+  .deposit-review-worklist__receipts dl,
+  .deposit-review-worklist__sales-discrepancy dl {
     grid-template-columns: 1fr;
   }
 }

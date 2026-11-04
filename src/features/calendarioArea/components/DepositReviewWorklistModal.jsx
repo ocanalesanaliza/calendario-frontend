@@ -57,6 +57,7 @@ function DepositDetailModal({ detail, loading, error, onClose, onRetry }) {
   const closure = detail?.closure
   const caseItem = detail?.case
   const branchName = caseItem?.branch_name || caseItem?.branch_code
+  const hasSalesDiscrepancy = closure?.sales_discrepancy_amount && closure.sales_discrepancy_amount !== '0.00'
   return (
     <Modal
       title="Detalle del depósito"
@@ -85,6 +86,13 @@ function DepositDetailModal({ detail, loading, error, onClose, onRetry }) {
               {closure?.no_depositado_reason && <div><dt>Motivo de no depósito</dt><dd>{closure.no_depositado_reason}</dd></div>}
             </dl>
           </section>
+          {hasSalesDiscrepancy && <section className="deposit-review-worklist__sales-discrepancy" aria-labelledby="deposit-review-sales-discrepancy-title">
+            <h3 id="deposit-review-sales-discrepancy-title">Descuadre de ventas</h3>
+            <dl>
+              <div><dt>Descuadre de ventas</dt><dd>{formatAmount(closure.sales_discrepancy_amount)}</dd></div>
+              <div><dt>Explicación del descuadre</dt><dd>{closure.sales_discrepancy_reason || 'Sin explicación registrada.'}</dd></div>
+            </dl>
+          </section>}
           <section aria-labelledby="deposit-review-receipts-title">
             <h3 id="deposit-review-receipts-title">Comprobantes aplicables</h3>
             {detail.receipts?.length ? <ul className="deposit-review-worklist__receipts">{detail.receipts.map((receipt) => <li key={`${receipt.reference}-${receipt.deposited_on}`}><dl><div><dt>Referencia</dt><dd>{receipt.reference}</dd></div><div><dt>Fecha de depósito</dt><dd>{receipt.deposited_on}</dd></div><div><dt>Monto aplicado a este cierre</dt><dd>{formatAmount(receipt.allocated_amount)}</dd></div></dl></li>)}</ul> : <p>No hay comprobantes aplicables para este cierre.</p>}

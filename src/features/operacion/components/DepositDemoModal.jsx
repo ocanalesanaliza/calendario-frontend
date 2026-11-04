@@ -9,9 +9,15 @@ const formatAmount = (value) => `L ${new Intl.NumberFormat('es-HN', {
   maximumFractionDigits: 2,
 }).format(Number(value || 0))}`
 
-const emptySales = { total_sales: '', cash_sales: '', card_sales: '' }
+const emptySales = { total_sales: '', cash_sales: '', card_sales: '', sales_discrepancy_reason: '' }
 const emptyReceipt = { deposited_amount: '', reference: '', deposited_on: '' }
 const newIdempotencyKey = () => globalThis.crypto?.randomUUID?.() ?? `deposit-${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+function salesDiscrepancy(values) {
+  const amounts = [values.total_sales, values.cash_sales, values.card_sales]
+  if (amounts.some((value) => !String(value ?? '').trim())) return null
+  return Math.round((Number(values.total_sales) - Number(values.cash_sales) - Number(values.card_sales)) * 100) / 100
+}
 
 function reportFrom(response) {
   return response?.report ?? null
@@ -124,19 +130,24 @@ export function DepositDemoModal({ tarea, fecha, sucursal, onClose }) {
 
   function updateSales(entryId, field, value) {
     setSales((current) => ({ ...current, [entryId]: { ...(current[entryId] ?? emptySales), [field]: value } }))
-    if (String(value).trim()) clearFieldError(`${field.replace('_', '-')}-${entryId}`)
+    if (String(value).trim()) clearFieldError(`${field.replaceAll('_', '-')}-${entryId}`)
   }
 
   function submitSales(event, closure) {
     event.preventDefault()
     const values = sales[closure.id] ?? emptySales
+    const discrepancy = salesDiscrepancy(values)
     if (!validateRequired([
       { name: `total-sales-${closure.id}`, value: values.total_sales, message: 'Ingresa las ventas totales.' },
       { name: `cash-sales-${closure.id}`, value: values.cash_sales, message: 'Ingresa las ventas en efectivo.' },
       { name: `card-sales-${closure.id}`, value: values.card_sales, message: 'Ingresa las ventas con tarjeta.' },
+      ...(discrepancy ? [{ name: `sales-discrepancy-reason-${closure.id}`, value: values.sales_discrepancy_reason, message: 'Explica el descuadre de ventas.' }] : []),
     ])) return
     void mutate(`capture-${closure.id}`, () => captureDepositClosure(report.id, closure.id, {
-      ...values,
+      total_sales: values.total_sales,
+      cash_sales: values.cash_sales,
+      card_sales: values.card_sales,
+      sales_discrepancy_reason: discrepancy ? values.sales_discrepancy_reason.trim() : '',
       expected_version: report.optimistic_version,
       idempotency_key: newIdempotencyKey(),
     }))
@@ -201,12 +212,17 @@ export function DepositDemoModal({ tarea, fecha, sucursal, onClose }) {
                 {closure.sales_captured && <p role="status">Ventas capturadas: {formatAmount(closure.total_sales)}. Efectivo: {formatAmount(closure.cash_sales)}. Tarjeta: {formatAmount(closure.card_sales)}.</p>}
                 {closure.no_depositado_reason ? <p role="status">No depositado: {closure.no_depositado_reason}</p> : <>
                   {!closure.sales_captured &&
-                  <form onSubmit={(event) => submitSales(event, closure)} className="deposit-flow-form" noValidate>
-                    <Field label="Ventas totales" required error={fieldErrors[`total-sales-${closure.id}`]}><input name={`total-sales-${closure.id}`} type="number" min="0" step="0.01" inputMode="decimal" value={(sales[closure.id] ?? emptySales).total_sales} onChange={(event) => updateSales(closure.id, 'total_sales', event.target.value)} /></Field>
-                    <Field label="Ventas en efectivo" required error={fieldErrors[`cash-sales-${closure.id}`]}><input name={`cash-sales-${closure.id}`} type="number" min="0" step="0.01" inputMode="decimal" value={(sales[closure.id] ?? emptySales).cash_sales} onChange={(event) => updateSales(closure.id, 'cash_sales', event.target.value)} /></Field>
-                    <Field label="Ventas con tarjeta" required error={fieldErrors[`card-sales-${closure.id}`]}><input name={`card-sales-${closure.id}`} type="number" min="0" step="0.01" inputMode="decimal" value={(sales[closure.id] ?? emptySales).card_sales} onChange={(event) => updateSales(closure.id, 'card_sales', event.target.value)} /></Field>
-                    <button type="submit" className="tuvet-btn" disabled={Boolean(saving)} aria-busy={saving === `capture-${closure.id}`}>{saving === `capture-${closure.id}` ? 'Guardando ventas…' : 'Capturar ventas'}</button>
-                  </form>}
+                  (() => {
+                    const values = sales[closure.id] ?? emptySales
+                    const discrepancy = salesDiscrepancy(values)
+                    return <form onSubmit={(event) => submitSales(event, closure)} className="deposit-flow-form" noValidate>
+                      <Field label="Ventas totales" required error={fieldErrors[`total-sales-${closure.id}`]}><input name={`total-sales-${closure.id}`} type="number" min="0" step="0.01" inputMode="decimal" value={values.total_sales} onChange={(event) => updateSales(closure.id, 'total_sales', event.target.value)} /></Field>
+                      <Field label="Ventas en efectivo" required error={fieldErrors[`cash-sales-${closure.id}`]}><input name={`cash-sales-${closure.id}`} type="number" min="0" step="0.01" inputMode="decimal" value={values.cash_sales} onChange={(event) => updateSales(closure.id, 'cash_sales', event.target.value)} /></Field>
+                      <Field label="Ventas con tarjeta" required error={fieldErrors[`card-sales-${closure.id}`]}><input name={`card-sales-${closure.id}`} type="number" min="0" step="0.01" inputMode="decimal" value={values.card_sales} onChange={(event) => updateSales(closure.id, 'card_sales', event.target.value)} /></Field>
+                      {discrepancy ? <><Aviso tipo="warning">{`Descuadre de ventas: ${formatAmount(discrepancy)}. Las ventas totales no coinciden con efectivo más tarjeta.`}</Aviso><Field label="Explicación del descuadre" required error={fieldErrors[`sales-discrepancy-reason-${closure.id}`]}><input name={`sales-discrepancy-reason-${closure.id}`} type="text" value={values.sales_discrepancy_reason} onChange={(event) => updateSales(closure.id, 'sales_discrepancy_reason', event.target.value)} /></Field></> : null}
+                      <button type="submit" className="tuvet-btn" disabled={Boolean(saving)} aria-busy={saving === `capture-${closure.id}`}>{saving === `capture-${closure.id}` ? 'Guardando ventas…' : 'Capturar ventas'}</button>
+                    </form>
+                  })()}
                   {declarationsOpen[closure.id] ? <form onSubmit={(event) => submitNoDepositado(event, closure)} className="deposit-flow-inline" noValidate>
                     <Field label="Motivo de no depositado" required error={fieldErrors[`no-deposit-reason-${closure.id}`]}><input name={`no-deposit-reason-${closure.id}`} type="text" value={reasons[closure.id] ?? ''} onChange={(event) => { setReasons((current) => ({ ...current, [closure.id]: event.target.value })); if (event.target.value.trim()) clearFieldError(`no-deposit-reason-${closure.id}`) }} /></Field>
                     <button type="submit" className="tuvet-btn tuvet-btn-secondary" disabled={Boolean(saving)} aria-busy={saving === `no-deposit-${closure.id}`}>{saving === `no-deposit-${closure.id}` ? 'Guardando declaración…' : 'Guardar declaración'}</button>

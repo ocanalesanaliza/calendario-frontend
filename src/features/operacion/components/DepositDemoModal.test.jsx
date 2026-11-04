@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DepositDemoModal } from './DepositDemoModal'
 
@@ -38,6 +38,69 @@ describe('DepositDemoModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Capturar ventas' }))
     await waitFor(() => expect(api.captureDepositClosure).toHaveBeenCalledWith('opaque-report-id', 71, expect.objectContaining({ total_sales: '100.00', cash_sales: '70.00', card_sales: '30.00', expected_version: 1 })))
     expect(await screen.findByText(/Ventas capturadas:/)).toBeInTheDocument()
+  })
+
+  it('captures balanced sales without requiring a discrepancy explanation', async () => {
+    api.captureDepositClosure.mockResolvedValue({ report: report({ optimistic_version: 2, closures: [capturedClosure()] }) })
+    renderModal()
+    await screen.findByText('Cierre del 2026-11-01')
+    fireEvent.change(screen.getByLabelText('Ventas totales *'), { target: { value: '100.00' } })
+    fireEvent.change(screen.getByLabelText('Ventas en efectivo *'), { target: { value: '70.00' } })
+    fireEvent.change(screen.getByLabelText('Ventas con tarjeta *'), { target: { value: '30.00' } })
+
+    expect(screen.queryByLabelText('Explicación del descuadre')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Capturar ventas' }))
+
+    await waitFor(() => expect(api.captureDepositClosure).toHaveBeenCalledWith('opaque-report-id', 71, expect.objectContaining({
+      total_sales: '100.00', cash_sales: '70.00', card_sales: '30.00', sales_discrepancy_reason: '',
+    })))
+  })
+
+  it('shows a localized sales discrepancy warning and requires a focused explanation before capture', async () => {
+    renderModal()
+    await screen.findByText('Cierre del 2026-11-01')
+    fireEvent.change(screen.getByLabelText('Ventas totales *'), { target: { value: '100.00' } })
+    fireEvent.change(screen.getByLabelText('Ventas en efectivo *'), { target: { value: '70.00' } })
+    fireEvent.change(screen.getByLabelText('Ventas con tarjeta *'), { target: { value: '20.00' } })
+
+    expect(await screen.findByText(/Descuadre de ventas: L 10\.00/)).toBeInTheDocument()
+    expect(screen.getByText(/Las ventas totales no coinciden con efectivo más tarjeta/)).toBeInTheDocument()
+    const explanation = screen.getByLabelText('Explicación del descuadre *')
+    fireEvent.change(explanation, { target: { value: ' \n ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Capturar ventas' }))
+
+    expect(await screen.findByText('Explica el descuadre de ventas.')).toBeInTheDocument()
+    expect(explanation).toHaveFocus()
+    expect(api.captureDepositClosure).not.toHaveBeenCalled()
+  })
+
+  it('sends a per-closure discrepancy explanation without applying it to another closure', async () => {
+    const firstClosure = report().closures[0]
+    const secondClosure = { ...firstClosure, id: 72, closure_date: '2026-11-02' }
+    api.openDepositReport.mockResolvedValue({ report: report({ closures: [firstClosure, secondClosure] }) })
+    api.captureDepositClosure
+      .mockResolvedValueOnce({ report: report({ optimistic_version: 2, closures: [capturedClosure(), secondClosure] }) })
+      .mockResolvedValueOnce({ report: report({ optimistic_version: 3, closures: [capturedClosure(), capturedClosure({ id: 72, closure_date: '2026-11-02' })] }) })
+    renderModal()
+    const cards = await screen.findAllByRole('article')
+    const firstCard = cards.find((card) => card.textContent.includes('2026-11-01'))
+    const initialSecondCard = cards.find((card) => card.textContent.includes('2026-11-02'))
+
+    for (const [card, values] of [[firstCard, ['100.00', '70.00', '20.00']], [initialSecondCard, ['100.00', '70.00', '30.00']]]) {
+      const inputs = card.querySelectorAll('input[type="number"]')
+      fireEvent.change(inputs[0], { target: { value: values[0] } })
+      fireEvent.change(inputs[1], { target: { value: values[1] } })
+      fireEvent.change(inputs[2], { target: { value: values[2] } })
+    }
+    fireEvent.change(within(firstCard).getByLabelText('Explicación del descuadre *'), { target: { value: 'El POS no registró una venta.' } })
+    fireEvent.click(within(firstCard).getByRole('button', { name: 'Capturar ventas' }))
+
+    await waitFor(() => expect(api.captureDepositClosure).toHaveBeenNthCalledWith(1, 'opaque-report-id', 71, expect.objectContaining({ sales_discrepancy_reason: 'El POS no registró una venta.' })))
+    const updatedCards = await screen.findAllByRole('article')
+    const updatedSecondCard = updatedCards.find((card) => card.textContent.includes('2026-11-02'))
+    expect(within(updatedSecondCard).queryByLabelText('Explicación del descuadre *')).not.toBeInTheDocument()
+    fireEvent.click(within(updatedSecondCard).getByRole('button', { name: 'Capturar ventas' }))
+    await waitFor(() => expect(api.captureDepositClosure).toHaveBeenNthCalledWith(2, 'opaque-report-id', 72, expect.objectContaining({ sales_discrepancy_reason: '' })))
   })
 
   it('renders the complete themed Tuvet dialog shell', async () => {

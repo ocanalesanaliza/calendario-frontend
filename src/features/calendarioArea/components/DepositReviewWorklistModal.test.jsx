@@ -131,6 +131,38 @@ describe('DepositReviewWorklistModal', () => {
     expect(dialog).toHaveTextContent('El banco estaba cerrado')
   })
 
+  it('keeps the pending deposit difference separate from a sales discrepancy warning', async () => {
+    api.getDepositReviewDetail.mockResolvedValue({ ...detail(), closure: { ...detail().closure, sales_discrepancy_amount: '10.00', sales_discrepancy_reason: 'El POS no registró una venta.' } })
+    renderModal()
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver depósito para PSO-002' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Detalle del depósito' })
+    expect(dialog).toHaveTextContent('Diferencia pendiente')
+    expect(dialog).toHaveTextContent('L 25.00')
+    expect(dialog).toHaveTextContent('Descuadre de ventas')
+    expect(dialog).toHaveTextContent('L 10.00')
+    expect(dialog).toHaveTextContent('Explicación del descuadre')
+    expect(dialog).toHaveTextContent('El POS no registró una venta.')
+  })
+
+  it('shows a historical fallback when a sales discrepancy has no recorded explanation', async () => {
+    api.getDepositReviewDetail.mockResolvedValue({ ...detail(), closure: { ...detail().closure, sales_discrepancy_amount: '10.00', sales_discrepancy_reason: null } })
+    renderModal()
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver depósito para PSO-002' }))
+
+    expect(await screen.findByText('Sin explicación registrada.')).toBeInTheDocument()
+  })
+
+  it('does not render a sales discrepancy warning for a balanced closure', async () => {
+    api.getDepositReviewDetail.mockResolvedValue({ ...detail(), closure: { ...detail().closure, sales_discrepancy_amount: '0.00', sales_discrepancy_reason: null } })
+    renderModal()
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver depósito para PSO-002' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Detalle del depósito' })
+    expect(dialog).not.toHaveTextContent('Descuadre de ventas')
+    expect(dialog).not.toHaveTextContent('Explicación del descuadre')
+  })
+
   it('requires a focused non-empty comment before saving an observation', async () => {
     renderModal()
     fireEvent.click(await screen.findByRole('button', { name: 'Con observación para PSO-002' }))
