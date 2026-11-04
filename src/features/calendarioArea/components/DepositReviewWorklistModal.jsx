@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Aviso, Field, FormSection, Modal } from '../../tuvet/components/TuvetUi'
 import { createIdempotencyKey } from '../../calendarArea/services/calendarAreaApi'
 import { getDepositReviewDetail, getDepositReviewWorklist, recordDepositReviewDecision } from '../../calendarArea/services/depositReviewWorklistService'
@@ -53,11 +53,52 @@ function HistoricalContext({ worklist }) {
   )
 }
 
+function ClosureFinancialDetail({ closure, receipts }) {
+  const id = useId()
+  const amount = closure?.sales_discrepancy_amount
+  const hasSalesDiscrepancy = typeof amount === 'string' && /^[+-]?\d+(?:\.\d+)?$/.test(amount) && /[1-9]/.test(amount)
+  return <>
+    <section aria-labelledby={`${id}-summary`}>
+      <h4 id={`${id}-summary`}>Resumen del cierre</h4>
+      <dl className="deposit-review-worklist__detail-summary">
+        <div><dt>Ventas totales</dt><dd>{formatAmount(closure?.total_sales)}</dd></div>
+        <div><dt>Ventas en efectivo</dt><dd>{formatAmount(closure?.cash_sales)}</dd></div>
+        <div><dt>Ventas con tarjeta</dt><dd>{formatAmount(closure?.card_sales)}</dd></div>
+        <div><dt>Monto aplicado</dt><dd>{formatAmount(closure?.deposited_amount)}</dd></div>
+        <div className="deposit-review-worklist__outstanding"><dt>Diferencia pendiente</dt><dd>{formatAmount(closure?.outstanding_amount)}</dd></div>
+        {closure?.no_depositado_reason && <div><dt>Motivo de no depósito</dt><dd>{closure.no_depositado_reason}</dd></div>}
+      </dl>
+    </section>
+    {hasSalesDiscrepancy && <section className="deposit-review-worklist__sales-discrepancy" aria-labelledby={`${id}-discrepancy`}>
+      <h4 id={`${id}-discrepancy`}>Descuadre de ventas</h4>
+      <dl>
+        <div><dt>Descuadre de ventas</dt><dd>{formatAmount(amount)}</dd></div>
+        <div><dt>Explicación del descuadre</dt><dd>{closure.sales_discrepancy_reason?.trim() || 'Sin explicación registrada.'}</dd></div>
+      </dl>
+    </section>}
+    <section aria-labelledby={`${id}-receipts`}>
+      <h4 id={`${id}-receipts`}>Comprobantes aplicables</h4>
+      {receipts?.length ? <ul className="deposit-review-worklist__receipts">{receipts.map((receipt, index) => <li key={`${receipt.reference}-${receipt.deposited_on}-${index}`}><dl><div><dt>Referencia</dt><dd>{receipt.reference}</dd></div><div><dt>Fecha de depósito</dt><dd>{receipt.deposited_on}</dd></div><div><dt>Monto aplicado a este cierre</dt><dd>{formatAmount(receipt.allocated_amount)}</dd></div></dl></li>)}</ul> : <p>No hay comprobantes aplicables para este cierre.</p>}
+    </section>
+  </>
+}
+
+function ReportClosureCard({ closure }) {
+  const id = useId()
+  return <article className="deposit-review-worklist__closure-card" aria-labelledby={id}>
+    <h3 id={id}>Cierre {closure.closure_date}</h3>
+    <ClosureFinancialDetail closure={closure} receipts={closure.receipts} />
+  </article>
+}
+
 function DepositDetailModal({ detail, loading, error, onClose, onRetry }) {
+  const id = useId()
   const closure = detail?.closure
   const caseItem = detail?.case
   const branchName = caseItem?.branch_name || caseItem?.branch_code
-  const hasSalesDiscrepancy = closure?.sales_discrepancy_amount && closure.sales_discrepancy_amount !== '0.00'
+  const otherClosures = (detail?.report_closures ?? [])
+    .filter((entry) => entry.is_selected === false)
+    .sort((a, b) => a.closure_date.localeCompare(b.closure_date))
   return (
     <Modal
       title="Detalle del depósito"
@@ -75,28 +116,15 @@ function DepositDetailModal({ detail, loading, error, onClose, onRetry }) {
             <h3>{branchName}</h3>
             <p>{caseItem?.branch_code} · Cierre {caseItem?.closure_date}</p>
           </header>
-          <section aria-labelledby="deposit-review-summary-title">
-            <h3 id="deposit-review-summary-title">Resumen del cierre</h3>
-            <dl className="deposit-review-worklist__detail-summary">
-            <div><dt>Ventas totales</dt><dd>{formatAmount(closure?.total_sales)}</dd></div>
-            <div><dt>Ventas en efectivo</dt><dd>{formatAmount(closure?.cash_sales)}</dd></div>
-            <div><dt>Ventas con tarjeta</dt><dd>{formatAmount(closure?.card_sales)}</dd></div>
-              <div><dt>Monto aplicado</dt><dd>{formatAmount(closure?.deposited_amount)}</dd></div>
-              <div className="deposit-review-worklist__outstanding"><dt>Diferencia pendiente</dt><dd>{formatAmount(closure?.outstanding_amount)}</dd></div>
-              {closure?.no_depositado_reason && <div><dt>Motivo de no depósito</dt><dd>{closure.no_depositado_reason}</dd></div>}
-            </dl>
-          </section>
-          {hasSalesDiscrepancy && <section className="deposit-review-worklist__sales-discrepancy" aria-labelledby="deposit-review-sales-discrepancy-title">
-            <h3 id="deposit-review-sales-discrepancy-title">Descuadre de ventas</h3>
-            <dl>
-              <div><dt>Descuadre de ventas</dt><dd>{formatAmount(closure.sales_discrepancy_amount)}</dd></div>
-              <div><dt>Explicación del descuadre</dt><dd>{closure.sales_discrepancy_reason || 'Sin explicación registrada.'}</dd></div>
-            </dl>
+          <article className="deposit-review-worklist__closure-card" aria-labelledby={`${id}-selected`}>
+            <h3 id={`${id}-selected`}>En revisión · Cierre {caseItem?.closure_date}</h3>
+            <ClosureFinancialDetail closure={closure} receipts={detail.receipts} />
+          </article>
+          {otherClosures.length > 0 && <section className="deposit-review-worklist__other-closures" aria-labelledby={`${id}-others`}>
+            <h3 id={`${id}-others`}>Otros cierres de este reporte</h3>
+            <p>Contexto financiero de solo lectura. La revisión corresponde únicamente al cierre indicado como «En revisión».</p>
+            {otherClosures.map((entry) => <ReportClosureCard key={entry.closure_date} closure={entry} />)}
           </section>}
-          <section aria-labelledby="deposit-review-receipts-title">
-            <h3 id="deposit-review-receipts-title">Comprobantes aplicables</h3>
-            {detail.receipts?.length ? <ul className="deposit-review-worklist__receipts">{detail.receipts.map((receipt) => <li key={`${receipt.reference}-${receipt.deposited_on}`}><dl><div><dt>Referencia</dt><dd>{receipt.reference}</dd></div><div><dt>Fecha de depósito</dt><dd>{receipt.deposited_on}</dd></div><div><dt>Monto aplicado a este cierre</dt><dd>{formatAmount(receipt.allocated_amount)}</dd></div></dl></li>)}</ul> : <p>No hay comprobantes aplicables para este cierre.</p>}
-          </section>
         </>}
       </div>
     </Modal>

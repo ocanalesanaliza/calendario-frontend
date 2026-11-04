@@ -223,8 +223,28 @@
 }
 
 .deposit-review-worklist__detail h3,
+.deposit-review-worklist__detail h4,
 .deposit-review-worklist__detail p {
   margin: 0;
+}
+
+.deposit-review-worklist__closure-card,
+.deposit-review-worklist__other-closures {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.deposit-review-worklist__closure-card {
+  padding: 1rem;
+  border: 1px solid var(--tv-border);
+  border-radius: var(--tv-radius-sm);
+  background: var(--tv-surface);
+}
+
+.deposit-review-worklist__closure-card dd {
+  font-variant-numeric: tabular-nums;
 }
 
 .deposit-review-worklist__detail-heading {
@@ -275,7 +295,7 @@
   background: var(--tv-warning-soft);
 }
 
-.deposit-review-worklist__sales-discrepancy h3 {
+.deposit-review-worklist__sales-discrepancy h4 {
   color: var(--tv-warning-text);
 }
 

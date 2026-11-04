@@ -45,10 +45,146 @@ function renderModal() {
   return render(<DepositReviewWorklistModal occurrenceVirtualId={occurrenceVirtualId} onClose={vi.fn()} onTerminal={vi.fn()} />)
 }
 
+function reportDetail() {
+  const selected = detail()
+  return {
+    ...selected,
+    report_closures: [
+      { ...selected.closure, closure_date: '2026-11-04', is_selected: false, total_sales: '321.00', outstanding_amount: '17.25', sales_discrepancy_amount: '-8.50', sales_discrepancy_reason: null, no_depositado_reason: 'Depósito del jueves pendiente', receipts: [] },
+      { ...selected.closure, closure_date: selected.case.closure_date, is_selected: true, receipts: selected.receipts },
+      { ...selected.closure, closure_date: '2026-11-01', is_selected: false, total_sales: '212.00', outstanding_amount: '13.75', sales_discrepancy_amount: '4.50', sales_discrepancy_reason: 'Ajuste del domingo', no_depositado_reason: 'Banco del domingo cerrado', receipts: [{ reference: 'REF-CONTEXT', deposited_on: '2026-11-05', deposited_amount: '888.00', allocated_amount: '33.00' }] },
+    ],
+  }
+}
+
+async function openReport(data) {
+  api.getDepositReviewDetail.mockResolvedValue(data)
+  renderModal()
+  const trigger = await screen.findByRole('button', { name: 'Ver depósito para PSO-002' })
+  trigger.focus()
+  fireEvent.click(trigger)
+  const dialog = await screen.findByRole('dialog', { name: 'Detalle del depósito' })
+  await within(dialog).findByText('REF-001')
+  return { dialog, trigger }
+}
+
 describe('DepositReviewWorklistModal', () => {
   beforeEach(() => {
     Object.values(api).forEach((mock) => mock.mockReset())
     api.getDepositReviewWorklist.mockResolvedValue(worklist())
+  })
+
+  it('isolates the selected closure and chronologically sorted context without mutating the report', async () => {
+    const data = reportDetail()
+    const snapshot = structuredClone(data)
+    Object.freeze(data.report_closures)
+    const { dialog, trigger } = await openReport(data)
+    const selected = within(dialog).getByRole('article', { name: 'En revisión · Cierre 2026-11-02' })
+    const context = within(dialog).getByRole('region', { name: 'Otros cierres de este reporte' })
+    const cards = within(context).getAllByRole('article')
+    expect(cards).toHaveLength(2)
+    expect(within(cards[0]).getByRole('heading', { name: 'Cierre 2026-11-01' })).toBeInTheDocument()
+    expect(within(cards[1]).getByRole('heading', { name: 'Cierre 2026-11-04' })).toBeInTheDocument()
+    expect(data).toEqual(snapshot)
+    expect(within(dialog).getAllByRole('article')).toHaveLength(3)
+    expect(selected).toHaveTextContent('REF-001')
+    expect(selected).not.toHaveTextContent('REF-CONTEXT')
+    expect(cards[0]).not.toHaveTextContent('REF-001')
+    expect(cards[0]).toHaveTextContent('REF-CONTEXT')
+    expect(cards[0]).toHaveTextContent('2026-11-05')
+    expect(cards[0]).toHaveTextContent('L 33.00')
+    expect(cards[0]).not.toHaveTextContent('888.00')
+    expect(cards[0]).toHaveTextContent('Banco del domingo cerrado')
+    expect(cards[0]).not.toHaveTextContent('Depósito del jueves pendiente')
+    expect(cards[1]).toHaveTextContent('Depósito del jueves pendiente')
+    expect(cards[1]).toHaveTextContent('No hay comprobantes aplicables para este cierre.')
+    for (const [card, total, pending, discrepancy, reason] of [
+      [cards[0], '212.00', '13.75', '4.50', 'Ajuste del domingo'],
+      [cards[1], '321.00', '17.25', '-8.50', 'Sin explicación registrada.'],
+    ]) {
+      const summary = within(card).getByRole('region', { name: 'Resumen del cierre' })
+      const warning = within(card).getByRole('region', { name: 'Descuadre de ventas' })
+      expect(summary).toHaveTextContent(`L ${total}`)
+      expect(summary).toHaveTextContent('L 60.00')
+      expect(summary).toHaveTextContent('L 40.00')
+      expect(summary).toHaveTextContent('L 75.00')
+      expect(summary).toHaveTextContent(`Diferencia pendienteL ${pending}`)
+      expect(summary).not.toHaveTextContent('Descuadre de ventas')
+      expect(warning).toHaveTextContent(`L ${discrepancy}`)
+      expect(warning).toHaveTextContent(reason)
+    }
+    const ids = [...dialog.querySelectorAll('[id]')].map((node) => node.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(dialog.querySelectorAll('input, select, textarea, [contenteditable="true"]')).toHaveLength(0)
+    expect(within(dialog).queryByRole('button', { name: /Conforme|observación|Guardar/ })).not.toBeInTheDocument()
+    const buttons = within(dialog).getAllByRole('button')
+    buttons.at(-1).focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(buttons[0]).toHaveFocus()
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+    expect(buttons.at(-1)).toHaveFocus()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(dialog).not.toBeInTheDocument())
+    expect(trigger).toHaveFocus()
+    expect(api.recordDepositReviewDecision).not.toHaveBeenCalled()
+    expect(api.getDepositReviewDetail).toHaveBeenCalledExactlyOnceWith(occurrenceVirtualId, reportAvailableCase.id)
+  })
+
+  it('preserves selected evidence and opaque decision identity after closing contextual detail', async () => {
+    const data = reportDetail()
+    const snapshot = structuredClone(data)
+    api.recordDepositReviewDecision.mockResolvedValue({ worklist: worklist([]) })
+    const { dialog, trigger } = await openReport(data)
+    const selected = within(dialog).getByRole('article', { name: 'En revisión · Cierre 2026-11-02' })
+    expect([...selected.querySelectorAll('dd')].map((node) => node.textContent)).toEqual([
+      'L 100.00', 'L 60.00', 'L 40.00', 'L 75.00', 'L 25.00', 'El banco estaba cerrado', 'REF-001', '2026-11-03', 'L 75.00',
+    ])
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(trigger).toHaveFocus())
+    fireEvent.click(screen.getByRole('button', { name: 'Conforme para PSO-002' }))
+    await waitFor(() => expect(api.recordDepositReviewDecision).toHaveBeenCalledExactlyOnceWith(occurrenceVirtualId, reportAvailableCase.id, expect.objectContaining({ decision: 'conforme', comment: '' })))
+    expect(data).toEqual(snapshot)
+  })
+
+  it('requires an explicit false selection flag and preserves duplicate receipt allocations', async () => {
+    const data = reportDetail()
+    const row = {
+      ...data.report_closures[2], outstanding_amount: '-19.87', sales_discrepancy_amount: '+3.25', sales_discrepancy_reason: '  ',
+      receipts: [
+        { reference: 'OWN', deposited_on: '2026-11-05', allocated_amount: '0.21' },
+        { reference: 'OWN', deposited_on: '2026-11-05', allocated_amount: '0.22' },
+      ],
+    }
+    data.report_closures = [{ ...row, is_selected: true }, { ...row, is_selected: 0 }, { ...row, is_selected: undefined }, row]
+    const { dialog } = await openReport(data)
+    const context = within(dialog).getByRole('region', { name: 'Otros cierres de este reporte' })
+    const cards = within(context).getAllByRole('article')
+    expect(cards).toHaveLength(1)
+    expect(cards[0]).toHaveTextContent('L -19.87')
+    expect(cards[0]).toHaveTextContent('L 3.25')
+    expect(cards[0]).toHaveTextContent('Sin explicación registrada.')
+    const receipts = within(cards[0]).getAllByRole('listitem')
+    expect(receipts).toHaveLength(2)
+    expect(receipts[0]).toHaveTextContent('OWN')
+    expect(receipts[0]).toHaveTextContent('L 0.21')
+    expect(receipts[1]).toHaveTextContent('OWN')
+    expect(receipts[1]).toHaveTextContent('L 0.22')
+  })
+
+  it.each([undefined, null, [], [{ ...detail().closure, closure_date: '2026-11-02', is_selected: true }]])('omits context when there are no other closures (%j)', async (closures) => {
+    const { dialog } = await openReport({ ...detail(), report_closures: closures })
+    expect(within(dialog).queryByRole('region', { name: 'Otros cierres de este reporte' })).not.toBeInTheDocument()
+  })
+
+  it.each(['0', '0.00', '-0.000', null, undefined, '', ' ', 'invalid', 'NaN', 'Infinity', '0x10', '1e2'])('does not warn for a zero, historical or invalid decimal (%s) in either closure', async (amount) => {
+    const data = reportDetail()
+    data.closure.sales_discrepancy_amount = amount
+    data.report_closures = data.report_closures.map((closure) => ({ ...closure, sales_discrepancy_amount: amount }))
+    const { dialog } = await openReport(data)
+    for (const card of within(dialog).getAllByRole('article')) {
+      expect(within(card).queryByRole('region', { name: 'Descuadre de ventas' })).not.toBeInTheDocument()
+      expect(card).not.toHaveTextContent('Sin explicación registrada.')
+    }
   })
 
   it('translates classifications and only exposes the actions allowed for each dynamic case', async () => {
