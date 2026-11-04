@@ -220,7 +220,7 @@ describe('DepositDemoModal', () => {
   })
 
   it('submits with the current version and renders the server-submitted state', async () => {
-    api.openDepositReport.mockResolvedValue({ report: report({ closures: [capturedClosure({ no_depositado_reason: 'El banco estaba cerrado.' })] }) })
+    api.openDepositReport.mockResolvedValue({ report: report({ closures: [capturedClosure({ no_depositado_reason: 'El banco estaba cerrado.' })], readiness: { ready_to_submit: true, blockers: [] } }) })
     api.submitDepositReport.mockResolvedValue({ report: report({ state: 'submitted', optimistic_version: 2, submission: { state: 'submitted', closures: [], receipts: [] } }) })
     renderModal()
     fireEvent.click(await screen.findByRole('button', { name: 'Revisar y enviar reporte' }))
@@ -230,7 +230,7 @@ describe('DepositDemoModal', () => {
   })
 
   it('exposes an operational conflict without losing the recoverable report', async () => {
-    api.openDepositReport.mockResolvedValue({ report: report({ closures: [capturedClosure({ no_depositado_reason: 'Banco cerrado' })] }) })
+    api.openDepositReport.mockResolvedValue({ report: report({ closures: [capturedClosure({ no_depositado_reason: 'Banco cerrado' })], readiness: { ready_to_submit: true, blockers: [] } }) })
     api.submitDepositReport.mockRejectedValue(Object.assign(new Error('deposit_api_disabled'), { status: 409, detail: 'deposit_api_disabled' }))
     renderModal()
     fireEvent.click(await screen.findByRole('button', { name: 'Revisar y enviar reporte' }))
@@ -251,7 +251,7 @@ describe('DepositDemoModal', () => {
   })
 
   it('translates known conflicts to the Spanish recoverable-conflict message', async () => {
-    const ready = report({ closures: [capturedClosure({ no_depositado_reason: 'Banco cerrado' })] })
+    const ready = report({ closures: [capturedClosure({ no_depositado_reason: 'Banco cerrado' })], readiness: { ready_to_submit: true, blockers: [] } })
     api.openDepositReport.mockResolvedValue({ report: ready })
     api.submitDepositReport.mockRejectedValue(backendError({ status: 409, detail: 'stale_report' }))
     api.getDepositReport.mockResolvedValue({ report: ready })
@@ -275,7 +275,7 @@ describe('DepositDemoModal', () => {
       capturedClosure({ id: 73, closure_date: '2026-11-03', no_depositado_reason: 'Banco cerrado' }),
       capturedClosure({ id: 74, closure_date: '2026-11-04' }),
     ]
-    api.openDepositReport.mockResolvedValue({ report: report({ closures, receipts: [{ id: 81, reference: 'REF-1', deposited_amount: '50.00', deposited_on: '2026-11-04', allocations: [{ closure_entry_id: 74, allocated_amount: '50.00' }] }] }) })
+    api.openDepositReport.mockResolvedValue({ report: report({ closures, receipts: [{ id: 81, reference: 'REF-1', deposited_amount: '50.00', deposited_on: '2026-11-04', allocations: [{ closure_entry_id: 74, allocated_amount: '50.00' }] }], readiness: { ready_to_submit: false, blockers: [{ code: 'closure_sales_missing', closure_entry_id: 71, closure_date: '2026-11-01' }, { code: 'closure_resolution_missing', closure_entry_id: 72, closure_date: '2026-11-02' }] } }) })
     renderModal()
 
     expect(await screen.findByText('Faltan acciones para enviar')).toBeInTheDocument()
@@ -288,7 +288,7 @@ describe('DepositDemoModal', () => {
     expect(screen.getByText('Pendiente de capturar ventas.')).toBeInTheDocument()
     expect(screen.getByText('Ventas capturadas; pendiente de resolver depósito.')).toBeInTheDocument()
     expect(screen.getByText('Declarado como no depositado.')).toBeInTheDocument()
-    expect(screen.getByText('Resuelto con comprobante asignado.')).toBeInTheDocument()
+    expect(screen.getByText('Resuelto según validación del reporte.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Revisar y enviar reporte' })).toBeDisabled()
   })
 
@@ -326,7 +326,7 @@ describe('DepositDemoModal', () => {
   })
 
   it('opens review only for a ready report and does not submit when review is cancelled', async () => {
-    api.openDepositReport.mockResolvedValue({ report: report({ closures: [capturedClosure({ no_depositado_reason: 'Banco cerrado' })] }) })
+    api.openDepositReport.mockResolvedValue({ report: report({ closures: [capturedClosure({ no_depositado_reason: 'Banco cerrado' })], readiness: { ready_to_submit: true, blockers: [] } }) })
     renderModal()
     const review = await screen.findByRole('button', { name: 'Revisar y enviar reporte' })
     expect(screen.getByText('Listo para revisión')).toBeInTheDocument()
@@ -335,5 +335,125 @@ describe('DepositDemoModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
     expect(api.submitDepositReport).not.toHaveBeenCalled()
     expect(review).toHaveFocus()
+  })
+
+  it('shows backend financial context without recalculating the closure outstanding amount', async () => {
+    api.openDepositReport.mockResolvedValue({ report: report({
+      closures: [capturedClosure({
+        total_sales: '130.00', cash_sales: '100.00', card_sales: '20.00',
+        deposited_amount: '40.00', outstanding_amount: '987.65',
+        sales_discrepancy_amount: '10.00', sales_discrepancy_reason: 'Ajuste de caja',
+      })],
+      readiness: { ready_to_submit: false, blockers: [{ code: 'closure_resolution_missing', closure_entry_id: 71, closure_date: '2026-11-01' }] },
+    }) })
+    renderModal()
+
+    expect(await screen.findByText(/Ventas en efectivo: L 100\.00/)).toBeInTheDocument()
+    expect(screen.getByText(/Monto aplicado\/depositado: L 40\.00/)).toBeInTheDocument()
+    expect(screen.getByText(/Diferencia pendiente de depósito: L 987\.65/)).toBeInTheDocument()
+    expect(screen.getByText(/Descuadre de ventas: L 10\.00/)).toBeInTheDocument()
+    expect(screen.getByText('Explicación del descuadre: Ajuste de caja')).toBeInTheDocument()
+    expect(screen.queryByText(/Diferencia pendiente de depósito: L 60\.00/)).not.toBeInTheDocument()
+  })
+
+  it('does not invent financial amounts for a closure without captured sales', async () => {
+    api.openDepositReport.mockResolvedValue({ report: report({
+      readiness: { ready_to_submit: false, blockers: [{ code: 'closure_sales_missing', closure_entry_id: 71, closure_date: '2026-11-01' }] },
+    }) })
+    renderModal()
+
+    await screen.findByText('Cierre del 2026-11-01')
+    expect(screen.queryByText(/Monto aplicado\/depositado/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Diferencia pendiente de depósito/)).not.toBeInTheDocument()
+  })
+
+  it('shows receipt backend amounts and resolved allocation dates without calculating availability', async () => {
+    api.openDepositReport.mockResolvedValue({ report: report({
+      closures: [capturedClosure({ outstanding_amount: '31.00', deposited_amount: '69.00' })],
+      receipts: [{ id: 81, reference: 'REF-1', deposited_amount: '70.00', allocated_amount: '7.00', unallocated_amount: '456.78', deposited_on: '2026-11-02', allocations: [{ closure_entry_id: 71, allocated_amount: '7.00' }] }],
+      readiness: { ready_to_submit: false, blockers: [{ code: 'closure_resolution_missing', closure_entry_id: 71, closure_date: '2026-11-01' }] },
+    }) })
+    renderModal()
+
+    expect(await screen.findByText(/Monto depositado: L 70\.00/)).toBeInTheDocument()
+    expect(screen.getByText(/Monto asignado: L 7\.00/)).toBeInTheDocument()
+    expect(screen.getByText(/Monto disponible: L 456\.78/)).toBeInTheDocument()
+    expect(screen.getByText(/Asignado al cierre 2026-11-01: L 7\.00/)).toBeInTheDocument()
+    expect(screen.queryByText(/Monto disponible: L 63\.00/)).not.toBeInTheDocument()
+  })
+
+  it('uses backend amounts in allocation confirmation while preserving cancellation and payload', async () => {
+    const captured = report({
+      closures: [capturedClosure({ outstanding_amount: '333.33', deposited_amount: '70.00' })],
+      receipts: [{ id: 81, reference: 'REF-1', deposited_amount: '70.00', allocated_amount: '10.00', unallocated_amount: '222.22', deposited_on: '2026-11-02', allocations: [] }],
+      readiness: { ready_to_submit: false, blockers: [{ code: 'closure_resolution_missing', closure_entry_id: 71, closure_date: '2026-11-01' }] },
+    })
+    api.openDepositReport.mockResolvedValue({ report: captured })
+    renderModal()
+    const closureSelect = await screen.findByLabelText('Cierre capturado *')
+    fireEvent.change(closureSelect, { target: { value: '71' } })
+    fireEvent.change(screen.getByLabelText('Monto asignado *'), { target: { value: '12.00' } })
+    const trigger = screen.getByRole('button', { name: 'Asignar comprobante' })
+    fireEvent.click(trigger)
+
+    expect(await screen.findByText(/Monto disponible del comprobante: L 222\.22/)).toBeInTheDocument()
+    expect(screen.getByText(/Pendiente del cierre seleccionado: L 333\.33/)).toBeInTheDocument()
+    expect(screen.getByText(/Monto a asignar: L 12\.00/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(trigger).toHaveFocus()
+    expect(api.allocateDepositReceipt).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['closure_sales_missing', 'Captura las ventas del cierre 2026-11-01.'],
+    ['closure_resolution_missing', 'Asigna un comprobante o declara que no hubo depósito para el cierre 2026-11-01.'],
+    ['report_receipt_missing', 'Agrega al menos un comprobante para poder enviar el reporte.'],
+    ['unexpected_code', 'El reporte tiene una validación pendiente. Actualiza e inténtalo nuevamente.'],
+  ])('uses authoritative readiness blocker %s and keeps submission blocked', async (code, message) => {
+    api.openDepositReport.mockResolvedValue({ report: report({
+      closures: [capturedClosure()],
+      readiness: { ready_to_submit: false, blockers: [{ code, closure_entry_id: 71, closure_date: '2026-11-01' }] },
+    }) })
+    renderModal()
+
+    expect(await screen.findByText(message)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Revisar y enviar reporte' })).toBeDisabled()
+  })
+
+  it('blocks submission when readiness is missing or invalid and opens final review only when backend marks it ready', async () => {
+    api.openDepositReport.mockResolvedValueOnce({ report: report({ closures: [capturedClosure({ no_depositado_reason: 'Banco cerrado' })] }) })
+    const first = renderModal()
+    expect(await screen.findByText('El reporte tiene una validación pendiente. Actualiza e inténtalo nuevamente.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Revisar y enviar reporte' })).toBeDisabled()
+    first.unmount()
+
+    api.openDepositReport.mockResolvedValueOnce({ report: report({
+      closures: [capturedClosure({ no_depositado_reason: 'Banco cerrado' })],
+      readiness: { ready_to_submit: 'true', blockers: [] },
+    }) })
+    const second = renderModal()
+    expect(await screen.findByRole('button', { name: 'Revisar y enviar reporte' })).toBeDisabled()
+    second.unmount()
+
+    api.openDepositReport.mockResolvedValueOnce({ report: report({
+      closures: [capturedClosure({ no_depositado_reason: 'Banco cerrado' })],
+      readiness: { ready_to_submit: true, blockers: [] },
+    }) })
+    renderModal()
+    const review = await screen.findByRole('button', { name: 'Revisar y enviar reporte' })
+    expect(review).toBeEnabled()
+    fireEvent.click(review)
+    expect(await screen.findByText('El envío del reporte es definitivo.')).toBeInTheDocument()
+  })
+
+  it('blocks contradictory readiness payloads', async () => {
+    api.openDepositReport.mockResolvedValue({ report: report({
+      closures: [capturedClosure({ no_depositado_reason: 'Banco cerrado' })],
+      readiness: { ready_to_submit: true, blockers: [{ code: 'closure_resolution_missing', closure_entry_id: 71, closure_date: '2026-11-01' }] },
+    }) })
+    renderModal()
+
+    expect(await screen.findByText('Asigna un comprobante o declara que no hubo depósito para el cierre 2026-11-01.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Revisar y enviar reporte' })).toBeDisabled()
   })
 })

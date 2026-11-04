@@ -32,17 +32,27 @@ function messageFor(error) {
   return 'No se pudo completar la acción. Revisa los datos e inténtalo de nuevo.'
 }
 
-function closureHasPositiveAllocation(closure, receipts) {
-  return receipts.some((receipt) => (receipt.allocations ?? []).some((allocation) => (
-    String(allocation.closure_entry_id) === String(closure.id) && Number(allocation.allocated_amount) > 0
-  )))
+const hasReportedAmount = (value) => value !== null && value !== undefined
+const formatReportedAmount = (value) => hasReportedAmount(value) ? formatAmount(value) : 'No disponible'
+
+function isValidReadiness(readiness) {
+  return Boolean(readiness) && typeof readiness === 'object' && typeof readiness.ready_to_submit === 'boolean' && Array.isArray(readiness.blockers) && readiness.blockers.every((blocker) => blocker && typeof blocker.code === 'string')
 }
 
-function closurePreparation(closure, receipts) {
-  if (!closure.sales_captured) return { status: 'Pendiente de capturar ventas.', resolved: false, reason: `Captura las ventas del cierre ${closure.closure_date}.` }
-  if (String(closure.no_depositado_reason ?? '').trim()) return { status: 'Declarado como no depositado.', resolved: true }
-  if (closureHasPositiveAllocation(closure, receipts)) return { status: 'Resuelto con comprobante asignado.', resolved: true }
-  return { status: 'Ventas capturadas; pendiente de resolver depósito.', resolved: false, reason: `Asigna un comprobante o declara que no hubo depósito para el cierre ${closure.closure_date}.` }
+function readinessMessage(blocker) {
+  if (blocker?.code === 'closure_sales_missing') return `Captura las ventas del cierre ${blocker.closure_date}.`
+  if (blocker?.code === 'closure_resolution_missing') return `Asigna un comprobante o declara que no hubo depósito para el cierre ${blocker.closure_date}.`
+  if (blocker?.code === 'report_receipt_missing') return 'Agrega al menos un comprobante para poder enviar el reporte.'
+  return 'El reporte tiene una validación pendiente. Actualiza e inténtalo nuevamente.'
+}
+
+function closurePreparation(closure, blockers, readinessValid) {
+  if (!readinessValid) return { status: 'Preparación pendiente de actualizar.', resolved: false }
+  const blocker = blockers.find((item) => String(item.closure_entry_id) === String(closure.id))
+  if (blocker?.code === 'closure_sales_missing') return { status: 'Pendiente de capturar ventas.', resolved: false }
+  if (blocker) return { status: 'Ventas capturadas; pendiente de resolver depósito.', resolved: false }
+  if (closure.no_depositado_reason) return { status: 'Declarado como no depositado.', resolved: true }
+  return { status: 'Resuelto según validación del reporte.', resolved: true }
 }
 
 function ConfirmationModal({ title, children, confirmLabel, onConfirm, onCancel, saving }) {
@@ -202,9 +212,11 @@ export function DepositDemoModal({ tarea, fecha, sucursal, onClose }) {
   }
 
   const allSalesCaptured = (report?.closures ?? []).every((closure) => closure.sales_captured === true)
-  const preparations = (report?.closures ?? []).map((closure) => ({ closure, ...closurePreparation(closure, report?.receipts ?? []) }))
-  const blockers = preparations.filter(({ resolved }) => !resolved)
-  const readyForReview = Boolean(report) && blockers.length === 0
+  const readinessValid = isValidReadiness(report?.readiness)
+  const readinessBlockers = readinessValid ? report.readiness.blockers : [{ code: 'readiness_invalid' }]
+  const blockerClosureIds = new Set(readinessBlockers.filter((blocker) => blocker.closure_entry_id !== null && blocker.closure_entry_id !== undefined).map((blocker) => String(blocker.closure_entry_id)))
+  const resolvedClosures = readinessValid ? (report?.closures ?? []).filter((closure) => !blockerClosureIds.has(String(closure.id))) : []
+  const readyForReview = Boolean(report) && readinessValid && report.readiness.ready_to_submit === true && readinessBlockers.length === 0
 
   function confirmAction() {
     if (!confirmation) return
@@ -236,19 +248,19 @@ export function DepositDemoModal({ tarea, fecha, sucursal, onClose }) {
         {report?.state === 'submitted' ? <Aviso tipo="success">El reporte fue enviado correctamente.</Aviso> : <>
           <section className="deposit-readiness" aria-labelledby="deposit-readiness-title" aria-live="polite">
             <h3 id="deposit-readiness-title">Preparación del reporte</h3>
-            <div className="deposit-readiness-metrics"><span>Cierres presentados: {preparations.length}</span><span>Ventas capturadas: {preparations.filter(({ closure }) => closure.sales_captured).length}</span><span>Cierres resueltos: {preparations.filter(({ resolved }) => resolved).length}</span><span>Cierres pendientes: {blockers.length}</span></div>
+            <div className="deposit-readiness-metrics"><span>Cierres presentados: {(report?.closures ?? []).length}</span><span>Ventas capturadas: {(report?.closures ?? []).filter((closure) => closure.sales_captured).length}</span><span>Cierres resueltos: {resolvedClosures.length}</span><span>Cierres pendientes: {blockerClosureIds.size}</span></div>
             <p className={`deposit-readiness-state ${readyForReview ? 'is-ready' : ''}`} role="status">{readyForReview ? 'Listo para revisión' : 'Faltan acciones para enviar'}</p>
-            {!readyForReview && <ul id="deposit-submit-blockers" className="deposit-readiness-blockers">{blockers.map(({ closure, reason }) => <li key={closure.id}>{reason}</li>)}</ul>}
+            {!readyForReview && <ul id="deposit-submit-blockers" className="deposit-readiness-blockers">{readinessBlockers.map((blocker, index) => <li key={`${blocker.code}-${blocker.closure_entry_id ?? index}`}>{readinessMessage(blocker)}</li>)}</ul>}
           </section>
           <FormSection title="Cierres" description="Registra solo los cierres proporcionados por el reporte.">
             {!allSalesCaptured && <p className="deposit-flow-notice" role="status">Captura las ventas de todos los cierres presentados antes de declarar un cierre como no depositado.</p>}
             <div className="deposit-flow-list">
               {(report?.closures ?? []).map((closure) => {
-                const preparation = closurePreparation(closure, report?.receipts ?? [])
+                const preparation = closurePreparation(closure, readinessBlockers, readinessValid)
                 return <article className="deposit-flow-card" key={closure.id}>
                 <h3>Cierre del {closure.closure_date}</h3>
                 <p className={`deposit-closure-status ${preparation.resolved ? 'is-resolved' : ''}`} role="status">{preparation.status}</p>
-                {closure.sales_captured && <p role="status">Ventas capturadas: {formatAmount(closure.total_sales)}. Efectivo: {formatAmount(closure.cash_sales)}. Tarjeta: {formatAmount(closure.card_sales)}.</p>}
+                {closure.sales_captured && <><p role="status">Ventas capturadas: {formatReportedAmount(closure.total_sales)}. Efectivo: {formatReportedAmount(closure.cash_sales)}. Tarjeta: {formatReportedAmount(closure.card_sales)}.</p><div className="deposit-financial-context"><p>Ventas en efectivo: {formatReportedAmount(closure.cash_sales)}</p>{hasReportedAmount(closure.deposited_amount) && <p>Monto aplicado/depositado: {formatReportedAmount(closure.deposited_amount)}</p>}{hasReportedAmount(closure.outstanding_amount) && <p>Diferencia pendiente de depósito: {formatReportedAmount(closure.outstanding_amount)}</p>}{hasReportedAmount(closure.sales_discrepancy_amount) && <p>Descuadre de ventas: {formatReportedAmount(closure.sales_discrepancy_amount)}</p>}</div>{closure.sales_discrepancy_reason && <p role="status">Explicación del descuadre: {closure.sales_discrepancy_reason}</p>}</>}
                 {closure.no_depositado_reason ? <p role="status">No depositado: {closure.no_depositado_reason}</p> : <>
                   {!closure.sales_captured &&
                   (() => {
@@ -277,7 +289,7 @@ export function DepositDemoModal({ tarea, fecha, sucursal, onClose }) {
               <Field label="Fecha de depósito" required error={fieldErrors['deposited-on']}><input name="deposited-on" type="date" value={receipt.deposited_on} onChange={(event) => { setReceipt((current) => ({ ...current, deposited_on: event.target.value })); if (event.target.value.trim()) clearFieldError('deposited-on') }} /></Field>
               <button type="submit" className="tuvet-btn" disabled={Boolean(saving)} aria-busy={saving === 'receipt'}>{saving === 'receipt' ? 'Agregando comprobante…' : 'Agregar comprobante'}</button>
             </form>
-            {(report?.receipts ?? []).map((receiptItem) => <article className="deposit-flow-card" key={receiptItem.id}><h3>Comprobante {receiptItem.reference}</h3><p>{formatAmount(receiptItem.deposited_amount)} · {receiptItem.deposited_on}</p>
+            {(report?.receipts ?? []).map((receiptItem) => <article className="deposit-flow-card" key={receiptItem.id}><h3>Comprobante {receiptItem.reference}</h3><p>{formatReportedAmount(receiptItem.deposited_amount)} · {receiptItem.deposited_on}</p><div className="deposit-financial-context"><p>Monto depositado: {formatReportedAmount(receiptItem.deposited_amount)}</p>{hasReportedAmount(receiptItem.allocated_amount) && <p>Monto asignado: {formatReportedAmount(receiptItem.allocated_amount)}</p>}{hasReportedAmount(receiptItem.unallocated_amount) && <p>Monto disponible: {formatReportedAmount(receiptItem.unallocated_amount)}</p>}</div>{(receiptItem.allocations ?? []).map((allocation, index) => { const closure = (report?.closures ?? []).find((item) => String(item.id) === String(allocation.closure_entry_id)); return <p key={allocation.id ?? `${allocation.closure_entry_id}-${index}`}>Asignado al cierre {closure?.closure_date ?? 'no disponible'}: {formatReportedAmount(allocation.allocated_amount)}</p> })}
               <form onSubmit={(event) => submitAllocation(event, receiptItem)} className="deposit-flow-inline" noValidate>
                 <Field label="Cierre capturado" required error={fieldErrors[`closure-${receiptItem.id}`]}><select name={`closure-${receiptItem.id}`} value={(allocations[receiptItem.id] ?? {}).closure_entry_id ?? ''} onChange={(event) => { setAllocations((current) => ({ ...current, [receiptItem.id]: { ...(current[receiptItem.id] ?? {}), closure_entry_id: event.target.value } })); if (event.target.value) clearFieldError(`closure-${receiptItem.id}`) }}><option value="">Selecciona un cierre</option>{(report?.closures ?? []).filter((closure) => closure.sales_captured).map((closure) => <option value={closure.id} key={closure.id}>{closure.closure_date}</option>)}</select></Field>
                 <Field label="Monto asignado" required error={fieldErrors[`allocated-${receiptItem.id}`]}><input name={`allocated-${receiptItem.id}`} type="number" min="0" step="0.01" inputMode="decimal" value={(allocations[receiptItem.id] ?? {}).allocated_amount ?? ''} onChange={(event) => { setAllocations((current) => ({ ...current, [receiptItem.id]: { ...(current[receiptItem.id] ?? {}), allocated_amount: event.target.value } })); if (event.target.value.trim()) clearFieldError(`allocated-${receiptItem.id}`) }} /></Field>
@@ -289,7 +301,7 @@ export function DepositDemoModal({ tarea, fecha, sucursal, onClose }) {
       </EstadoCarga>
     </div>
     {confirmation?.type === 'capture' && <ConfirmationModal title="Confirmar captura de ventas" confirmLabel="Confirmar captura" onCancel={() => setConfirmation(null)} onConfirm={confirmAction} saving={Boolean(saving)}><p>Cierre: <strong>{confirmation.closure.closure_date}</strong></p><p>Ventas totales: <strong>{formatAmount(confirmation.values.total_sales)}</strong></p><p>Efectivo: <strong>{formatAmount(confirmation.values.cash_sales)}</strong></p><p>Tarjeta: <strong>{formatAmount(confirmation.values.card_sales)}</strong></p>{confirmation.discrepancy ? <p>Descuadre: <strong>{formatAmount(confirmation.discrepancy)}</strong>. Explicación: {confirmation.values.sales_discrepancy_reason}</p> : null}<Aviso tipo="warning">Después de guardar, esta captura no podrá modificarse.</Aviso></ConfirmationModal>}
-    {confirmation?.type === 'allocation' && <ConfirmationModal title="Confirmar asignación" confirmLabel="Confirmar asignación" onCancel={() => setConfirmation(null)} onConfirm={confirmAction} saving={Boolean(saving)}><p>Referencia: <strong>{confirmation.receipt.reference}</strong></p><p>Fecha: <strong>{confirmation.receipt.deposited_on}</strong></p><p>Monto a asignar: <strong>{formatAmount(confirmation.values.allocated_amount)}</strong></p><p>Cierre destino: <strong>{confirmation.closure?.closure_date}</strong></p><Aviso tipo="warning">Esta asignación no podrá modificarse.</Aviso></ConfirmationModal>}
-    {confirmation?.type === 'submit' && <ConfirmationModal title="Revisar y enviar reporte" confirmLabel="Enviar reporte completo" onCancel={() => setConfirmation(null)} onConfirm={confirmAction} saving={Boolean(saving)}><p>Cierres resueltos: <strong>{preparations.filter(({ resolved }) => resolved).length}</strong></p><ul className="deposit-review-list">{preparations.map(({ closure }) => <li key={closure.id}>Cierre {closure.closure_date}: {closure.no_depositado_reason ? `No depositado — ${closure.no_depositado_reason}` : 'Resuelto con comprobante asignado.'}</li>)}</ul><h3>Comprobantes y asignaciones</h3><ul className="deposit-review-list">{(report?.receipts ?? []).map((receiptItem) => <li key={receiptItem.id}>{receiptItem.reference} · {receiptItem.deposited_on}{(receiptItem.allocations ?? []).map((allocation) => ` · cierre ${preparations.find(({ closure }) => String(closure.id) === String(allocation.closure_entry_id))?.closure.closure_date}`).join('')}</li>)}</ul><Aviso tipo="warning">El envío del reporte es definitivo.</Aviso></ConfirmationModal>}
+    {confirmation?.type === 'allocation' && <ConfirmationModal title="Confirmar asignación" confirmLabel="Confirmar asignación" onCancel={() => setConfirmation(null)} onConfirm={confirmAction} saving={Boolean(saving)}><p>Referencia: <strong>{confirmation.receipt.reference}</strong></p><p>Fecha: <strong>{confirmation.receipt.deposited_on}</strong></p><p>Monto disponible del comprobante: {formatReportedAmount(confirmation.receipt.unallocated_amount)}</p><p>Pendiente del cierre seleccionado: {formatReportedAmount(confirmation.closure?.outstanding_amount)}</p><p>Monto a asignar: {formatAmount(confirmation.values.allocated_amount)}</p><p>Cierre destino: <strong>{confirmation.closure?.closure_date}</strong></p><Aviso tipo="warning">Esta asignación no podrá modificarse.</Aviso></ConfirmationModal>}
+    {confirmation?.type === 'submit' && <ConfirmationModal title="Revisar y enviar reporte" confirmLabel="Enviar reporte completo" onCancel={() => setConfirmation(null)} onConfirm={confirmAction} saving={Boolean(saving)}><p>Cierres resueltos: <strong>{resolvedClosures.length}</strong></p><ul className="deposit-review-list">{(report?.closures ?? []).map((closure) => <li key={closure.id}>Cierre {closure.closure_date}: {closure.no_depositado_reason ? `No depositado — ${closure.no_depositado_reason}` : 'Resuelto según validación del reporte.'}</li>)}</ul><h3>Comprobantes y asignaciones</h3><ul className="deposit-review-list">{(report?.receipts ?? []).map((receiptItem) => <li key={receiptItem.id}>{receiptItem.reference} · {receiptItem.deposited_on}{(receiptItem.allocations ?? []).map((allocation) => ` · cierre ${(report?.closures ?? []).find((closure) => String(closure.id) === String(allocation.closure_entry_id))?.closure_date ?? 'no disponible'}`).join('')}</li>)}</ul><Aviso tipo="warning">El envío del reporte es definitivo.</Aviso></ConfirmationModal>}
   </Modal>
 }
