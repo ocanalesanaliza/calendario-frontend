@@ -359,6 +359,21 @@ describe('DepositReviewWorklistModal', () => {
     await waitFor(() => expect(api.recordDepositReviewDecision).toHaveBeenCalledWith(occurrenceVirtualId, 'case-opaque-report-456', expect.objectContaining({ decision: 'conforme', comment: '' })))
   })
 
+  it('uses the successful Sin registro response to render the terminal decision and remove its action', async () => {
+    api.recordDepositReviewDecision.mockResolvedValue({ worklist: worklist([
+      reportAvailableCase,
+      pendingCase,
+      { ...noRecordCase, decision: 'sin_registro_revisado' },
+    ]) })
+    renderModal()
+    fireEvent.click(await screen.findByRole('button', { name: 'Sin registro revisado para SUC-003' }))
+    fireEvent.change(await screen.findByLabelText('Comentario *'), { target: { value: 'No hubo depósito registrado.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar decisión' }))
+
+    expect(await screen.findByText('Sin registro revisado')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Sin registro revisado para SUC-003' })).not.toBeInTheDocument()
+  })
+
   it('presents persisted decisions in Spanish without further actions', async () => {
     api.getDepositReviewWorklist.mockResolvedValue(worklist([{ ...reportAvailableCase, decision: 'con_observacion' }]))
     renderModal()
