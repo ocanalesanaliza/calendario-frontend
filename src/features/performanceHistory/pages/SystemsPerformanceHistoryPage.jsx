@@ -49,10 +49,23 @@ function normalizeError(error) {
   return 'No fue posible cargar el historial de rendimiento mensual.'
 }
 
+function responsibilityLabel(responsibility) {
+  if (typeof responsibility === 'string') return responsibility || '—'
+  if (!responsibility || typeof responsibility !== 'object') return '—'
+
+  const managerName = responsibility.manager?.display_name
+  if (typeof managerName === 'string' && managerName) return managerName
+
+  const legacyName = responsibility.nombre ?? responsibility.name
+  if (typeof legacyName === 'string' && legacyName) return legacyName
+
+  return 'Gerente histórico no disponible'
+}
+
 function HistoryRow({ row, onSelectTarget }) {
   const performance = row?.performance ?? {}
   const definitive = performance.kind === 'definitive'
-  const responsibility = row?.responsibility?.nombre ?? row?.responsibility?.name ?? row?.responsibility ?? '—'
+  const responsibility = responsibilityLabel(row?.responsibility)
   const area = row?.area ? areaLabel(row.area) : '—'
   const state = performance.state === 'not_applicable' ? 'No aplica' : (performance.state ?? '—')
   const canCorrect = definitive && Object.prototype.hasOwnProperty.call(performance, 'snapshot_id') && performance.snapshot_id !== null && performance.snapshot_id !== undefined

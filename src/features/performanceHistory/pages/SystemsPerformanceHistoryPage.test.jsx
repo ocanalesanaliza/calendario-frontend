@@ -13,7 +13,7 @@ const result = (kind = 'definitive', state = 'closed') => ({
   performance: { kind, state, version: 4, expected_weight: '20', credited_weight: '15', percentage: kind === 'provisional' ? null : '75', as_of: '2026-10-25T10:30:00Z', snapshot_id: 'never-render-this' },
 })
 
-function renderPage() { return render(<MemoryRouter><SystemsPerformanceHistoryPage /></MemoryRouter>) }
+function renderPage(props = {}) { return render(<MemoryRouter><SystemsPerformanceHistoryPage {...props} /></MemoryRouter>) }
 
 describe('SystemsPerformanceHistoryPage', () => {
   beforeEach(() => {
@@ -83,5 +83,22 @@ describe('SystemsPerformanceHistoryPage', () => {
     await waitFor(() => expect(service.getAreas).toHaveBeenCalledTimes(2))
     expect(await screen.findByRole('option', { name: /Área Sur.*Inactiva/ })).toBeInTheDocument()
     await waitFor(() => expect(service.getPerformanceHistory).toHaveBeenCalledWith(expect.objectContaining({ areaId: '7' })))
+  })
+
+  it('shows nested historical managers safely in the correction selector and preserves legacy responsibility labels', async () => {
+    service.getPerformanceHistory.mockResolvedValue({
+      results: [
+        { ...result(), responsibility: { id: 1, starts_on: '2026-10-01', ends_on: null, manager: { display_name: 'Nombre del GA' } } },
+        { ...result(), responsibility: { id: 2, starts_on: '2026-10-01', ends_on: null, manager: null } },
+        { ...result(), responsibility: 'Responsable histórico' },
+      ],
+      next_cursor: null,
+    })
+
+    renderPage({ selectionMode: true, onSelectTarget: vi.fn() })
+
+    expect(await screen.findByText('Nombre del GA')).toBeInTheDocument()
+    expect(screen.getByText('Gerente histórico no disponible')).toBeInTheDocument()
+    expect(screen.getByText('Responsable histórico')).toBeInTheDocument()
   })
 })
