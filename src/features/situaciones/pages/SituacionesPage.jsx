@@ -31,13 +31,6 @@ function formatFecha(iso) {
   return `${d}/${m}/${y}`
 }
 
-function formatFechaHora(iso) {
-  if (!iso) return '—'
-  const fecha = formatFecha(iso.slice(0, 10))
-  const hora = new Date(iso).toLocaleTimeString('es-HN', { hour: '2-digit', minute: '2-digit' })
-  return `${fecha} ${hora}`
-}
-
 function hoyISO() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -208,7 +201,6 @@ export default function SituacionesPage() {
                 <th scope="col">Tipo</th>
                 <th scope="col">Notas</th>
                 <th scope="col">Creada por</th>
-                <th scope="col">Fecha creación</th>
                 <th scope="col">Estado</th>
                 <th scope="col"><span className="tuvet-visually-hidden">Acciones</span></th>
               </tr>
@@ -226,7 +218,6 @@ export default function SituacionesPage() {
                   </td>
                   <td className="situaciones-notes">{s.notas || <span className="tuvet-hint">—</span>}</td>
                   <td>{s.creada_por?.nombre ?? '—'}</td>
-                  <td>{formatFechaHora(s.created_at)}</td>
                   <td>
                     <span className={`tuvet-badge ${s.activa ? 'tuvet-badge-aprobada' : 'tuvet-badge-cancelada'}`}>
                       <Icono nombre={s.activa ? 'check' : 'cerrar'} className="tuvet-badge-icon" />

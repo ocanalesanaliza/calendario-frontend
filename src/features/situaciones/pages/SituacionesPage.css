@@ -27,10 +27,11 @@
   color: var(--tv-primary-text);
 }
 
-.situaciones-kit .situaciones-notes {
-  max-width: 260px;
+.situaciones-kit .situaciones-table td.situaciones-notes {
+  max-width: 320px;
   overflow-wrap: anywhere;
   white-space: normal;
+  line-height: 1.45;
 }
 
 .situaciones-kit .situaciones-row-actions { display: flex; justify-content: flex-end; }
