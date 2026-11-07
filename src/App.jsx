@@ -50,6 +50,7 @@ import OperationalAlertsPage from './features/operationalAlerts/pages/Operationa
 import SystemsPerformanceHistoryPage from './features/performanceHistory/pages/SystemsPerformanceHistoryPage'
 import MonthlyPerformanceCorrectionsPage from './features/monthlyPerformanceCorrections/pages/MonthlyPerformanceCorrectionsPage'
 import GOAreaPerformanceHistoryPage from './features/goPerformanceHistory/pages/GOAreaPerformanceHistoryPage'
+import DepositHistoryPage from './features/calendarioArea/pages/DepositHistoryPage'
 
 export function RendimientoRoute({ children }) {
   const { perfil } = useAuth()
@@ -153,6 +154,13 @@ export function MisTareasRoute({ children }) {
 export function DepositosPendientesRoute({ children }) {
   const { perfil } = useAuth()
   if (!getProfileCapabilities(perfil).canAccessPendingDeposits) return <Navigate to="/" replace />
+  return children
+}
+
+export function DepositHistoryRoute({ children }) {
+  const { perfil } = useAuth()
+  const { isAreaManager, isOperationsManager } = getProfileCapabilities(perfil)
+  if (!isAreaManager && !isOperationsManager) return <Navigate to="/" replace />
   return children
 }
 
@@ -261,7 +269,8 @@ function App() {
           <Route path="/organizacion" element={<OrganizacionRoute><OrganizacionPage /></OrganizacionRoute>} />
           <Route path="/mis-tareas" element={<MisTareasRoute><MisTareasPage /></MisTareasRoute>} />
           <Route path="/mis-tareas-v2" element={<MisTareasRoute><MisTareasPage className="mis-tareas-page mis-tareas-v2-page" groupByStartTime selectionUxVariant scanabilityVariant availableFilterVariant priorityVariant /></MisTareasRoute>} />
-          <Route path="/depositospendientes" element={<DepositosPendientesRoute><DepositosPendientesPage /></DepositosPendientesRoute>} />
+           <Route path="/depositospendientes" element={<DepositosPendientesRoute><DepositosPendientesPage /></DepositosPendientesRoute>} />
+           <Route path="/analitica/historial-depositos" element={<DepositHistoryRoute><DepositHistoryPage /></DepositHistoryRoute>} />
           <Route path="/calendario-area" element={<CalendarioAreaRoute><CalendarioAreaPage /></CalendarioAreaRoute>} />
           <Route path="/ausencias-area" element={<AusenciasAreaRoute><AusenciasAreaPage /></AusenciasAreaRoute>} />
           <Route path="/solicitudes-pendientes" element={<PendientesRoute><SolicitudesPendientesPage /></PendientesRoute>} />

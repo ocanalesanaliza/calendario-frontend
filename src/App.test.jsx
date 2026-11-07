@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AdminMaestroRoute, AlmuerzosRoute, AusenciasAreaRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GOAreaPerformanceHistoryRoute, GerentesOperacionesRoute, MisTareasRoute, MonthlyPerformanceCorrectionsRoute, OperationalAlertsRoute, OrganizacionRoute, PendientesRoute, PerformanceHistoryRoute, PlantillasAreaRoute, RendimientoRoute, SystemsOnlyRoute } from './App'
+import { AdminMaestroRoute, AlmuerzosRoute, AusenciasAreaRoute, CalendarioAreaRoute, CapabilityRoute, DepositHistoryRoute, DepositosPendientesRoute, GOAreaPerformanceHistoryRoute, GerentesOperacionesRoute, MisTareasRoute, MonthlyPerformanceCorrectionsRoute, OperationalAlertsRoute, OrganizacionRoute, PendientesRoute, PerformanceHistoryRoute, PlantillasAreaRoute, RendimientoRoute, SystemsOnlyRoute } from './App'
+import Layout from './components/Layout/Layout'
 
 const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
 
@@ -9,6 +10,12 @@ vi.mock('./features/auth/context/AuthContext', () => ({
   AuthProvider: ({ children }) => children,
   useAuth,
 }))
+vi.mock('./features/apariencia/AparienciaContext', () => ({
+  AparienciaProvider: ({ children }) => children,
+  useApariencia: () => ({}),
+}))
+vi.mock('./features/trabajosCampo/services/trabajosCampoService', () => ({ getTrabajosCampo: vi.fn().mockResolvedValue({ results: [] }) }))
+vi.mock('./features/vacacionesProgramadas/services/vacacionesProgramadasService', () => ({ getSolicitudesVacacion: vi.fn().mockResolvedValue({ results: [] }) }))
 
 function renderMisTareasRoute() {
   render(
@@ -289,6 +296,43 @@ describe('DepositosPendientesRoute', () => {
 
     expect(await screen.findByText('Inicio')).toBeInTheDocument()
     expect(screen.queryByText('Depósitos autorizados')).not.toBeInTheDocument()
+  })
+})
+
+describe('DepositHistoryRoute', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  it.each([
+    ['GA', { type: 'gerente_area' }],
+    ['GO', { type: 'gerente_operaciones' }],
+  ])('allows %s to consult deposit history', async (_role, perfil) => {
+    useAuth.mockReturnValue({ perfil })
+    render(<MemoryRouter initialEntries={['/analitica/historial-depositos']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/analitica/historial-depositos" element={<DepositHistoryRoute><p>Historial autorizado</p></DepositHistoryRoute>} /></Routes></MemoryRouter>)
+    expect(screen.getByText('Historial autorizado')).toBeInTheDocument()
+  })
+
+  it('redirects GS to home', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_sucursal' } })
+    render(<MemoryRouter initialEntries={['/analitica/historial-depositos']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/analitica/historial-depositos" element={<DepositHistoryRoute><p>Historial autorizado</p></DepositHistoryRoute>} /></Routes></MemoryRouter>)
+    expect(await screen.findByText('Inicio')).toBeInTheDocument()
+  })
+})
+
+describe('Deposit history navigation', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  it('shows the analytics entry to GA and GO, but not GS', () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', nombre: 'GA' }, logout: vi.fn() })
+    const { rerender } = render(<MemoryRouter><Layout /></MemoryRouter>)
+    expect(screen.getByRole('link', { name: /Historial de depósitos/i })).toHaveAttribute('href', '/analitica/historial-depositos')
+
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_operaciones', nombre: 'GO' }, logout: vi.fn() })
+    rerender(<MemoryRouter><Layout /></MemoryRouter>)
+    expect(screen.getByRole('link', { name: /Historial de depósitos/i })).toHaveAttribute('href', '/analitica/historial-depositos')
+
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_sucursal', nombre: 'GS' }, logout: vi.fn() })
+    rerender(<MemoryRouter><Layout /></MemoryRouter>)
+    expect(screen.queryByRole('link', { name: /Historial de depósitos/i })).not.toBeInTheDocument()
   })
 })
 
