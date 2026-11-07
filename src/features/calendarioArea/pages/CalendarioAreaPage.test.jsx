@@ -2,11 +2,12 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CalendarioAreaPage from './CalendarioAreaPage'
 
-const { completeAreaOccurrence, getMonthlyAreaAbsences, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, rescheduleAreaOccurrence, getDepositReviewWorklist, recordDepositReviewDecision } = vi.hoisted(() => ({ completeAreaOccurrence: vi.fn(), getMonthlyAreaAbsences: vi.fn(), getMonthlyAreaOccurrences: vi.fn(), getMonthlyAreaPerformance: vi.fn(), rescheduleAreaOccurrence: vi.fn(), getDepositReviewWorklist: vi.fn(), recordDepositReviewDecision: vi.fn() }))
+const { completeAreaOccurrence, finalizeDepositReviewWorklist, getMonthlyAreaAbsences, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, rescheduleAreaOccurrence, getDepositReviewWorklist, recordDepositReviewDecision, useAuth } = vi.hoisted(() => ({ completeAreaOccurrence: vi.fn(), finalizeDepositReviewWorklist: vi.fn(), getMonthlyAreaAbsences: vi.fn(), getMonthlyAreaOccurrences: vi.fn(), getMonthlyAreaPerformance: vi.fn(), rescheduleAreaOccurrence: vi.fn(), getDepositReviewWorklist: vi.fn(), recordDepositReviewDecision: vi.fn(), useAuth: vi.fn() }))
 let datesSetHandler
 
 vi.mock('../services/calendarioAreaService', () => ({ completeAreaOccurrence, getMonthlyAreaAbsences, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, rescheduleAreaOccurrence }))
-vi.mock('../../calendarArea/services/depositReviewWorklistService', () => ({ getDepositReviewWorklist, recordDepositReviewDecision }))
+vi.mock('../../calendarArea/services/depositReviewWorklistService', () => ({ finalizeDepositReviewWorklist, getDepositReviewWorklist, recordDepositReviewDecision }))
+vi.mock('../../auth/context/AuthContext', () => ({ useAuth }))
 vi.mock('@fullcalendar/react', () => ({
   default: ({ events, datesSet, eventClick, eventClassNames, eventContent }) => {
     datesSetHandler = datesSet
@@ -24,6 +25,7 @@ describe('CalendarioAreaPage', () => {
   const occurrence = { occurrence_id: 4, task: 'Auditoría', status: 'pendiente', effective_date: '2026-09-03', scheduled_date: '2026-09-02', weight: 20, all_day: true, coverage_snapshot: { jornada: 'manana', aplica_ambas_jornadas: true }, template: { name: 'Apertura' }, template_version: { number: 3 } }
 
   beforeEach(() => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area' } })
     getMonthlyAreaOccurrences.mockReset()
     getMonthlyAreaAbsences.mockReset()
     getMonthlyAreaAbsences.mockResolvedValue({ month: '2026-09', absences: [] })
@@ -33,6 +35,7 @@ describe('CalendarioAreaPage', () => {
     rescheduleAreaOccurrence.mockReset()
     getDepositReviewWorklist.mockReset()
     recordDepositReviewDecision.mockReset()
+    finalizeDepositReviewWorklist.mockReset()
   })
 
   it('shows loading and then the monthly occurrences as read-only events', async () => {
@@ -212,7 +215,7 @@ describe('CalendarioAreaPage', () => {
     expect(getDepositReviewWorklist).not.toHaveBeenCalled()
   })
 
-  it('sends exact opaque decision payloads and refreshes the calendar after a resolved worklist', async () => {
+  it('sends exact opaque decision payloads and refreshes the calendar only after explicit finalization', async () => {
     const depositOccurrence = { ...occurrence, id: 'occurrence-signed-opaque', occurrence_id: undefined, task: { id: 123, name: 'Deposit review', mode: 'deposit_review' } }
     const pendingWorklist = {
       id: 'occurrence-signed-opaque', state: 'pending', origin_date: '2026-09-02',
@@ -221,7 +224,8 @@ describe('CalendarioAreaPage', () => {
     }
     getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [depositOccurrence] })
     getDepositReviewWorklist.mockResolvedValue(pendingWorklist)
-    recordDepositReviewDecision.mockResolvedValue({ worklist: { ...pendingWorklist, state: 'resolved', cases: [{ ...pendingWorklist.cases[0], decision: 'conforme' }], terminal: { state: 'resolved' } } })
+    recordDepositReviewDecision.mockResolvedValue({ worklist: { ...pendingWorklist, cases: [{ ...pendingWorklist.cases[0], decision: 'conforme' }] } })
+    finalizeDepositReviewWorklist.mockResolvedValue({ worklist: { ...pendingWorklist, state: 'completed', cases: [{ ...pendingWorklist.cases[0], decision: 'conforme' }], terminal: { state: 'completed' } } })
     render(<CalendarioAreaPage />)
 
     fireEvent.click(await screen.findByRole('button', { name: /Deposit review/ }))
@@ -229,22 +233,10 @@ describe('CalendarioAreaPage', () => {
 
     await waitFor(() => expect(recordDepositReviewDecision).toHaveBeenCalledWith('occurrence-signed-opaque', 'case-signed-opaque', expect.objectContaining({ decision: 'conforme', comment: '' })))
     expect(recordDepositReviewDecision.mock.calls[0][2].idempotency_key).toEqual(expect.any(String))
-    expect(await screen.findByText('La revisión de depósitos quedó resuelta.')).toBeInTheDocument()
-    await waitFor(() => expect(getMonthlyAreaOccurrences).toHaveBeenCalledTimes(2))
-  })
-
-  it('shows no-applicable terminal feedback and refreshes the calendar', async () => {
-    const depositOccurrence = { ...occurrence, id: 'occurrence-signed-opaque', occurrence_id: undefined, task: { id: 123, name: 'Deposit review', mode: 'deposit_review' } }
-    const pendingWorklist = { id: 'occurrence-signed-opaque', state: 'pending', origin_date: '2026-09-02', historical_context: { scheduled_on: '2026-09-02', effective_on: '2026-09-03', attribution_month: '2026-09-01' }, cases: [{ id: 'case-signed-opaque', branch_code: 'BRANCH-007', closure_date: '2026-09-01', classification: 'report_available', decision: null }], terminal: { state: null } }
-    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [depositOccurrence] })
-    getDepositReviewWorklist.mockResolvedValue(pendingWorklist)
-    recordDepositReviewDecision.mockResolvedValue({ worklist: { ...pendingWorklist, state: 'no_aplicable', terminal: { state: 'no_aplicable' } } })
-    render(<CalendarioAreaPage />)
-
-    fireEvent.click(await screen.findByRole('button', { name: /Deposit review/ }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Conforme para BRANCH-007' }))
-
-    expect(await screen.findByText('No hubo casos aplicables para esta revisión de depósitos.')).toBeInTheDocument()
+    expect(getMonthlyAreaOccurrences).toHaveBeenCalledTimes(1)
+    fireEvent.click(await screen.findByRole('button', { name: 'Finalizar revisión' }))
+    await waitFor(() => expect(finalizeDepositReviewWorklist).toHaveBeenCalledWith('occurrence-signed-opaque', expect.objectContaining({ idempotency_key: expect.any(String) })))
+    expect(await screen.findByText('La revisión de depósitos quedó completada.')).toBeInTheDocument()
     await waitFor(() => expect(getMonthlyAreaOccurrences).toHaveBeenCalledTimes(2))
   })
 

@@ -355,9 +355,12 @@ export default function CalendarioAreaPage() {
 
   async function handleDepositTerminal(worklist) {
     setSelected(null)
-    setDepositTerminal(worklist.state === 'no_aplicable' || worklist.terminal?.state === 'no_aplicable'
+    const state = worklist.state ?? worklist.terminal?.state
+    setDepositTerminal(state === 'no_aplicable'
       ? 'No hubo casos aplicables para esta revisión de depósitos.'
-      : 'La revisión de depósitos quedó resuelta.')
+      : state === 'completed' || state === 'completada'
+        ? 'La revisión de depósitos quedó completada.'
+        : 'La revisión de depósitos quedó resuelta.')
     await loadMonth()
   }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { getDepositReviewDetail, getDepositReviewWorklist, recordDepositReviewDecision } from './depositReviewWorklistService'
+import { finalizeDepositReviewWorklist, getDepositReviewDetail, getDepositReviewWorklist, recordDepositReviewDecision } from './depositReviewWorklistService'
 
 const { getCalendarArea, postCalendarArea } = vi.hoisted(() => ({ getCalendarArea: vi.fn(), postCalendarArea: vi.fn() }))
 vi.mock('./calendarAreaApi', () => ({ getCalendarArea, postCalendarArea }))
@@ -27,11 +27,13 @@ describe('deposit review worklist service', () => {
     await recordDepositReviewDecision('occurrence-signed-opaque', 'case-signed-opaque', {
       decision: 'con_observacion', comment: 'La referencia requiere seguimiento.', idempotency_key: 'decision-key',
     })
+    await finalizeDepositReviewWorklist('occurrence-signed-opaque', { idempotency_key: 'finalize-key' })
 
     expect(getCalendarArea).toHaveBeenCalledWith('/api/depositos/ga/bandejas/occurrence-signed-opaque/', expect.any(String))
     expect(getCalendarArea).toHaveBeenCalledWith('/api/depositos/ga/bandejas/occurrence-signed-opaque/casos/case-signed-opaque/detalle/', expect.any(String))
     expect(postCalendarArea).toHaveBeenCalledWith('/api/depositos/ga/bandejas/occurrence-signed-opaque/casos/case-signed-opaque/decisiones/', {
       decision: 'con_observacion', comment: 'La referencia requiere seguimiento.', idempotency_key: 'decision-key',
     }, expect.any(String))
+    expect(postCalendarArea).toHaveBeenCalledWith('/api/depositos/ga/bandejas/occurrence-signed-opaque/finalizar/', { idempotency_key: 'finalize-key' }, expect.any(String))
   })
 })

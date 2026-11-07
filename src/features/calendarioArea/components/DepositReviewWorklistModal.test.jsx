@@ -6,9 +6,12 @@ const api = vi.hoisted(() => ({
   getDepositReviewWorklist: vi.fn(),
   getDepositReviewDetail: vi.fn(),
   recordDepositReviewDecision: vi.fn(),
+  finalizeDepositReviewWorklist: vi.fn(),
 }))
 
 vi.mock('../../calendarArea/services/depositReviewWorklistService', () => api)
+const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
+vi.mock('../../auth/context/AuthContext', () => ({ useAuth }))
 
 const occurrenceVirtualId = 'occurrence-opaque-123'
 const reportAvailableCase = {
@@ -72,6 +75,7 @@ describe('DepositReviewWorklistModal', () => {
   beforeEach(() => {
     Object.values(api).forEach((mock) => mock.mockReset())
     api.getDepositReviewWorklist.mockResolvedValue(worklist())
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area' } })
   })
 
   it('isolates the selected closure and chronologically sorted context without mutating the report', async () => {
@@ -200,6 +204,13 @@ describe('DepositReviewWorklistModal', () => {
     expect(screen.queryByRole('button', { name: 'Conforme para SUC-003' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Con observación para SUC-003' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Ver depósito para PSO-002' })).toBeInTheDocument()
+  })
+
+  it('shows the branch name for each worklist case and falls back to the branch code when absent', async () => {
+    renderModal()
+
+    expect(await screen.findByRole('heading', { name: 'PSO - El Paraíso' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'SUC-002' })).toBeInTheDocument()
   })
 
   it('renders the branch hierarchy, five localized summary amounts, and applicable receipts read-only', async () => {
@@ -389,5 +400,55 @@ describe('DepositReviewWorklistModal', () => {
     expect(await screen.findByText('No hay Sucursales o cierres aplicables para esta revisión en este momento.')).toBeInTheDocument()
     expect(screen.getByText(/actualmente aplicables/)).toBeInTheDocument()
     expect(screen.queryByText(/congelados/)).not.toBeInTheDocument()
+  })
+
+  it('lets GA explicitly finalize only after every case has a terminal decision', async () => {
+    api.getDepositReviewWorklist.mockResolvedValue(worklist([{ ...reportAvailableCase, decision: 'conforme' }, { ...noRecordCase, decision: 'sin_registro_revisado' }]))
+    api.finalizeDepositReviewWorklist.mockResolvedValue({ worklist: { ...worklist([]), state: 'completed' } })
+    renderModal()
+
+    const finalize = await screen.findByRole('button', { name: 'Finalizar revisión' })
+    expect(finalize).toBeEnabled()
+    fireEvent.click(finalize)
+    await waitFor(() => expect(api.finalizeDepositReviewWorklist).toHaveBeenCalledWith(occurrenceVirtualId, expect.objectContaining({ idempotency_key: expect.any(String) })))
+    expect(await screen.findByText('La revisión de depósitos quedó completada.')).toBeInTheDocument()
+  })
+
+  it('keeps finalization disabled with an accessible explanation while a case is pending', async () => {
+    renderModal()
+    const finalize = await screen.findByRole('button', { name: 'Finalizar revisión' })
+    expect(finalize).toBeDisabled()
+    expect(document.getElementById(finalize.getAttribute('aria-describedby'))).toHaveTextContent('Aún hay casos sin una decisión final.')
+  })
+
+  it('does not expose GA finalization to GO and safely handles finalization errors', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_operaciones' } })
+    api.getDepositReviewWorklist.mockResolvedValue(worklist([{ ...reportAvailableCase, decision: 'conforme' }]))
+    renderModal()
+    expect(await screen.findByText('Conforme')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Finalizar revisión' })).not.toBeInTheDocument()
+  })
+
+  it.each([
+    [403, 'No tienes acceso a esta revisión de depósitos.'],
+    [404, 'La revisión de depósitos ya no está disponible.'],
+    [409, 'La revisión cambió o ya fue finalizada. Actualizamos la información disponible.'],
+  ])('shows a safe finalization message for HTTP %s', async (status, message) => {
+    api.getDepositReviewWorklist.mockResolvedValue(worklist([{ ...reportAvailableCase, decision: 'conforme' }]))
+    api.finalizeDepositReviewWorklist.mockRejectedValue({ status, message: 'backend secret' })
+    renderModal()
+    fireEvent.click(await screen.findByRole('button', { name: 'Finalizar revisión' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(message)
+    expect(screen.queryByText('backend secret')).not.toBeInTheDocument()
+  })
+
+  it('does not complete the review merely because the last case gets a decision', async () => {
+    const onTerminal = vi.fn()
+    api.getDepositReviewWorklist.mockResolvedValue(worklist([{ ...reportAvailableCase }]))
+    api.recordDepositReviewDecision.mockResolvedValue({ worklist: worklist([{ ...reportAvailableCase, decision: 'conforme' }]) })
+    render(<DepositReviewWorklistModal occurrenceVirtualId={occurrenceVirtualId} onClose={vi.fn()} onTerminal={onTerminal} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Conforme para PSO-002' }))
+    await screen.findByRole('button', { name: 'Finalizar revisión' })
+    expect(onTerminal).not.toHaveBeenCalled()
   })
 })

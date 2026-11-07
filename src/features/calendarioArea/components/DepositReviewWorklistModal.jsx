@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Aviso, Field, FormSection, Modal } from '../../tuvet/components/TuvetUi'
 import { createIdempotencyKey } from '../../calendarArea/services/calendarAreaApi'
-import { getDepositReviewDetail, getDepositReviewWorklist, recordDepositReviewDecision } from '../../calendarArea/services/depositReviewWorklistService'
+import { useAuth } from '../../auth/context/AuthContext'
+import { finalizeDepositReviewWorklist, getDepositReviewDetail, getDepositReviewWorklist, recordDepositReviewDecision } from '../../calendarArea/services/depositReviewWorklistService'
 
 const classificationLabels = {
   report_available: 'Depósito enviado',
@@ -20,10 +21,11 @@ function formatAmount(value) {
 }
 
 function isTerminal(worklist) {
-  return ['resolved', 'no_aplicable'].includes(worklist?.state) || ['resolved', 'no_aplicable'].includes(worklist?.terminal?.state)
+  return ['resolved', 'no_aplicable', 'completed', 'completada'].includes(worklist?.state) || ['resolved', 'no_aplicable', 'completed', 'completada'].includes(worklist?.terminal?.state)
 }
 
 function terminalMessage(worklist) {
+  if (worklist?.state === 'completed' || worklist?.state === 'completada' || worklist?.terminal?.state === 'completed' || worklist?.terminal?.state === 'completada') return 'La revisión de depósitos quedó completada.'
   return worklist?.state === 'no_aplicable' || worklist?.terminal?.state === 'no_aplicable'
     ? 'No hubo casos aplicables para esta revisión de depósitos.'
     : 'La revisión de depósitos quedó resuelta.'
@@ -32,6 +34,7 @@ function terminalMessage(worklist) {
 function requestMessage(error) {
   if (error?.status === 403) return 'No tienes acceso a esta revisión de depósitos.'
   if (error?.status === 404) return 'La revisión de depósitos ya no está disponible.'
+  if (error?.status === 409) return 'La revisión cambió o ya fue finalizada. Actualizamos la información disponible.'
   if (error?.status === 400) return `No se pudo guardar la decisión: ${error.message}`
   if (error?.detail === 'deposit_api_disabled' || error?.message === 'deposit_api_disabled') return 'La revisión de depósitos no está disponible en este momento.'
   return error?.message || 'No se pudo completar la operación. Intenta nuevamente.'
@@ -151,10 +154,12 @@ function CommentDecisionModal({ caseItem, comment, commentError, saving, comment
 }
 
 export default function DepositReviewWorklistModal({ occurrenceVirtualId, onClose, onTerminal }) {
+  const { perfil } = useAuth() ?? {}
   const [worklist, setWorklist] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [savingCaseId, setSavingCaseId] = useState(null)
+  const [finalizing, setFinalizing] = useState(false)
   const [commentCase, setCommentCase] = useState(null)
   const [comment, setComment] = useState('')
   const [commentError, setCommentError] = useState('')
@@ -227,7 +232,6 @@ export default function DepositReviewWorklistModal({ occurrenceVirtualId, onClos
       const nextWorklist = response.worklist
       setWorklist(nextWorklist)
       setCommentCase(null)
-      if (isTerminal(nextWorklist)) onTerminal(nextWorklist)
     } catch (requestError) {
       if (requestError?.status === 409) {
         setError('La revisión cambió o ya fue resuelta. Se recargó la bandeja.')
@@ -237,6 +241,27 @@ export default function DepositReviewWorklistModal({ occurrenceVirtualId, onClos
       }
     } finally {
       setSavingCaseId(null)
+    }
+  }
+
+  const canFinalize = perfil?.type === 'gerente_area'
+  const hasPendingDecision = (worklist?.cases ?? []).some((caseItem) => !['conforme', 'con_observacion', 'sin_registro_revisado'].includes(caseItem.decision))
+  const finalizationHintId = useId()
+
+  async function finalizeReview() {
+    if (!worklist || hasPendingDecision || finalizing) return
+    setFinalizing(true)
+    setError('')
+    try {
+      const response = await finalizeDepositReviewWorklist(occurrenceVirtualId, { idempotency_key: createIdempotencyKey() })
+      const nextWorklist = response.worklist ?? response
+      setWorklist(nextWorklist)
+      if (isTerminal(nextWorklist)) onTerminal(nextWorklist)
+    } catch (requestError) {
+      setError(requestMessage(requestError))
+      if (requestError?.status === 409) await loadWorklist(true)
+    } finally {
+      setFinalizing(false)
     }
   }
 
@@ -254,26 +279,30 @@ export default function DepositReviewWorklistModal({ occurrenceVirtualId, onClos
   }
 
   return (
-    <Modal title="Revisión de depósitos" subtitle="Muestra Sucursales y cierres actualmente aplicables a esta revisión dinámica." icon="info" wide onClose={onClose}>
+    <Modal title="Revisión de depósitos" icon="info" wide onClose={onClose}>
       <div className="deposit-review-worklist">
         {error && <Aviso tipo="error">{error}</Aviso>}
         {loading && <div className="deposit-review-worklist__loading" role="status" aria-busy="true"><span className="tuvet-skeleton" /><span className="tuvet-skeleton" /><span className="sr-only">Cargando revisión de depósitos...</span></div>}
         {!loading && !worklist && <Aviso tipo="error">No se pudo cargar la revisión. <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => void loadWorklist()}>Reintentar</button></Aviso>}
         {!loading && worklist && <>
           <HistoricalContext worklist={worklist} />
-          {isTerminal(worklist) ? <Aviso tipo="success">{terminalMessage(worklist)}</Aviso> : (
-            <div className="deposit-review-worklist__cases">
+           {isTerminal(worklist) ? <Aviso tipo="success">{terminalMessage(worklist)}</Aviso> : (
+             <div className="deposit-review-worklist__cases">
               {worklist.cases?.length === 0 && <Aviso tipo="info">No hay Sucursales o cierres aplicables para esta revisión en este momento.</Aviso>}
               {worklist.cases?.map((caseItem) => <article className="deposit-review-worklist__case" key={caseItem.id}>
-                <header><h3>{caseItem.branch_code}</h3><p>Cierre: {caseItem.closure_date}</p></header>
+                <header><h3>{caseItem.branch_name || caseItem.branch_code}</h3><p>Cierre: {caseItem.closure_date}</p></header>
                 <dl><div><dt>Clasificación</dt><dd>{classificationLabels[caseItem.classification] ?? 'No disponible'}</dd></div><div><dt>Decisión</dt><dd>{caseItem.decision ? (decisionLabels[caseItem.decision] ?? 'No disponible') : 'Pendiente'}</dd></div></dl>
                 {!caseItem.decision && <div className="deposit-review-worklist__actions">
                   {caseItem.classification === 'report_available' && <><button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => openDetail(caseItem)} aria-label={`Ver depósito para ${caseItem.branch_code}`}>Ver depósito</button><button type="button" className="tuvet-btn" disabled={Boolean(savingCaseId)} onClick={() => void saveDecision(caseItem, 'conforme')} aria-label={`Conforme para ${caseItem.branch_code}`}>Conforme</button><button type="button" className="tuvet-btn tuvet-btn-secondary" disabled={Boolean(savingCaseId)} onClick={() => openComment(caseItem)} aria-label={`Con observación para ${caseItem.branch_code}`}>Con observación</button></>}
                   {caseItem.classification === 'sin_registro' && <button type="button" className="tuvet-btn tuvet-btn-secondary" disabled={Boolean(savingCaseId)} onClick={() => openComment(caseItem)} aria-label={`Sin registro revisado para ${caseItem.branch_code}`}>Sin registro revisado</button>}
                 </div>}
               </article>)}
-            </div>
-          )}
+             </div>
+           )}
+           {!isTerminal(worklist) && canFinalize && <section className="deposit-review-worklist__finalization" aria-label="Finalización de revisión">
+             <p id={finalizationHintId}>{hasPendingDecision ? 'Aún hay casos sin una decisión final.' : 'Todos los casos tienen una decisión final. Finaliza la revisión cuando estés listo.'}</p>
+             <button type="button" className="tuvet-btn" disabled={hasPendingDecision || finalizing} aria-describedby={finalizationHintId} aria-busy={finalizing} onClick={() => void finalizeReview()}>{finalizing ? 'Finalizando revisión…' : 'Finalizar revisión'}</button>
+           </section>}
           {commentCase && <CommentDecisionModal caseItem={commentCase} comment={comment} commentError={commentError} saving={Boolean(savingCaseId)} commentRef={commentRef} onChange={(event) => { setComment(event.target.value); setCommentError('') }} onCancel={() => setCommentCase(null)} onSubmit={submitComment} />}
           {detailCase && <DepositDetailModal detail={detail} loading={detailLoading} error={detailError} onClose={closeDetail} onRetry={() => void loadDetail(detailCase)} />}
         </>}

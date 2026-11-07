@@ -12,3 +12,7 @@ export function getDepositReviewDetail(occurrenceVirtualId, caseId) {
 export function recordDepositReviewDecision(occurrenceVirtualId, caseId, body) {
   return postCalendarArea(`/api/depositos/ga/bandejas/${occurrenceVirtualId}/casos/${caseId}/decisiones/`, body, 'No se pudo guardar la decisión de revisión.')
 }
+
+export function finalizeDepositReviewWorklist(occurrenceVirtualId, body) {
+  return postCalendarArea(`/api/depositos/ga/bandejas/${occurrenceVirtualId}/finalizar/`, body, 'No se pudo finalizar la revisión de depósitos.')
+}
