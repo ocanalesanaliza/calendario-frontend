@@ -3,6 +3,7 @@ import { Aviso, EstadoCarga, Field, FormSection, Modal } from '../../tuvet/compo
 import '../../tuvet/tuvet.css'
 import { addDepositReceipt, allocateDepositReceipt, captureDepositClosure, declareNoDepositado, getDepositReport, openDepositReport, submitDepositReport } from '../services/depositService'
 import './DepositDemo.css'
+import './DepositDemoModal.css'
 
 const formatAmount = (value) => `L ${new Intl.NumberFormat('es-HN', {
   minimumFractionDigits: 2,
@@ -77,7 +78,7 @@ function ConfirmationModal({ title, children, confirmLabel, onConfirm, onCancel,
   </Modal>
 }
 
-export function DepositDemoModal({ tarea, fecha, sucursal, onClose }) {
+export function DepositDemoModal({ tarea, fecha, onClose }) {
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -266,7 +267,7 @@ export function DepositDemoModal({ tarea, fecha, sucursal, onClose }) {
   return <Modal title="Registrar depósito" subtitle={tarea.tarea?.nombre} icon="archivo" wide className="tema-analiza" onClose={onClose} footer={footer}>
     <div className="deposit-flow">
       <div className="deposit-flow-context" aria-label="Datos de la tarea">
-        <span>Sucursal: <strong>{sucursal}</strong></span><span>Fecha: <strong>{fecha || 'No disponible'}</strong></span>
+        <span>Fecha: <strong>{fecha || 'No disponible'}</strong></span>
       </div>
       <EstadoCarga loading={loading} error={error && !report ? error : ''} onRetry={recoverReport} empty={!loading && !error && report && report.closures?.length === 0} emptyText="El reporte no contiene cierres proporcionados por el servidor.">
         {error && report && <Aviso tipo="error">{error} <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={recoverReport} disabled={Boolean(saving)}>Actualizar reporte</button></Aviso>}
@@ -309,7 +310,7 @@ export function DepositDemoModal({ tarea, fecha, sucursal, onClose }) {
           </FormSection>
           {historicalClosures.length > 0 && <section className="deposit-historical-reconciliation" aria-labelledby="deposit-historical-reconciliation-title">
             <h3 id="deposit-historical-reconciliation-title">Conciliación de cierres pendientes</h3>
-            <div className="deposit-flow-list">{historicalClosures.map((closure) => <article className="deposit-flow-card" key={closure.id}><h3>Cierre del {closure.closure_date}</h3><div className="deposit-financial-context"><p>Monto aplicado/depositado: {formatReportedAmount(closure.deposited_amount)}</p><p>Diferencia pendiente de depósito: {formatReportedAmount(closure.outstanding_amount)}</p></div></article>)}</div>
+            <div className="deposit-flow-list">{historicalClosures.map((closure) => <article className="deposit-flow-card" key={closure.id}><h3>Cierre del {closure.closure_date}</h3><div className="deposit-pending-closure-metrics" data-testid="pending-closure-metrics" data-responsive-breakpoints="375 768 1024 1440"><div className="deposit-pending-closure-metric"><span>Efectivo del cierre</span><strong>{formatReportedAmount(closure.cash_sales)}</strong></div><div className="deposit-pending-closure-metric"><span>Monto ya aplicado</span><strong>{formatReportedAmount(closure.deposited_amount)}</strong></div><div className="deposit-pending-closure-metric"><span>Pendiente por aplicar</span><strong>{formatReportedAmount(closure.outstanding_amount)}</strong></div></div></article>)}</div>
           </section>}
           <FormSection title="Comprobantes" description="Agrega el comprobante y después asígnalo a un cierre capturado.">
             <form onSubmit={submitReceipt} className="deposit-flow-form" noValidate>

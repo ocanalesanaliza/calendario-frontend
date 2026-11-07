@@ -210,9 +210,12 @@ describe('DepositDemoModal', () => {
 
     const reconciliation = await screen.findByRole('region', { name: 'Conciliación de cierres pendientes' })
     expect(within(reconciliation).getByText('Cierre del 2026-10-30')).toBeInTheDocument()
-    expect(within(reconciliation).getByText('Monto aplicado/depositado: L 40.00')).toBeInTheDocument()
-    expect(within(reconciliation).getByText('Diferencia pendiente de depósito: L 50.00')).toBeInTheDocument()
+    expect(within(reconciliation).getByText('Efectivo del cierre').parentElement).toHaveTextContent('L 70.00')
+    expect(within(reconciliation).getByText('Monto ya aplicado').parentElement).toHaveTextContent('L 40.00')
+    expect(within(reconciliation).getByText('Pendiente por aplicar').parentElement).toHaveTextContent('L 50.00')
     expect(screen.getByText('Cierres presentados: 1')).toBeInTheDocument()
+    expect(within(reconciliation).getByTestId('pending-closure-metrics')).toHaveAttribute('data-responsive-breakpoints', '375 768 1024 1440')
+    expect(within(reconciliation).getByText('Efectivo del cierre').parentElement).toHaveClass('deposit-pending-closure-metric')
   })
 
   it('assigns a receipt to a historical closure with its opaque selector only', async () => {
