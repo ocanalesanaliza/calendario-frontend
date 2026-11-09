@@ -14,9 +14,6 @@ const { getSucursales, getGerentes, getUsuarios, getAnalitica, aoaToSheet, bookN
   encodeCol: vi.fn(),
 }))
 
-vi.mock('@mui/x-data-grid', () => ({
-  DataGrid: ({ columns, rows }) => <div role="grid">{columns.map((column) => <span key={column.field}>{column.headerName}</span>)}{rows.map((row) => <div key={row.id}>{row.sucursal}</div>)}</div>,
-}))
 vi.mock('xlsx', () => ({
   utils: { aoa_to_sheet: aoaToSheet, book_new: bookNew, book_append_sheet: bookAppendSheet, encode_col: encodeCol },
   writeFile,
@@ -62,7 +59,7 @@ describe('RevisionesGuardiaPage export', () => {
 
   it('exports the loaded page into Revisiones then Guardias without further requests', async () => {
     render(<RevisionesGuardiaPage />)
-    await screen.findByRole('grid')
+    await screen.findByRole('table')
     const requestsBeforeExport = [getSucursales, getGerentes, getUsuarios, getAnalitica].map((request) => request.mock.calls.length)
 
     expect(screen.getByText('Página actual: 1')).toBeInTheDocument()

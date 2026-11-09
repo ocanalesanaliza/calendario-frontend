@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import UsuariosPage from './UsuariosPage'
 
@@ -28,9 +28,9 @@ describe('UsuariosPage', () => {
     render(<UsuariosPage />)
     await screen.findByText('No hay usuarios registrados.')
     fireEvent.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
-    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'Ana' } })
-    fireEvent.change(screen.getAllByRole('textbox')[1], { target: { value: 'ana@test.com' } })
-    fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: '1' } })
+    fireEvent.change(screen.getByLabelText(/^Nombre/), { target: { value: 'Ana' } })
+    fireEvent.change(screen.getByLabelText(/^Email/), { target: { value: 'ana@test.com' } })
+    fireEvent.change(screen.getByLabelText(/^Sucursal/), { target: { value: '1' } })
     fireEvent.click(screen.getByRole('button', { name: 'Crear usuario' }))
 
     expect(await screen.findByText('Temporal123')).toBeInTheDocument()
@@ -42,9 +42,35 @@ describe('UsuariosPage', () => {
     render(<UsuariosPage />)
     await screen.findByText('No hay usuarios registrados.')
     expect(apiRequest).toHaveBeenCalledWith('/api/usuarios/')
-    fireEvent.change(screen.getByLabelText('Mostrar'), { target: { value: 'inactive' } })
+    fireEvent.click(within(screen.getByRole('group', { name: 'Mostrar' })).getByRole('button', { name: 'Inactivos' }))
     await screen.findByText('No hay usuarios registrados.')
     expect(apiRequest).toHaveBeenCalledWith('/api/usuarios/?habilitado=false')
+  })
+
+  it('filtra por nombre, correo o sucursal y pide confirmación antes de resetear la contraseña', async () => {
+    const lista = [
+      { id_usuario: 1, nombre: 'Ana Pérez', email: 'ana@test.com', habilitado: true, sucursal_actual: { id_sucursal: 1, nombre: 'Centro' } },
+      { id_usuario: 2, nombre: 'Luis Gómez', email: 'luis@test.com', habilitado: true, debe_cambiar_password: true, sucursal_actual: { id_sucursal: 2, nombre: 'Norte' } },
+    ]
+    apiRequest.mockImplementation(async (path, options) => {
+      if (options?.method === 'POST') return response({ usuario: { nombre: 'Luis Gómez' }, password_temporal: 'Nueva456' })
+      if (path === '/api/sucursales/') return response({ count: 0, results: [] })
+      return response({ count: lista.length, results: lista })
+    })
+    render(<UsuariosPage />)
+    await screen.findByText('Ana Pérez')
+    expect(screen.getByText(/1 debe cambiar su contraseña/)).toBeInTheDocument()
+
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'norte' } })
+    expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument()
+    expect(screen.getByText('Mostrando 1 de 2 usuarios')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resetear contraseña de Luis Gómez' }))
+    const dialogo = screen.getByRole('alertdialog', { name: 'Resetear contraseña' })
+    expect(apiRequest).not.toHaveBeenCalledWith(expect.stringContaining('reset'), expect.anything())
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Resetear' }))
+
+    expect(await screen.findByText('Nueva456')).toBeInTheDocument()
   })
 
   describe('when the branch already has an assigned GS', () => {
@@ -87,9 +113,9 @@ describe('UsuariosPage', () => {
       await screen.findByText('No hay usuarios registrados.')
 
       fireEvent.click(screen.getByRole('button', { name: 'Nuevo usuario' }))
-      fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'Ana' } })
-      fireEvent.change(screen.getAllByRole('textbox')[1], { target: { value: 'ana@test.com' } })
-      fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: '2' } })
+      fireEvent.change(screen.getByLabelText(/^Nombre/), { target: { value: 'Ana' } })
+      fireEvent.change(screen.getByLabelText(/^Email/), { target: { value: 'ana@test.com' } })
+      fireEvent.change(screen.getByLabelText(/^Sucursal/), { target: { value: '2' } })
       fireEvent.click(screen.getByRole('button', { name: 'Crear usuario' }))
 
       expect(await screen.findByText(assignmentError)).toBeInTheDocument()
@@ -109,7 +135,7 @@ describe('UsuariosPage', () => {
       await screen.findByText('Ana')
 
       fireEvent.click(screen.getByTitle('Cambiar sucursal'))
-      fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: '2' } })
+      fireEvent.change(screen.getByLabelText(/^Nueva sucursal/), { target: { value: '2' } })
       fireEvent.click(screen.getByText('Cambiar sucursal', { selector: 'button' }))
 
       expect(await screen.findByText(assignmentError)).toBeInTheDocument()
@@ -126,11 +152,11 @@ describe('UsuariosPage', () => {
       mockAssignmentConflict([{ ...usuario, habilitado: false }])
       render(<UsuariosPage />)
       await screen.findByText('No hay usuarios registrados.')
-      fireEvent.change(screen.getByLabelText('Mostrar'), { target: { value: 'inactive' } })
+      fireEvent.click(within(screen.getByRole('group', { name: 'Mostrar' })).getByRole('button', { name: 'Inactivos' }))
       await screen.findByText('Ana')
 
       fireEvent.click(screen.getByTitle('Editar'))
-      fireEvent.click(screen.getByRole('checkbox'))
+      fireEvent.click(screen.getByRole('switch', { name: /Habilitado/ }))
       fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
       expect(await screen.findByText(assignmentError)).toBeInTheDocument()
@@ -139,7 +165,7 @@ describe('UsuariosPage', () => {
         body: JSON.stringify({ nombre: 'Ana', email: 'ana@test.com', habilitado: true }),
       })
       expect(screen.getByRole('cell', { name: 'Inactivo' })).toBeInTheDocument()
-      expect(screen.getByLabelText('Mostrar')).toHaveValue('inactive')
+      expect(screen.getByRole('button', { name: 'Inactivos' })).toHaveAttribute('aria-pressed', 'true')
       expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled()
     })
   })

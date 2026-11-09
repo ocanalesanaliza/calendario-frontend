@@ -2,9 +2,12 @@
 import { getSituaciones, crearSituacion, desactivarSituacion, getTiposSituaciones, crearTipoSituacion, getUsuariosSituaciones } from '../services/situacionesService'
 import { getGerentes } from '../../gerentes/services/gerentesService'
 import { useAuth } from '../../auth/context/AuthContext'
+import { EstadoCarga, Icono, PageHeader } from '../../tuvet/components/TuvetUi'
+import '../../tuvet/tuvet.css'
 import './SituacionesPage.css'
 
 const PAGE_SIZE = 15
+const ESTADOS = { todas: 'Todas', activas: 'Activas', inactivas: 'Inactivas' }
 
 function porcentajeTipo(codigo) {
   return codigo === 'no_aprobada_ga' ? 0 : 100
@@ -26,13 +29,6 @@ function formatFecha(iso) {
   if (!iso) return '—'
   const [y, m, d] = iso.split('-')
   return `${d}/${m}/${y}`
-}
-
-function formatFechaHora(iso) {
-  if (!iso) return '—'
-  const fecha = formatFecha(iso.slice(0, 10))
-  const hora = new Date(iso).toLocaleTimeString('es-HN', { hour: '2-digit', minute: '2-digit' })
-  return `${fecha} ${hora}`
 }
 
 function hoyISO() {
@@ -105,6 +101,22 @@ export default function SituacionesPage() {
     setRevisionLista((value) => value + 1)
   }
 
+  function seleccionarApartado(siguienteApartado) {
+    setApartado(siguienteApartado)
+    setPage(1)
+  }
+
+  function manejarTeclasPestanas(event) {
+    const pestañas = ['todas', 'programadas']
+    const indice = pestañas.indexOf(apartado)
+    const desplazamiento = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+    if (!desplazamiento) return
+    event.preventDefault()
+    const siguienteApartado = pestañas[(indice + desplazamiento + pestañas.length) % pestañas.length]
+    seleccionarApartado(siguienteApartado)
+    document.getElementById(`situaciones-tab-${siguienteApartado}`)?.focus()
+  }
+
   function handleCreacionCompleta() {
     loadData()
     setModal(null)
@@ -117,98 +129,112 @@ export default function SituacionesPage() {
   }
 
   return (
-    <div className="situaciones-page">
-      <div className="page-header">
-        <div>
-          <h1>Situaciones especiales</h1>
-          <p>Ausencias, permisos e incapacidades que afectan el rendimiento del día</p>
-        </div>
-        <button className="btn-primary" onClick={() => setModal({ type: 'crear' })}>
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
+    <div className="tema-analiza tuvet-page situaciones-kit">
+      <PageHeader
+        title="Situaciones especiales"
+        description="Ausencias, permisos e incapacidades que afectan el rendimiento del día."
+      >
+        <button type="button" className="tuvet-btn" onClick={() => setModal({ type: 'crear' })}>
           Nueva situación
         </button>
-      </div>
+      </PageHeader>
 
-      <div className="tab-bar">
+      <div className="tuvet-tabs situaciones-tabs" role="tablist" aria-label="Situaciones especiales" onKeyDown={manejarTeclasPestanas}>
         <button
-          className={`tab-btn${apartado === 'todas' ? ' active' : ''}`}
-          onClick={() => { setApartado('todas'); setPage(1) }}
+          id="situaciones-tab-todas"
+          type="button"
+          role="tab"
+          aria-selected={apartado === 'todas'}
+          aria-controls="situaciones-panel"
+          tabIndex={apartado === 'todas' ? 0 : -1}
+          className={`tuvet-tab${apartado === 'todas' ? ' active' : ''}`}
+          onClick={() => seleccionarApartado('todas')}
         >
           Todas
         </button>
         <button
-          className={`tab-btn${apartado === 'programadas' ? ' active' : ''}`}
-          onClick={() => { setApartado('programadas'); setPage(1) }}
+          id="situaciones-tab-programadas"
+          type="button"
+          role="tab"
+          aria-selected={apartado === 'programadas'}
+          aria-controls="situaciones-panel"
+          tabIndex={apartado === 'programadas' ? 0 : -1}
+          className={`tuvet-tab${apartado === 'programadas' ? ' active' : ''}`}
+          onClick={() => seleccionarApartado('programadas')}
         >
           Vacaciones programadas
         </button>
       </div>
 
-      <div className="toolbar">
-        <select className="filtro-select" value={filtroActiva} onChange={(e) => { setFiltroActiva(e.target.value); setPage(1) }}>
-          <option value="activas">Activas</option>
-          <option value="inactivas">Inactivas</option>
-          <option value="todas">Todas</option>
-        </select>
+      <div className="situaciones-toolbar">
+        <div className="tuvet-filtros situaciones-filter-pills" role="group" aria-label="Filtrar por estado">
+          {Object.entries(ESTADOS).map(([clave, etiqueta]) => (
+            <button
+              key={clave}
+              type="button"
+              className={`tuvet-chip ${filtroActiva === clave ? 'active' : ''}`}
+              aria-pressed={filtroActiva === clave}
+              onClick={() => { setFiltroActiva(clave); setPage(1) }}
+            >
+              {etiqueta}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {loading ? (
-        <div className="loading-state">Cargando situaciones...</div>
-      ) : errorLista ? (
-        <div role="alert" className="modal-error">
-          {errorLista}{' '}
-          <button className="btn-secondary" onClick={loadData}>Reintentar situaciones</button>
-        </div>
-      ) : situaciones.length === 0 ? (
-        <div className="empty-state">No hay situaciones especiales registradas.</div>
-      ) : (
-        <div className="table-card">
-          <table className="situaciones-table">
+      <section id="situaciones-panel" className="situaciones-panel" role="tabpanel" aria-labelledby={`situaciones-tab-${apartado}`}>
+        <EstadoCarga
+          loading={loading}
+          error={errorLista}
+          onRetry={loadData}
+          empty={!situaciones.length}
+          emptyText="No hay situaciones especiales registradas."
+        >
+          <div className="tuvet-card situaciones-table-card">
+            <div className="tuvet-table-wrap">
+              <table className="tuvet-table situaciones-table">
             <thead>
               <tr>
-                <th>Usuario</th>
-                <th>Fecha</th>
-                <th>Jornada</th>
-                <th>Tipo</th>
-                <th>Notas</th>
-                <th>Creada por</th>
-                <th>Fecha creación</th>
-                <th>Estado</th>
-                <th>Acciones</th>
+                <th scope="col">Usuario</th>
+                <th scope="col">Fecha</th>
+                <th scope="col">Jornada</th>
+                <th scope="col">Tipo</th>
+                <th scope="col">Notas</th>
+                <th scope="col">Creada por</th>
+                <th scope="col">Estado</th>
+                <th scope="col"><span className="tuvet-visually-hidden">Acciones</span></th>
               </tr>
             </thead>
             <tbody>
               {situaciones.map((s) => (
-                <tr key={s.id_situacion_especial} className={!s.activa ? 'row-inactive' : ''}>
-                  <td className="td-nombre">{s.usuario?.nombre ?? '—'}</td>
+                <tr key={s.id_situacion_especial} className={!s.activa ? 'tuvet-row-inactiva' : ''}>
+                  <td className="situaciones-user"><strong>{s.usuario?.nombre ?? '—'}</strong></td>
                   <td>{formatFecha(s.fecha)}</td>
                   <td>{nombreJornada(s.slot ?? s.jornada)}</td>
                   <td>
-                    <span className="badge badge-tipo">
+                    <span className="tuvet-badge situaciones-type-badge">
                       {nombreTipoConPorcentaje(tipos.find((tipo) => tipo.codigo === s.tipo) ?? { codigo: s.tipo, nombre: s.tipo })}
                     </span>
                   </td>
-                  <td className="td-notas">{s.notas || <span className="td-empty">—</span>}</td>
+                  <td className="situaciones-notes">{s.notas || <span className="tuvet-hint">—</span>}</td>
                   <td>{s.creada_por?.nombre ?? '—'}</td>
-                  <td>{formatFechaHora(s.created_at)}</td>
                   <td>
-                    <span className={`badge ${s.activa ? 'badge-green' : 'badge-red'}`}>
+                    <span className={`tuvet-badge ${s.activa ? 'tuvet-badge-aprobada' : 'tuvet-badge-cancelada'}`}>
+                      <Icono nombre={s.activa ? 'check' : 'cerrar'} className="tuvet-badge-icon" />
                       {s.activa ? 'Activa' : 'Inactiva'}
                     </span>
                   </td>
-                  <td>
+                  <td className="tuvet-cell-acciones">
                     {s.activa && (
-                      <div className="row-actions">
+                      <div className="situaciones-row-actions">
                         <button
-                          className="action-btn action-btn-danger"
+                          type="button"
+                          className="tuvet-icon-action tuvet-icon-action-danger"
                           title="Desactivar"
+                          aria-label={`Desactivar situación de ${s.usuario?.nombre ?? 'usuario'} del ${formatFecha(s.fecha)}`}
                           onClick={() => setModal({ type: 'desactivar', situacion: s })}
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                          </svg>
+                          <Icono nombre="prohibido" />
                         </button>
                       </div>
                     )}
@@ -216,23 +242,25 @@ export default function SituacionesPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
-          <div className="table-footer">
+              </table>
+            </div>
+            <p className="situaciones-table-footer" aria-live="polite">
             {situaciones.length} situación{situaciones.length !== 1 ? 'es' : ''}
+            </p>
           </div>
-        </div>
-      )}
+        </EstadoCarga>
+      </section>
 
       {totalPages > 1 && (
-        <div className="paginacion">
-          <button className="btn-secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+        <nav className="situaciones-pagination" aria-label="Paginación de situaciones">
+          <button type="button" className="tuvet-btn tuvet-btn-secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
             Anterior
           </button>
-          <span className="paginacion-info">Página {page} de {totalPages}</span>
-          <button className="btn-secondary" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+          <span className="situaciones-pagination-info" aria-live="polite">Página {page} de {totalPages}</span>
+          <button type="button" className="tuvet-btn tuvet-btn-secondary" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
             Siguiente
           </button>
-        </div>
+        </nav>
       )}
 
       {errorTipos && modal?.type !== 'crear' && (

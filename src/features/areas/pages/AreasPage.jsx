@@ -113,6 +113,8 @@ function FormModal({ area, isSystemsAccount, onClose, onSubmit }) {
   useEffect(() => {
     const requestId = ++hydrationRequestRef.current
     if (!isSystemsAccount || !area?.country_id || !companies.length) {
+      // Indicador de carga de una sincronización externa (jerarquía empresa → región → país).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHydratingCountry(false)
       return undefined
     }

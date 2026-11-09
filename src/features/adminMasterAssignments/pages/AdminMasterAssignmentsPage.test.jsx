@@ -26,18 +26,162 @@ describe('AdminMasterAssignmentsPage', () => {
     Object.assign(navigator, { clipboard: { writeText: vi.fn() } })
   })
 
-  it('loads once, defaults to active assignments, and can show all states', async () => {
+  it('renders current and historical organization assignment details, filters Activas by is_current, and shows all history', async () => {
     apiRequest.mockResolvedValueOnce(response({ results: [
-      { id: 1, profile: { username: 'ana', email: 'ana@example.com' }, country: { name: 'México' }, effective_on: '2026-10-01', lifecycle_state: 'active' },
-      { id: 2, profile: { username: 'luis', email: 'luis@example.com' }, country: { name: 'Chile' }, effective_on: '2026-09-01', lifecycle_state: 'expired' },
+      { id: 1, profile: { id: 7, username: 'ana', email: 'ana@example.com' }, organization: { id: 1, name: 'Analiza' }, country: { name: 'México' }, starts_on: '2026-10-01', ends_on: null, lifecycle_state: 'active', is_current: true },
+      { id: 2, profile: { id: 8, username: 'luis', email: 'luis@example.com' }, organization: { id: 2, name: 'Andes' }, country: { name: 'Chile' }, starts_on: '2026-09-01', ends_on: '2026-09-30', lifecycle_state: 'revoked', is_current: false },
     ] }))
     render(<AdminMasterAssignmentsPage />)
     expect(await screen.findByText('ana')).toBeInTheDocument()
     expect(screen.queryByText('luis')).not.toBeInTheDocument()
+    expect(screen.getByText('Analiza')).toBeInTheDocument()
+    expect(screen.getByText('2026-10-01')).toBeInTheDocument()
+    expect(screen.getByText('Vigente')).toBeInTheDocument()
+    expect(screen.getByText('Activa')).toBeInTheDocument()
     expect(apiRequest).toHaveBeenCalledTimes(1)
     fireEvent.click(screen.getByRole('button', { name: 'Todas' }))
     expect(screen.getByText('luis')).toBeInTheDocument()
-    expect(screen.getByText('expired')).toBeInTheDocument()
+    expect(screen.getByText('Andes')).toBeInTheDocument()
+    expect(screen.getByText('2026-09-01')).toBeInTheDocument()
+    expect(screen.getByText('2026-09-30')).toBeInTheDocument()
+    expect(screen.getByText('Histórica')).toBeInTheDocument()
+    expect(screen.getByText('Revocada')).toBeInTheDocument()
+    expect(screen.getByText('—')).toBeInTheDocument()
+  })
+
+  it('excludes profiles only when is_current is true', async () => {
+    const catalog = { results: [
+      { id: 1, profile: { id: 7, username: 'ana' }, lifecycle_state: 'revoked', is_current: false },
+      { id: 2, profile: { id: 8, username: 'luis' }, lifecycle_state: 'revoked', is_current: true },
+    ], eligible_profiles: [{ id: 7, username: 'ana' }, { id: 8, username: 'luis' }], countries: [{ id: 3, name: 'México' }] }
+    apiRequest.mockResolvedValueOnce(response(catalog))
+    render(<AdminMasterAssignmentsPage />)
+    await screen.findByText('luis')
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva asignación' }))
+
+    expect(screen.getByRole('option', { name: 'ana' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'luis' })).not.toBeInTheDocument()
+  })
+
+  it('only exposes the revoke action for current assignments', async () => {
+    apiRequest.mockResolvedValueOnce(response({ results: [
+      { id: 1, profile: { username: 'ana' }, country: { name: 'México' }, lifecycle_state: 'active', is_current: true },
+      { id: 2, profile: { username: 'luis' }, country: { name: 'Chile' }, lifecycle_state: 'replaced', is_current: false },
+    ] }))
+    render(<AdminMasterAssignmentsPage />)
+    await screen.findByText('ana')
+    expect(screen.getByRole('button', { name: 'Revocar' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Todas' }))
+    expect(screen.getByText('Reemplazada')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Revocar' })).toHaveLength(1)
+  })
+
+  it('opens the existing create and current-assignment revoke modals with independent pending latches', async () => {
+    const catalog = {
+      results: [{ id: 1, profile: { id: 8, username: 'ana' }, lifecycle_state: 'active', is_current: true }],
+      eligible_profiles: [{ id: 7, username: 'luis' }],
+      countries: [{ id: 3, name: 'México' }],
+    }
+    let resolveCreate
+    const pendingCreate = new Promise((resolve) => { resolveCreate = resolve })
+    apiRequest.mockResolvedValueOnce(response(catalog)).mockReturnValueOnce(pendingCreate).mockResolvedValueOnce(response({})).mockResolvedValueOnce(response(catalog))
+    render(<AdminMasterAssignmentsPage />)
+    await screen.findByText('ana')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva asignación' }))
+    expect(screen.getByRole('dialog', { name: 'Nueva asignación de Admin Master' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Perfil existente'), { target: { value: '7' } })
+    fireEvent.change(screen.getByLabelText('País'), { target: { value: '3' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Crear asignación' }))
+    await waitFor(() => expect(apiRequest).toHaveBeenNthCalledWith(2, '/api/v1/admin-master-assignments/', { method: 'POST', body: JSON.stringify({ mode: 'existing', profile_id: 7, country_id: 3 }) }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Revocar' }))
+    expect(screen.getByRole('dialog', { name: 'Revocar asignación de Admin Master' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Fecha efectiva de revocación'), { target: { value: '2026-10-15' } })
+    fireEvent.change(screen.getByLabelText('Motivo de revocación'), { target: { value: 'Fin de responsabilidad' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Revocar asignación' }))
+    await waitFor(() => expect(apiRequest).toHaveBeenNthCalledWith(3, '/api/v1/admin-master-assignments/1/revoke/', { method: 'POST', body: JSON.stringify({ effective_on: '2026-10-15', reason: 'Fin de responsabilidad' }) }))
+
+    await act(async () => {
+      resolveCreate(response({}))
+      await pendingCreate
+    })
+  })
+
+  it('validates required revoke fields locally without sending a request', async () => {
+    apiRequest.mockResolvedValueOnce(response({ results: [{ id: 1, profile: { username: 'ana' }, lifecycle_state: 'active', is_current: true }], eligible_profiles: [], countries: [] }))
+    render(<AdminMasterAssignmentsPage />)
+    await screen.findByText('ana')
+    fireEvent.click(screen.getByRole('button', { name: 'Revocar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Revocar asignación' }))
+
+    expect(await screen.findByText('Ingresa una fecha ISO válida (YYYY-MM-DD).')).toBeInTheDocument()
+    expect(screen.getByLabelText('Fecha efectiva de revocación')).toHaveAttribute('aria-describedby', 'ama-fecha-efectiva-de-revocación-error')
+    expect(screen.getByText('El motivo de revocación es obligatorio.')).toBeInTheDocument()
+    expect(apiRequest).toHaveBeenCalledTimes(1)
+  })
+
+  it('posts an explicit revoke, closes the modal, and refreshes the collection without creating a replacement', async () => {
+    const catalog = { results: [{ id: 1, profile: { username: 'ana' }, organization: { name: 'Analiza' }, country: { name: 'México' }, starts_on: '2026-10-01', lifecycle_state: 'active', is_current: true }], eligible_profiles: [], countries: [] }
+    apiRequest.mockResolvedValueOnce(response(catalog)).mockResolvedValueOnce(response({})).mockResolvedValueOnce(response({ results: [], eligible_profiles: [], countries: [] }))
+    render(<AdminMasterAssignmentsPage />)
+    await screen.findByText('ana')
+    fireEvent.click(screen.getByRole('button', { name: 'Revocar' }))
+    fireEvent.change(screen.getByLabelText('Fecha efectiva de revocación'), { target: { value: '2026-10-15' } })
+    fireEvent.change(screen.getByLabelText('Motivo de revocación'), { target: { value: '  Fin de responsabilidad  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Revocar asignación' }))
+
+    await waitFor(() => expect(apiRequest).toHaveBeenNthCalledWith(2, '/api/v1/admin-master-assignments/1/revoke/', { method: 'POST', body: JSON.stringify({ effective_on: '2026-10-15', reason: 'Fin de responsabilidad' }) }))
+    expect(await screen.findByText('No hay asignaciones para mostrar.')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Revocar asignación de Admin Master' })).not.toBeInTheDocument()
+    expect(apiRequest).toHaveBeenCalledTimes(3)
+    expect(apiRequest.mock.calls.filter(([, options]) => options?.method === 'POST' && !String(options.body).includes('Fin de responsabilidad'))).toHaveLength(0)
+  })
+
+  it('keeps revoke modal open for validation and authorization errors without refresh or create', async () => {
+    const catalog = { results: [{ id: 1, profile: { username: 'ana' }, country: { name: 'México' }, lifecycle_state: 'active', is_current: true }], eligible_profiles: [], countries: [] }
+    apiRequest.mockResolvedValueOnce(response(catalog)).mockResolvedValueOnce(response({ detail: { reason: ['Explica el motivo.'] } }, false, 400)).mockResolvedValueOnce(response({ detail: 'No autorizado.' }, false, 403))
+    render(<AdminMasterAssignmentsPage />)
+    await screen.findByText('ana')
+    fireEvent.click(screen.getByRole('button', { name: 'Revocar' }))
+    fireEvent.change(screen.getByLabelText('Fecha efectiva de revocación'), { target: { value: '2026-10-15' } })
+    fireEvent.change(screen.getByLabelText('Motivo de revocación'), { target: { value: 'Motivo válido' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Revocar asignación' }))
+    const reasonError = await screen.findByText('Explica el motivo.')
+    expect(screen.getByLabelText('Motivo de revocación')).toHaveAttribute('aria-describedby', reasonError.id)
+    expect(apiRequest).toHaveBeenCalledTimes(2)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Revocar asignación' }))
+    expect(await screen.findByText('No autorizado.')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Revocar asignación de Admin Master' })).toBeInTheDocument()
+    expect(apiRequest).toHaveBeenCalledTimes(3)
+    expect(apiRequest.mock.calls.filter(([, options]) => options?.method === 'POST' && !String(options.body).includes('Motivo válido'))).toHaveLength(0)
+  })
+
+  it('prevents duplicate pending revoke submissions without creating a replacement', async () => {
+    const catalog = { results: [{ id: 1, profile: { username: 'ana' }, lifecycle_state: 'active', is_current: true }], eligible_profiles: [], countries: [] }
+    let resolveRequest
+    const pendingRequest = new Promise((resolve) => { resolveRequest = resolve })
+    apiRequest.mockResolvedValueOnce(response(catalog)).mockReturnValueOnce(pendingRequest)
+    render(<AdminMasterAssignmentsPage />)
+    await screen.findByText('ana')
+    fireEvent.click(screen.getByRole('button', { name: 'Revocar' }))
+    fireEvent.change(screen.getByLabelText('Fecha efectiva de revocación'), { target: { value: '2026-10-15' } })
+    fireEvent.change(screen.getByLabelText('Motivo de revocación'), { target: { value: 'Fin de responsabilidad' } })
+    const form = screen.getByRole('dialog', { name: 'Revocar asignación de Admin Master' }).querySelector('form')
+    act(() => {
+      fireEvent.submit(form)
+      fireEvent.submit(form)
+    })
+
+    expect(screen.getByRole('button', { name: 'Revocando...' })).toBeDisabled()
+    expect(apiRequest).toHaveBeenCalledTimes(2)
+    expect(apiRequest.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(1)
+    await act(async () => {
+      resolveRequest(response({}))
+      await pendingRequest
+    })
   })
 
   it('renders an error and retries the GET request', async () => {
@@ -50,12 +194,13 @@ describe('AdminMasterAssignmentsPage', () => {
   })
 
   it('posts the exact existing-profile shape without an optional effective date and shows an ephemeral password', async () => {
-    const catalog = { results: [], eligible_profiles: [{ id: 7, username: 'ana' }], countries: [{ id: 3, name: 'México' }] }
+    const catalog = { results: [], eligible_profiles: [{ id: 7, username: 'ana' }], countries: [{ id: 3, name: 'México', label: 'Analiza · Centroamérica · México' }] }
     apiRequest.mockResolvedValueOnce(response(catalog)).mockResolvedValueOnce(response({ password_temporal: 'only-once' })).mockResolvedValueOnce(response(catalog))
     render(<AdminMasterAssignmentsPage />)
     await screen.findByText('No hay asignaciones para mostrar.')
     fireEvent.click(screen.getByRole('button', { name: 'Nueva asignación' }))
     fireEvent.change(screen.getByLabelText('Perfil existente'), { target: { value: '7' } })
+    expect(screen.getByRole('option', { name: 'Analiza · Centroamérica · México' })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('País'), { target: { value: '3' } })
     fireEvent.click(screen.getByRole('button', { name: 'Crear asignación' }))
     await waitFor(() => expect(apiRequest).toHaveBeenNthCalledWith(2, '/api/v1/admin-master-assignments/', { method: 'POST', body: JSON.stringify({ mode: 'existing', profile_id: 7, country_id: 3 }) }))
@@ -67,7 +212,7 @@ describe('AdminMasterAssignmentsPage', () => {
 
   it('excludes user-nested active profiles and blocks a stale selected profile locally', async () => {
     const catalog = {
-      results: [{ id: 1, user: { id: 7, username: 'ana' }, lifecycle_state: 'active' }],
+      results: [{ id: 1, user: { id: 7, username: 'ana' }, lifecycle_state: 'active', is_current: true }],
       eligible_profiles: [{ id: 7, username: 'ana' }, { id: 8, username: 'luis' }],
       countries: [{ id: 3, name: 'México' }],
     }
@@ -93,7 +238,7 @@ describe('AdminMasterAssignmentsPage', () => {
 
   it('excludes profile-nested active profiles and blocks a stale selected profile locally', async () => {
     const catalog = {
-      results: [{ id: 1, profile: { id: 7, username: 'ana' }, lifecycle_state: 'active' }],
+      results: [{ id: 1, profile: { id: 7, username: 'ana' }, lifecycle_state: 'active', is_current: true }],
       eligible_profiles: [{ id: 7, username: 'ana' }, { id: 8, username: 'luis' }],
       countries: [{ id: 3, name: 'México' }],
     }
@@ -299,7 +444,7 @@ describe('AdminMasterAssignmentsPage', () => {
   })
 
   it('posts the exact new-profile shape and keeps the modal open with field errors', async () => {
-    apiRequest.mockResolvedValueOnce(response({ results: [], eligible_profiles: [], countries: [{ id: 3, name: 'México' }] })).mockResolvedValueOnce(response({ detail: { email: ['Ya está asignado.'] } }, false, 409))
+    apiRequest.mockResolvedValueOnce(response({ results: [], eligible_profiles: [], countries: [{ id: 3, name: 'México', label: 'Analiza · Centroamérica · México' }] })).mockResolvedValueOnce(response({ detail: { email: ['Ya está asignado.'] } }, false, 409))
     render(<AdminMasterAssignmentsPage />)
     await screen.findByText('No hay asignaciones para mostrar.')
     fireEvent.click(screen.getByRole('button', { name: 'Nueva asignación' }))
@@ -308,6 +453,7 @@ describe('AdminMasterAssignmentsPage', () => {
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'marta@example.com' } })
     fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Marta' } })
     fireEvent.change(screen.getByLabelText('Apellido'), { target: { value: 'García' } })
+    expect(screen.getByRole('option', { name: 'Analiza · Centroamérica · México' })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('País'), { target: { value: '3' } })
     fireEvent.change(screen.getByLabelText('Fecha efectiva (opcional)'), { target: { value: '2026-10-01' } })
     fireEvent.click(screen.getByRole('button', { name: 'Crear asignación' }))
@@ -326,6 +472,15 @@ describe('AdminMasterAssignmentsPage', () => {
     expect(screen.getByRole('button', { name: 'Cancelar' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Crear asignación' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Cerrar' })).toBeEnabled()
+  })
+
+  it('renders a name-only country option for the legacy country shape', async () => {
+    apiRequest.mockResolvedValueOnce(response({ results: [], eligible_profiles: [], countries: [{ id: 3, name: 'México' }] }))
+    render(<AdminMasterAssignmentsPage />)
+    await screen.findByText('No hay asignaciones para mostrar.')
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva asignación' }))
+
+    expect(screen.getByRole('option', { name: 'México' })).toBeInTheDocument()
   })
 
   it('associates non-conflict field errors with their controls', async () => {

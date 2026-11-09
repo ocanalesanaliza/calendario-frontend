@@ -8,11 +8,18 @@ function parseDetail(detail) {
   return JSON.stringify(detail)
 }
 
+function createRequestError(res, data, fallbackMessage) {
+  return Object.assign(
+    new Error(parseDetail(data.detail) || fallbackMessage),
+    { status: res.status },
+  )
+}
+
 export async function getSolicitudesVacacion(params = {}) {
   const query = new URLSearchParams(params).toString()
   const res = await apiRequest(`/api/solicitudes-vacacion/${query ? `?${query}` : ''}`)
   const data = await res.json()
-  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al cargar solicitudes de vacacion')
+  if (!res.ok) throw createRequestError(res, data, 'Error al cargar solicitudes de vacacion')
   return data
 }
 
@@ -22,14 +29,14 @@ export async function crearSolicitudVacacion(body) {
     body: JSON.stringify(body),
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al solicitar vacacion programada')
+  if (!res.ok) throw createRequestError(res, data, 'Error al solicitar vacacion programada')
   return data
 }
 
 export async function aceptarSolicitudVacacion(id) {
   const res = await apiRequest(`/api/solicitudes-vacacion/${id}/aceptar/`, { method: 'POST' })
   const data = await res.json()
-  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al aceptar vacacion programada')
+  if (!res.ok) throw createRequestError(res, data, 'Error al aceptar vacacion programada')
   return data
 }
 
@@ -39,13 +46,13 @@ export async function rechazarSolicitudVacacion(id, motivo = '') {
     body: JSON.stringify(motivo ? { motivo } : {}),
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al rechazar vacacion programada')
+  if (!res.ok) throw createRequestError(res, data, 'Error al rechazar vacacion programada')
   return data
 }
 
 export async function cancelarSolicitudVacacion(id) {
   const res = await apiRequest(`/api/solicitudes-vacacion/${id}/cancelar/`, { method: 'POST' })
   const data = await res.json()
-  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al cancelar vacacion programada')
+  if (!res.ok) throw createRequestError(res, data, 'Error al cancelar vacacion programada')
   return data
 }

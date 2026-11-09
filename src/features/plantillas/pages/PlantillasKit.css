@@ -1,0 +1,103 @@
+/*
+ * Plantillas (lista y detalle, Analiza) con el diseño del kit compartido (TuvetUi + tema .tema-analiza).
+ * Todo va limitado a .plantillas-kit para no afectar a otras páginas.
+ */
+
+.plantillas-kit .pk-barra { display: flex; flex-direction: column; gap: .75rem; }
+
+.plantillas-kit .pk-tabla-card { padding: 0; overflow: hidden; }
+.plantillas-kit .pk-tabla th,
+.plantillas-kit .pk-tabla td { padding-left: .6rem; padding-right: .6rem; }
+.plantillas-kit .pk-tabla th:first-child,
+.plantillas-kit .pk-tabla td:first-child { padding-left: 1rem; }
+.plantillas-kit .pk-tabla th:last-child,
+.plantillas-kit .pk-tabla td:last-child { padding-right: 1rem; }
+.plantillas-kit .pk-num { width: 1%; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.plantillas-kit .pk-nowrap { white-space: nowrap; }
+.plantillas-kit .pk-tabla .tuvet-badge { white-space: nowrap; }
+
+/* Nombre como enlace al detalle y descripción en una línea recortada. */
+.plantillas-kit .pk-plantilla { display: grid; gap: .1rem; min-width: 200px; }
+
+.plantillas-kit .pk-enlace {
+  justify-self: start;
+  border-radius: 4px;
+  color: var(--tv-fg);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.plantillas-kit .pk-enlace:hover { color: var(--tv-primary); text-decoration: underline; }
+.plantillas-kit .pk-enlace:focus-visible { outline: 2px solid var(--tv-primary-accent); outline-offset: 2px; }
+
+.plantillas-kit .pk-descripcion {
+  max-width: 420px;
+  overflow: hidden;
+  color: var(--tv-subtle);
+  font-size: .82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plantillas-kit .pk-pie { margin: 0; padding: .7rem 1rem; border-top: 1px solid var(--tv-border); color: var(--tv-subtle); font-size: .82rem; }
+
+/* ── Detalle ── */
+.plantillas-kit .pd-volver { align-self: flex-start; font-size: .85rem; font-weight: 600; text-decoration: none; }
+.plantillas-kit .pd-volver:hover { text-decoration: underline; }
+
+.plantillas-kit .pd-titulo { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+.plantillas-kit .pd-titulo h1 { margin: 0; }
+
+.plantillas-kit .pd-resumen {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .75rem;
+}
+
+.plantillas-kit .pd-resumen div {
+  display: grid;
+  gap: .1rem;
+  padding: .75rem 1rem;
+  border: 1px solid var(--tv-border);
+  border-radius: var(--tv-radius);
+  background: var(--tv-surface);
+  color: var(--tv-muted);
+  font-size: .8rem;
+}
+
+.plantillas-kit .pd-resumen strong { color: var(--tv-fg); font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+
+.plantillas-kit .pd-seccion { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: .75rem; }
+.plantillas-kit .pd-seccion h2 { margin: 0; color: var(--tv-fg); font-size: 1.1rem; }
+.plantillas-kit .pd-seccion p { margin: .15rem 0 0; color: var(--tv-subtle); font-size: .85rem; }
+
+.plantillas-kit .pd-jornada-manana { background: var(--tv-warning-soft); color: var(--tv-warning-text); }
+.plantillas-kit .pd-jornada-tarde { background: var(--tv-primary-soft); color: var(--tv-primary-text); }
+
+/* Catálogo para agregar tareas: lista seleccionable con elementos ya agregados bloqueados. */
+.plantillas-kit .pd-catalogo { max-height: 300px; }
+.plantillas-kit .pd-catalogo .tuvet-select-item.is-disabled { cursor: not-allowed; opacity: .55; }
+
+.plantillas-kit .pd-resultados {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .6rem;
+  margin: 0;
+}
+
+.plantillas-kit .pd-resultados div {
+  display: grid;
+  gap: .1rem;
+  padding: .7rem .85rem;
+  border: 1px solid var(--tv-border);
+  border-radius: var(--tv-radius);
+  background: var(--tv-surface);
+}
+
+.plantillas-kit .pd-resultados dt { color: var(--tv-muted); font-size: .78rem; }
+.plantillas-kit .pd-resultados dd { margin: 0; color: var(--tv-fg); font-size: 1.2rem; font-variant-numeric: tabular-nums; font-weight: 700; }
+
+@media (max-width: 640px) {
+  .plantillas-kit .pd-resumen,
+  .plantillas-kit .pd-resultados { grid-template-columns: 1fr; }
+}

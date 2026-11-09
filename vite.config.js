@@ -7,5 +7,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: './src/test/setup.js',
+    // Mayor que el asyncUtilTimeout de Testing Library (5 s, en src/test/setup.js).
+    testTimeout: 15000,
   },
 })

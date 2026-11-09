@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { Icono } from '../../tuvet/components/TuvetUi'
 import './RevisionGuardiaDetalleModal.css'
 
 const EMPTY_VALUE = '—'
@@ -86,52 +87,61 @@ export default function RevisionGuardiaDetalleModal({ revision, onClose }) {
   const sucursal = displayName(revision.sucursal) !== EMPTY_VALUE ? displayName(revision.sucursal) : revision.nombre_sucursal
   const gs = displayName(revision.usuario) !== EMPTY_VALUE ? displayName(revision.usuario) : displayName(revision.gerente_sucursal)
 
+  const realizada = !revision.no_se_presento_guardia
+
+  // Estructura del kit (tuvet-modal) con el foco y el ciclo de Tab propios de este componente.
   return (
-    <div className="modal-overlay revision-guardia-detalle-overlay">
-      <section ref={dialogRef} className="modal revision-guardia-detalle-modal" role="dialog" aria-modal="true" aria-label="Detalle de revisión de guardia" tabIndex="-1" onKeyDown={handleKeyDown}>
-        <div className="modal-header">
-          <div>
-            <h2>Detalle de revisión</h2>
-            <p>{present(revision.fecha)}</p>
+    <div className="tuvet-modal-backdrop revision-guardia-detalle-overlay">
+      <section ref={dialogRef} className="tuvet-modal tuvet-modal-wide revision-guardia-detalle-modal" role="dialog" aria-modal="true" aria-label="Detalle de revisión de guardia" tabIndex="-1" onKeyDown={handleKeyDown}>
+        <div className="tuvet-modal-header">
+          <div className="tuvet-modal-heading">
+            <span className={`tuvet-modal-icon tuvet-modal-icon-${realizada ? 'success' : 'danger'}`}><Icono nombre={realizada ? 'check' : 'alerta'} /></span>
+            <div>
+              <h2>Detalle de revisión</h2>
+              <p className="tuvet-modal-subtitle">{present(revision.fecha)}</p>
+            </div>
           </div>
-          <button data-autofocus type="button" className="modal-close" aria-label="Cerrar detalle" onClick={onClose}>×</button>
+          <button data-autofocus type="button" className="tuvet-icon-btn" aria-label="Cerrar detalle" onClick={onClose}><Icono nombre="cerrar" /></button>
         </div>
 
-        <dl className="revision-guardia-detalle-summary">
-          <div><dt>Sucursal</dt><dd>{present(sucursal)}</dd></div>
-          <div><dt>Gerente de sucursal</dt><dd>{present(gs)}</dd></div>
-          <div><dt>Resultado</dt><dd>{resultado}</dd></div>
-          <div><dt>Cantidad de guardias</dt><dd>{guardias.length}</dd></div>
-          <div className="revision-guardia-detalle-notes"><dt>Notas</dt><dd>{present(revision.notas)}</dd></div>
-        </dl>
+        <div className="tuvet-modal-body">
+          <dl className="revision-guardia-detalle-summary">
+            <div><dt>Sucursal</dt><dd>{present(sucursal)}</dd></div>
+            <div><dt>Gerente de sucursal</dt><dd>{present(gs)}</dd></div>
+            <div><dt>Resultado</dt><dd><span className={`tuvet-badge ${realizada ? 'tuvet-badge-aprobada' : 'tuvet-badge-vencida'}`}>{resultado}</span></dd></div>
+            <div><dt>Cantidad de guardias</dt><dd>{guardias.length}</dd></div>
+            <div className="revision-guardia-detalle-notes"><dt>Notas</dt><dd>{present(revision.notas)}</dd></div>
+          </dl>
 
-        <section aria-labelledby="revision-guardia-detalle-guardias">
-          <h3 id="revision-guardia-detalle-guardias">Guardias</h3>
-          {guardias.length === 0 ? (
-            <p className="revision-guardia-detalle-empty">No hay guardias registrados.</p>
-          ) : (
-            <div className="revision-guardia-detalle-guardias">
-              {guardias.map((guardia, index) => {
-                const uniformeFaltante = getMissingItems(guardia.uniforme, UNIFORME_LABELS)
-                const equipamientoFaltante = getMissingItems(guardia.equipamiento, EQUIPAMIENTO_LABELS)
+          <section className="revision-guardia-detalle-seccion" aria-labelledby="revision-guardia-detalle-guardias">
+            <h3 id="revision-guardia-detalle-guardias">Guardias</h3>
+            {guardias.length === 0 ? (
+              <p className="revision-guardia-detalle-empty">No hay guardias registrados.</p>
+            ) : (
+              <div className="revision-guardia-detalle-guardias">
+                {guardias.map((guardia, index) => {
+                  const uniformeFaltante = getMissingItems(guardia.uniforme, UNIFORME_LABELS)
+                  const equipamientoFaltante = getMissingItems(guardia.equipamiento, EQUIPAMIENTO_LABELS)
+                  const completo = !uniformeFaltante.length && !equipamientoFaltante.length
 
-                return (
-                  <dl key={guardia.id_guardia ?? guardia.numero_guardia ?? index} className="revision-guardia-detalle-guardia">
-                    <div><dt>Número</dt><dd>{present(guardia.numero_guardia ?? index + 1)}</dd></div>
-                    <div><dt>Nombre completo</dt><dd>{fullName(guardia)}</dd></div>
-                    <div><dt>Identidad</dt><dd>{present(guardia.identidad)}</dd></div>
-                    <div><dt>Teléfono</dt><dd>{present(guardia.telefono)}</dd></div>
-                    <div className="revision-guardia-detalle-missing"><dt>Uniforme no portado</dt><dd>{uniformeFaltante.length ? <ul>{uniformeFaltante.map((item) => <li key={item}>{item}</li>)}</ul> : 'Sin faltantes de uniforme.'}</dd></div>
-                    <div className="revision-guardia-detalle-missing"><dt>Equipamiento no portado</dt><dd>{equipamientoFaltante.length ? <ul>{equipamientoFaltante.map((item) => <li key={item}>{item}</li>)}</ul> : 'Sin faltantes de equipamiento.'}</dd></div>
-                  </dl>
-                )
-              })}
-            </div>
-          )}
-        </section>
+                  return (
+                    <dl key={guardia.id_guardia ?? guardia.numero_guardia ?? index} className={`revision-guardia-detalle-guardia ${completo ? 'is-completo' : 'has-faltantes'}`}>
+                      <div><dt>Número</dt><dd>{present(guardia.numero_guardia ?? index + 1)}</dd></div>
+                      <div><dt>Nombre completo</dt><dd>{fullName(guardia)}</dd></div>
+                      <div><dt>Identidad</dt><dd>{present(guardia.identidad)}</dd></div>
+                      <div><dt>Teléfono</dt><dd>{present(guardia.telefono)}</dd></div>
+                      <div className="revision-guardia-detalle-missing"><dt>Uniforme no portado</dt><dd>{uniformeFaltante.length ? <ul>{uniformeFaltante.map((item) => <li key={item}>{item}</li>)}</ul> : 'Sin faltantes de uniforme.'}</dd></div>
+                      <div className="revision-guardia-detalle-missing"><dt>Equipamiento no portado</dt><dd>{equipamientoFaltante.length ? <ul>{equipamientoFaltante.map((item) => <li key={item}>{item}</li>)}</ul> : 'Sin faltantes de equipamiento.'}</dd></div>
+                    </dl>
+                  )
+                })}
+              </div>
+            )}
+          </section>
+        </div>
 
-        <div className="modal-footer">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cerrar</button>
+        <div className="tuvet-modal-footer">
+          <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={onClose}>Cerrar</button>
         </div>
       </section>
     </div>

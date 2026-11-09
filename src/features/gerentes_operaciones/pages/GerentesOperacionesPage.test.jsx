@@ -134,9 +134,9 @@ describe('GerentesOperacionesPage', () => {
     render(<GerentesOperacionesPage />)
     await screen.findByText('Ana')
     fireEvent.click(screen.getByRole('button', { name: 'Nuevo gerente de operaciones' }))
-    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Beto' } })
-    fireEvent.change(screen.getByLabelText('Apellido'), { target: { value: 'Ruiz' } })
-    fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: 'beto@test.com' } })
+    fireEvent.change(screen.getByLabelText(/^Nombre/), { target: { value: 'Beto' } })
+    fireEvent.change(screen.getByLabelText(/^Apellido/), { target: { value: 'Ruiz' } })
+    fireEvent.change(screen.getByLabelText(/^Correo electrónico/), { target: { value: 'beto@test.com' } })
     fireEvent.click(screen.getByLabelText('VENTAS — Ventas'))
     fireEvent.click(screen.getByRole('button', { name: 'Crear gerente' }))
 
@@ -155,7 +155,7 @@ describe('GerentesOperacionesPage', () => {
     render(<GerentesOperacionesPage />)
     await screen.findByText('Pérez')
     fireEvent.click(screen.getByTitle('Editar'))
-    fireEvent.change(screen.getByLabelText('Correo electrónico'), { target: { value: 'duplicado@test.com' } })
+    fireEvent.change(screen.getByLabelText(/^Correo electrónico/), { target: { value: 'duplicado@test.com' } })
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
     await waitFor(() => expect(apiRequest).toHaveBeenNthCalledWith(2, '/api/calendar/go/12/', {
@@ -200,6 +200,30 @@ describe('GerentesOperacionesPage', () => {
     expect(screen.queryByText('Temporal123')).not.toBeInTheDocument()
   })
 
+  it('muestra las áreas como etiquetas y filtra por área o estado', async () => {
+    apiRequest.mockResolvedValue(response({
+      results: [
+        list.results[0],
+        { id: 13, nombre: 'Luis', apellido: 'Gómez', email: 'luis@test.com', activo: false, areas: [] },
+      ],
+      areas_disponibles: list.areas_disponibles,
+    }))
+
+    render(<GerentesOperacionesPage />)
+    await screen.findByText('Ana')
+    expect(screen.getByText(/1 activo de 2/)).toBeInTheDocument()
+    expect(screen.getByText('VENTAS')).toHaveClass('tuvet-tag')
+    expect(screen.getByText('Sin áreas asignadas')).toBeInTheDocument()
+    expect(screen.getByText('Cambiar contraseña')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'ventas' } })
+    expect(screen.queryByText('Luis')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Inactivos (1)' }))
+    expect(screen.queryByText('Ana')).not.toBeInTheDocument()
+    expect(screen.getByText('Luis')).toBeInTheDocument()
+  })
+
   it('deactivates a manager and reloads the list', async () => {
     apiRequest
       .mockResolvedValueOnce(response(list))
@@ -209,7 +233,7 @@ describe('GerentesOperacionesPage', () => {
     render(<GerentesOperacionesPage />)
     await screen.findByText('Ana')
     fireEvent.click(screen.getByTitle('Desactivar'))
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Desactivar' }))
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Desactivar' }))
 
     await waitFor(() => expect(apiRequest).toHaveBeenNthCalledWith(2, '/api/calendar/go/12/deactivation/', { method: 'POST' }))
     expect(await screen.findByText('No hay gerentes de operaciones registrados.')).toBeInTheDocument()

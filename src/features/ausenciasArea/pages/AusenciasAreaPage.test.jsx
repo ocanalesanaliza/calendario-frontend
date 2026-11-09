@@ -144,10 +144,37 @@ describe('AusenciasAreaPage', () => {
     expect(actOnGAVacationRequest).toHaveBeenCalledWith(4, 'cancel', { reason: '' }, 'command-key')
   })
 
+  it('shows the requester identity supplied by the vacation list without another request', async () => {
+    setup(manager, { vacations: [{ ...request, gerente_area: { id: 8, nombre: 'Ana GA' } }] })
+
+    // Vacaciones y situaciones están en pestañas: se revisa cada tabla en la suya.
+    const vacationTable = await screen.findByRole('table')
+    expect(within(vacationTable).getByRole('columnheader', { name: 'Gerente Área' })).toBeInTheDocument()
+    expect(within(vacationTable).getByText('Ana GA')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: /Situaciones especiales/ }))
+    expect(within(screen.getByRole('table')).getByText('Ana GA')).toBeInTheDocument()
+    expect(getGAVacationRequests).toHaveBeenCalledTimes(1)
+    expect(getGASpecialSituations).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders an em dash instead of an undefined GA when requester data is null', async () => {
+    setup(manager, {
+      vacations: [{ ...request, gerente_area_id: null, gerente_area: null }],
+      special: [{ ...situation, gerente_area_id: null, gerente_area: null }],
+    })
+
+    const vacationTable = await screen.findByRole('table')
+    expect(within(vacationTable).getAllByRole('cell')[0]).toHaveTextContent(/^—$/)
+    fireEvent.click(screen.getByRole('tab', { name: /Situaciones especiales/ }))
+    expect(within(screen.getByRole('table')).getAllByRole('cell')[0]).toHaveTextContent(/^—$/)
+    expect(screen.queryByText('GA #undefined')).not.toBeInTheDocument()
+  })
   it('lets GO approve and reject with a reason and shows special situation controls', async () => {
     setup(manager)
     expect(await screen.findByRole('button', { name: 'Nueva situación' })).toHaveClass('ausencias-area-admin-new-situation')
-    expect(screen.getAllByRole('table')).toHaveLength(2)
+    expect(screen.getByRole('tab', { name: /Vacaciones/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: /Situaciones especiales/ })).toHaveAttribute('aria-selected', 'false')
+    expect(screen.getAllByRole('table')).toHaveLength(1)
     expect(screen.getByText('Pendiente')).toHaveClass('ausencias-area-admin-badge')
     fireEvent.click(screen.getByRole('button', { name: 'Aprobar' }))
     const approveDialog = screen.getByRole('dialog', { name: 'Aprobar vacaciones' })
@@ -162,6 +189,56 @@ describe('AusenciasAreaPage', () => {
     await waitFor(() => expect(actOnGAVacationRequest).toHaveBeenCalledWith(4, 'reject', { reason: 'Fecha no disponible' }, 'command-key'))
   })
 
+  it.each([
+    ['Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }],
+    ['plain Admin Master', { type: 'admin_master' }],
+    ['global Admin Master', { es_admin_maestro: true }],
+  ])('gives %s vacation decisions and special-situation management without cancellation', async (_role, profile) => {
+    setup(profile)
+
+    expect(await screen.findByRole('button', { name: 'Nueva situación' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Aprobar' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Rechazar' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancelar solicitud' })).not.toBeInTheDocument()
+    // Las situaciones especiales están en su propia pestaña.
+    fireEvent.click(screen.getByRole('tab', { name: /Situaciones especiales/ }))
+    expect(screen.getByRole('button', { name: 'Desactivar' })).toBeInTheDocument()
+  })
+
+  it('lets an Admin Master select catalog types without exposing type management', async () => {
+    setup({ type: 'admin_master' }, { special: [] })
+    await screen.findByRole('button', { name: 'Nueva situación' })
+    fireEvent.click(screen.getByRole('button', { name: 'Nueva situación' }))
+
+    expect(await screen.findByRole('option', { name: 'Capacitación' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /tipo/i })).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['GA', ga],
+    ['GS', { type: 'gerente_sucursal' }],
+  ])('does not show GA special-situation management to %s', async (_role, profile) => {
+    setup(profile)
+
+    await screen.findByText(profile.type === 'gerente_area' ? 'Mis solicitudes' : 'Solicitudes de vacaciones')
+    expect(screen.queryByRole('button', { name: 'Nueva situación' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Desactivar' })).not.toBeInTheDocument()
+  })
+
+  it('rejects a whitespace-only rejection reason locally and trims a valid reason', async () => {
+    setup(manager)
+    await screen.findByRole('button', { name: 'Rechazar' })
+    fireEvent.click(screen.getByRole('button', { name: 'Rechazar' }))
+    const dialog = screen.getByRole('dialog', { name: 'Rechazar vacaciones' })
+    fireEvent.change(within(dialog).getByLabelText('Motivo'), { target: { value: '   ' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Rechazar' }))
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('El motivo es obligatorio')
+    expect(actOnGAVacationRequest).not.toHaveBeenCalled()
+    fireEvent.change(within(dialog).getByLabelText('Motivo'), { target: { value: '  Sin cobertura  ' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Rechazar' }))
+    await waitFor(() => expect(actOnGAVacationRequest).toHaveBeenCalledWith(4, 'reject', { reason: 'Sin cobertura' }, 'command-key'))
+  })
+
   it('renders a single requested day with its slot in the administrative period column', async () => {
     setup(manager, { vacations: [{ id: 9, state: 'pending', segments: [{ date: '2026-09-14', slot: 'morning' }] }] })
     const vacationRow = (await screen.findAllByRole('table'))[0].querySelector('tbody tr')
@@ -171,7 +248,7 @@ describe('AusenciasAreaPage', () => {
     expect(within(vacationTable).getByRole('columnheader', { name: 'Período solicitado' })).toBeInTheDocument()
     expect(within(vacationTable).queryByRole('columnheader', { name: 'Fecha' })).not.toBeInTheDocument()
     expect(within(vacationTable).queryByRole('columnheader', { name: 'Segmentos' })).not.toBeInTheDocument()
-    expect(cells[0]).toHaveTextContent('14 de septiembre de 2026 · Mañana')
+    expect(cells[1]).toHaveTextContent('14 de septiembre de 2026 · Mañana')
   })
 
   it('compresses consecutive full-day segments into an administrative period range', async () => {
@@ -319,6 +396,8 @@ describe('AusenciasAreaPage', () => {
   it('deactivates a situation', async () => {
     setup(manager)
     await screen.findByRole('button', { name: 'Nueva situación' })
+    fireEvent.click(screen.getByRole('tab', { name: /Situaciones especiales/ }))
+    expect(screen.getByRole('cell', { name: 'Capacitación' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Desactivar' }))
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar desactivación' }))
     await waitFor(() => expect(deactivateGASpecialSituation).toHaveBeenCalledWith(7, 'command-key'))
@@ -335,6 +414,18 @@ describe('AusenciasAreaPage', () => {
     fireEvent.change(screen.getByLabelText('Fecha de inicio'), { target: { value: '2026-10-01' } })
     fireEvent.click(screen.getByRole('button', { name: 'Solicitar vacaciones' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Revisa los datos enviados')
+  })
+
+  it('uses generic non-disclosing copy for a 404 operation failure', async () => {
+    actOnGAVacationRequest.mockRejectedValueOnce(Object.assign(new Error('foreign vacation request'), { status: 404 }))
+    setup(manager)
+    await screen.findByRole('button', { name: 'Aprobar' })
+    fireEvent.click(screen.getByRole('button', { name: 'Aprobar' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Aprobar vacaciones' })).getByRole('button', { name: 'Aprobar' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('No tienes permisos para realizar esta acción')
+    expect(alert).not.toHaveTextContent('foreign vacation request')
   })
 
   it('reuses a command key after a transport failure in the same modal', async () => {

@@ -21,10 +21,12 @@
 .ausencias-area-admin-table__period { min-width: 14rem; overflow-wrap: anywhere; white-space: normal; }
 .ausencias-area-admin-table__reason { max-width: 15rem; overflow: hidden; color: #64748b; font-size: .85rem; text-overflow: ellipsis; white-space: nowrap; }
 .ausencias-area-admin-table--vacations { min-width: 42rem; table-layout: fixed; }
-.ausencias-area-admin-table--vacations th:nth-child(1), .ausencias-area-admin-table--vacations td:nth-child(1) { width: 34%; }
-.ausencias-area-admin-table--vacations th:nth-child(2), .ausencias-area-admin-table--vacations td:nth-child(2) { width: 36%; }
-.ausencias-area-admin-table--vacations th:nth-child(3), .ausencias-area-admin-table--vacations td:nth-child(3) { width: 15%; }
-.ausencias-area-admin-table--vacations th:nth-child(4), .ausencias-area-admin-table--vacations td:nth-child(4) { width: 15%; white-space: nowrap; }
+.ausencias-area-admin-table--vacations th:nth-child(1), .ausencias-area-admin-table--vacations td:nth-child(1) { width: 16%; }
+.ausencias-area-admin-table--vacations th:nth-child(2), .ausencias-area-admin-table--vacations td:nth-child(2) { width: 33%; }
+.ausencias-area-admin-table--vacations th:nth-child(3), .ausencias-area-admin-table--vacations td:nth-child(3) { width: 25%; }
+.ausencias-area-admin-table--vacations th:nth-child(4), .ausencias-area-admin-table--vacations td:nth-child(4) { width: 12%; white-space: nowrap; }
+.ausencias-area-admin-table--vacations th:nth-child(5), .ausencias-area-admin-table--vacations td:nth-child(5) { width: 7.5rem; white-space: nowrap; }
+.ausencias-area-admin-table--vacations .ausencias-area-admin-table__name { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
 .ausencias-area-admin-table--vacations .ausencias-area-admin-table__period { min-width: 0; line-height: 1.45; }
 .ausencias-area-admin-table--vacations .ausencias-area-admin-table__reason { max-width: none; overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
 .ausencias-area-admin-badge { display: inline-flex; align-items: center; min-height: 1.5rem; padding: .125rem .5rem; border-radius: 999px; background: #e0e7ff; color: #4338ca; font-size: .8125rem; font-weight: 600; }

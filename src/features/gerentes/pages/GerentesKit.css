@@ -1,0 +1,77 @@
+/*
+ * Gerentes de área (Analiza) con el diseño del kit compartido (TuvetUi + tema .tema-analiza).
+ * Todo va limitado a .gerentes-kit para no afectar a otras páginas.
+ * Misma estructura que Usuarios y Sucursales: buscador + chips, tabla sin ancho mínimo y acciones con icono.
+ */
+
+.gerentes-kit .gk-barra { display: flex; flex-direction: column; gap: .75rem; }
+
+.gerentes-kit .gk-tabla-card { padding: 0; overflow: hidden; }
+.gerentes-kit .gk-tabla th,
+.gerentes-kit .gk-tabla td { padding-left: .6rem; padding-right: .6rem; }
+.gerentes-kit .gk-tabla th:first-child,
+.gerentes-kit .gk-tabla td:first-child { padding-left: 1rem; }
+.gerentes-kit .gk-tabla th:last-child,
+.gerentes-kit .gk-tabla td:last-child { padding-right: 1rem; }
+.gerentes-kit .gk-tabla .tuvet-badge { white-space: nowrap; }
+
+.gerentes-kit .gk-persona { display: inline-flex; align-items: center; gap: .6rem; max-width: 100%; }
+.gerentes-kit .gk-persona-texto { display: grid; min-width: 0; line-height: 1.3; }
+.gerentes-kit .gk-nombre { color: var(--tv-fg); font-weight: 600; }
+
+.gerentes-kit .gk-email {
+  max-width: 300px;
+  overflow: hidden;
+  color: var(--tv-subtle);
+  font-size: .82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Rol: admin maestro destacado con el color del tema; gerente de área en neutro. */
+.gerentes-kit .gk-badge-admin { background: var(--tv-primary-soft); color: var(--tv-primary-text); }
+.gerentes-kit .gk-badge-ga { background: var(--tv-neutral-soft); color: var(--tv-neutral-text); }
+
+.gerentes-kit .gk-tabla td.tuvet-cell-acciones { white-space: nowrap; }
+.gerentes-kit .gk-tabla td.tuvet-cell-acciones > * + * { margin-left: .5rem; }
+.gerentes-kit .gk-tabla .tuvet-icon-action { width: 34px; height: 34px; }
+
+.gerentes-kit .gk-pie { margin: 0; padding: .7rem 1rem; border-top: 1px solid var(--tv-border); color: var(--tv-subtle); font-size: .82rem; }
+
+/* Impacto de desactivar: cifras y sucursales afectadas. */
+.tuvet-modal .gk-impacto { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+
+.tuvet-modal .gk-impacto div {
+  display: grid;
+  gap: .1rem;
+  padding: .65rem .85rem;
+  border: 1px solid var(--tv-border);
+  border-radius: var(--tv-radius);
+  color: var(--tv-muted);
+  font-size: .8rem;
+}
+
+.tuvet-modal .gk-impacto strong { color: var(--tv-fg); font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+
+.tuvet-modal .gk-sucursales {
+  display: grid;
+  gap: .35rem;
+  max-height: 180px;
+  margin: 0;
+  padding: .6rem .75rem;
+  overflow-y: auto;
+  border: 1px solid var(--tv-border);
+  border-radius: var(--tv-radius-sm);
+  list-style: none;
+}
+
+.tuvet-modal .gk-sucursales li { display: flex; align-items: center; gap: .5rem; color: var(--tv-fg); font-size: .88rem; }
+.tuvet-modal .gk-sucursales .tuvet-tag { margin: 0; }
+
+@media (max-width: 1280px) {
+  .gerentes-kit .gk-tabla .gk-persona .tuvet-avatar { display: none; }
+}
+
+@media (max-width: 640px) {
+  .tuvet-modal .gk-impacto { grid-template-columns: 1fr; }
+}

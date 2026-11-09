@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import GerentesPage from './GerentesPage'
 
@@ -83,6 +83,41 @@ describe('GerentesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Crear gerente' }))
 
     expect(await screen.findByText('Temporal123')).toBeInTheDocument()
-    expect(screen.getByRole('alert')).toHaveTextContent('no pudo confirmar el envío del correo')
+    expect(within(screen.getByRole('dialog', { name: 'Contraseña temporal' })).getByRole('alert'))
+      .toHaveTextContent('no pudo confirmar el envío del correo')
+  })
+
+  it('filtra por nombre o correo y muestra el impacto antes de desactivar', async () => {
+    apiRequest.mockImplementation(async (path) => {
+      if (path.endsWith('/desactivar/')) {
+        return response({
+          gerente_area: { nombre: 'Ana' },
+          sucursales_count: 2,
+          sucursales: [{ id_sucursal: 1, nombre: 'Centro', codigo: 'CEN' }, { id_sucursal: 2, nombre: 'Norte', codigo: 'NOR' }],
+          usuarios_asignados_count: 3,
+          requiere_reasignacion: true,
+          gerentes_destino: [{ id_gerente_area: 9, nombre: 'Luis' }],
+        })
+      }
+      return response({ results: [
+        { id_gerente_area: 8, nombre: 'Ana', email: 'ana@test.com', activo: true, es_admin_maestro: true },
+        { id_gerente_area: 9, nombre: 'Luis', email: 'luis@test.com', activo: true },
+      ] })
+    })
+
+    render(<GerentesPage />)
+    await screen.findByText('Ana')
+    expect(screen.getByText(/2 activos de 2 · 1 admin maestro/)).toBeInTheDocument()
+
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'luis@' } })
+    expect(screen.queryByText('Ana')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '' } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Desactivar a Ana' }))
+    const dialogo = await screen.findByRole('alertdialog', { name: 'Desactivar gerente' })
+    expect(await within(dialogo).findByText('Sucursales a su cargo')).toBeInTheDocument()
+    expect(within(dialogo).getByText('CEN')).toBeInTheDocument()
+    fireEvent.click(within(dialogo).getByRole('button', { name: 'Desactivar' }))
+    expect(within(dialogo).getByRole('alert')).toHaveTextContent('Elige a qué gerente pasarán sus sucursales.')
   })
 })

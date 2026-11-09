@@ -1,0 +1,99 @@
+/*
+ * Conteo de inventario (Analiza) con el diseño del kit compartido (TuvetUi + tema .tema-analiza).
+ * InventarioDemo.css se conserva por los estilos de la celda editable de la tabla.
+ * Todo va limitado a .inventario-conteo para no afectar a otras páginas.
+ */
+
+.inventario-conteo .ic-resumen {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 2fr;
+  gap: .9rem;
+}
+
+.inventario-conteo .ic-sucursal,
+.inventario-conteo .ic-avance {
+  display: flex;
+  gap: .75rem;
+  padding: .9rem 1.1rem;
+  border: 1px solid var(--tv-border);
+  border-radius: var(--tv-radius);
+  background: var(--tv-surface);
+  box-shadow: var(--tv-shadow-sm);
+}
+
+.inventario-conteo .ic-sucursal { align-items: center; }
+
+.inventario-conteo .ic-sucursal-icono {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--tv-radius-sm);
+  background: var(--tv-primary-soft);
+  color: var(--tv-primary-text);
+}
+
+.inventario-conteo .ic-avance { flex-direction: column; justify-content: center; gap: .5rem; }
+.inventario-conteo .ic-avance-fila { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; }
+.inventario-conteo .ic-avance-valor { color: var(--tv-fg); font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+
+.inventario-conteo .ic-barra {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--tv-surface-sunken);
+}
+
+.inventario-conteo .ic-barra-relleno {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--tv-primary);
+  transition: width var(--tv-dur) var(--tv-ease);
+}
+
+.inventario-conteo .ic-controles { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+.inventario-conteo .ic-contador { margin: 0 0 0 auto; color: var(--tv-subtle); font-size: .82rem; }
+.inventario-conteo .ic-ayuda { margin: -.4rem 0 0; }
+
+.inventario-conteo kbd {
+  padding: .05rem .35rem;
+  border: 1px solid var(--tv-border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--tv-surface);
+  font-family: inherit;
+  font-size: .75rem;
+}
+
+/* Tabla editable (MUI DataGrid) dentro de la tarjeta del kit */
+.inventario-conteo .ic-grid {
+  border-color: var(--tv-border);
+  border-radius: var(--tv-radius);
+  background: var(--tv-surface);
+  box-shadow: var(--tv-shadow-sm);
+}
+
+.inventario-conteo .ic-grid .MuiDataGrid-cell--editing {
+  background: var(--tv-primary-softer);
+  box-shadow: inset 0 0 0 2px var(--tv-primary-accent);
+}
+
+.inventario-conteo .ic-grid .inventory-demo-grid-input:focus-visible { box-shadow: inset 0 0 0 2px var(--tv-primary); }
+
+.inventario-conteo .ic-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.inventario-conteo .ic-kpis .tv-kpi-valor { font-size: 1.4rem; }
+
+.inventario-conteo .ic-acciones { display: flex; justify-content: flex-end; gap: .6rem; }
+
+@media (max-width: 900px) {
+  .inventario-conteo .ic-resumen,
+  .inventario-conteo .ic-kpis { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .inventario-conteo .ic-contador { margin-left: 0; }
+  .inventario-conteo .ic-acciones { flex-direction: column-reverse; }
+  .inventario-conteo .ic-acciones .tuvet-btn { width: 100%; }
+}

@@ -1,7 +1,18 @@
-﻿import { useState, useEffect } from 'react'
+﻿import { useCallback, useEffect, useRef, useState } from 'react'
 import { getUsuarios, createUsuario, updateUsuario, cambiarSucursal, desactivarUsuario, resetPasswordUsuario } from '../services/usuariosService'
 import { getSucursales } from '../../sucursales/services/sucursalesService'
+// Kit de componentes compartido con Tuvet; los colores de Analiza llegan con la clase .tema-analiza.
+import { Avatar, Aviso, EstadoCarga, Field, Icono, Modal, PageHeader, Toggle } from '../../tuvet/components/TuvetUi'
+import { useConfirmacion } from '../../tuvet/components/useConfirmacion'
+import { enfocarPrimerError } from '../../tuvet/utils/formularios'
+import '../../tuvet/tuvet.css'
+// Se conserva: otras páginas podrían depender de sus clases genéricas (todos los CSS son globales).
 import './UsuariosPage.css'
+import './UsuariosKit.css'
+
+const FILTROS = { active: 'Activos', inactive: 'Inactivos' }
+
+const normalizar = (texto) => String(texto ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState([])
@@ -9,11 +20,12 @@ export default function UsuariosPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [filter, setFilter] = useState('active')
+  const [busqueda, setBusqueda] = useState('')
+  const [aviso, setAviso] = useState('')
   const [modal, setModal] = useState(null)
+  const [confirmar, dialogo] = useConfirmacion()
 
-  useEffect(() => { void loadData() }, [filter])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
@@ -25,12 +37,23 @@ export default function UsuariosPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filter])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadData()
+  }, [loadData])
 
   function closeModal() { setModal(null) }
 
+  function abrir(type, usuario = null) {
+    setAviso('')
+    setModal({ type, usuario })
+  }
+
   async function handleCreate(form) {
     const data = await createUsuario(form)
+    // La contraseña temporal solo vive en el estado del modal; se descarta al cerrarlo.
     setModal({
       type: 'password',
       password: data.password_temporal,
@@ -44,18 +67,15 @@ export default function UsuariosPage() {
     await updateUsuario(id, form)
     await loadData()
     closeModal()
+    setAviso(`Usuario “${form.nombre}” actualizado.`)
   }
 
-  async function handleCambiarSucursal(id, form) {
-    await cambiarSucursal(id, form)
+  async function handleCambiarSucursal(usuario, form) {
+    await cambiarSucursal(usuario.id_usuario, form)
     await loadData()
     closeModal()
-  }
-
-  async function handleDesactivar(id) {
-    await desactivarUsuario(id)
-    await loadData()
-    closeModal()
+    const destino = sucursales.find((s) => s.id_sucursal === form.id_sucursal)?.nombre
+    setAviso(`${usuario.nombre} ahora está en ${destino ?? 'la nueva sucursal'}.`)
   }
 
   async function handleResetPassword(id) {
@@ -69,124 +89,154 @@ export default function UsuariosPage() {
     void loadData().catch(() => {})
   }
 
+  async function desactivar(usuario) {
+    setAviso('')
+    const ok = await confirmar({
+      title: 'Desactivar usuario',
+      message: `¿Deseas desactivar a ${usuario.nombre}?`,
+      detail: 'No podrá iniciar sesión y se cerrará su asignación de sucursal.',
+      confirmLabel: 'Desactivar',
+      accion: () => desactivarUsuario(usuario.id_usuario),
+    })
+    if (!ok) return
+    setAviso(`${usuario.nombre} fue desactivado.`)
+    await loadData()
+  }
+
+  function resetear(usuario) {
+    setAviso('')
+    void confirmar({
+      title: 'Resetear contraseña',
+      message: `Se generará una nueva contraseña temporal para ${usuario.nombre}.`,
+      detail: 'Deberá cambiarla al iniciar sesión. La contraseña actual dejará de funcionar.',
+      confirmLabel: 'Resetear',
+      tone: 'primary',
+      accion: () => handleResetPassword(usuario.id_usuario),
+    })
+  }
+
+  const termino = normalizar(busqueda.trim())
+  const filtrados = termino
+    ? usuarios.filter((u) => normalizar(`${u.nombre} ${u.email} ${u.sucursal_actual?.nombre ?? ''} ${u.gerente_area_actual?.nombre ?? ''}`).includes(termino))
+    : usuarios
+  const pendientesPassword = usuarios.filter((u) => u.debe_cambiar_password).length
+  const etiquetaFiltro = filter === 'inactive' ? 'inactivo' : 'activo'
+
   return (
-    <div className="usuarios-page">
-      <div className="page-header">
-        <div>
-          <h1>Usuarios</h1>
-          <p>{usuarios.length} usuario{usuarios.length !== 1 ? 's' : ''} registrado{usuarios.length !== 1 ? 's' : ''}</p>
+    <div className="tema-analiza tuvet-page usuarios-kit">
+      <PageHeader
+        title="Usuarios"
+        description={`${usuarios.length} usuario${usuarios.length !== 1 ? 's' : ''} ${etiquetaFiltro}${usuarios.length !== 1 ? 's' : ''}${pendientesPassword ? ` · ${pendientesPassword} debe${pendientesPassword !== 1 ? 'n' : ''} cambiar su contraseña` : ''}.`}
+      >
+        <button type="button" className="tuvet-btn" onClick={() => abrir('crear')}>Nuevo usuario</button>
+      </PageHeader>
+
+      <div className="uk-barra">
+        <div className="tuvet-search-bar" role="search">
+          <Icono nombre="buscar" className="tuvet-search-icon" />
+          <input
+            type="search"
+            value={busqueda}
+            onChange={(event) => setBusqueda(event.target.value)}
+            placeholder="Buscar por nombre, correo, sucursal o gerente"
+            aria-label="Buscar por nombre, correo, sucursal o gerente"
+          />
+          {busqueda && <button type="button" className="tuvet-btn tuvet-btn-ghost" onClick={() => setBusqueda('')}>Limpiar</button>}
         </div>
-        <button className="btn-primary" onClick={() => setModal({ type: 'crear' })}>
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Nuevo usuario
-        </button>
+        <div className="tuvet-filtros" role="group" aria-label="Mostrar">
+          {Object.entries(FILTROS).map(([clave, etiqueta]) => (
+            <button
+              key={clave}
+              type="button"
+              className={`tuvet-chip ${filter === clave ? 'active' : ''}`}
+              aria-pressed={filter === clave}
+              onClick={() => { setFilter(clave); setAviso('') }}
+            >
+              {etiqueta}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="usuarios-filter">
-        <label htmlFor="usuarios-status-filter">Mostrar</label>
-        <select id="usuarios-status-filter" value={filter} onChange={(event) => setFilter(event.target.value)}>
-          <option value="active">Activos</option>
-          <option value="inactive">Inactivos</option>
-        </select>
-      </div>
+      <Aviso tipo="success">{aviso}</Aviso>
 
-      {loading ? (
-        <div className="loading-state">Cargando usuarios...</div>
-      ) : error ? (
-        <div className="empty-state" role="alert"><p>{error}</p><button className="btn-secondary" onClick={loadData}>Reintentar</button></div>
-      ) : usuarios.length === 0 ? (
-        <div className="empty-state">No hay usuarios registrados.</div>
-      ) : (
-        <div className="table-card">
-          <table className="usuarios-table">
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Email</th>
-                <th>Sucursal</th>
-                <th>Gerente</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {usuarios.map((u) => (
-                <tr key={u.id_usuario}>
-                  <td className="td-nombre">{u.nombre}</td>
-                  <td className="td-email">{u.email}</td>
-                  <td>{u.sucursal_actual?.nombre ?? <span className="td-empty">—</span>}</td>
-                  <td>{u.gerente_area_actual?.nombre ?? <span className="td-empty">—</span>}</td>
-                  <td>
-                    <div className="badges">
-                      <span className={`badge ${u.habilitado ? 'badge-green' : 'badge-red'}`}>
-                        {u.habilitado ? 'Activo' : 'Inactivo'}
+      <EstadoCarga
+        loading={loading}
+        error={error}
+        onRetry={loadData}
+        empty={!filtrados.length}
+        emptyText={termino ? `Ningún usuario coincide con “${busqueda.trim()}”.` : 'No hay usuarios registrados.'}
+        emptyAction={termino
+          ? <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => setBusqueda('')}>Quitar búsqueda</button>
+          : filter === 'active' && <button type="button" className="tuvet-btn" onClick={() => abrir('crear')}>Crear el primer usuario</button>}
+      >
+        <div className="tuvet-card uk-tabla-card">
+          <div className="tuvet-table-wrap">
+            <table className="tuvet-table uk-tabla">
+              <thead>
+                <tr>
+                  <th scope="col">Usuario</th>
+                  <th scope="col">Sucursal</th>
+                  <th scope="col">Gerente de área</th>
+                  <th scope="col">Estado</th>
+                  <th scope="col"><span className="tuvet-visually-hidden">Acciones</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtrados.map((u) => (
+                  <tr key={u.id_usuario} className={u.habilitado ? '' : 'tuvet-row-inactiva'}>
+                    <td>
+                      <span className="uk-persona">
+                        <Avatar nombre={u.nombre} size="sm" />
+                        <span className="uk-persona-texto">
+                          <strong className="uk-nombre">{u.nombre}</strong>
+                          <span className="uk-email" title={u.email}>{u.email}</span>
+                        </span>
                       </span>
-                      {u.debe_cambiar_password && (
-                        <span className="badge badge-yellow">Cambiar contraseña</span>
-                      )}
-                    </div>
-                  </td>
-                  <td>
-                    <div className="row-actions">
-                      <button
-                        className="action-btn"
-                        title="Editar"
-                        onClick={() => setModal({ type: 'editar', usuario: u })}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                        </svg>
+                    </td>
+                    <td>{u.sucursal_actual?.nombre ?? <span className="tuvet-hint">Sin sucursal</span>}</td>
+                    <td>{u.gerente_area_actual?.nombre ?? <span className="tuvet-hint">—</span>}</td>
+                    <td>
+                      <span className="tuvet-badges">
+                        <span className={`tuvet-badge ${u.habilitado ? 'tuvet-badge-aprobada' : 'tuvet-badge-cancelada'}`}>
+                          <Icono nombre={u.habilitado ? 'check' : 'cerrar'} className="tuvet-badge-icon" />
+                          {u.habilitado ? 'Activo' : 'Inactivo'}
+                        </span>
+                        {u.debe_cambiar_password && (
+                          <span className="tuvet-badge tuvet-badge-pendiente" title="Aún usa la contraseña temporal">
+                            <Icono nombre="llave" className="tuvet-badge-icon" />
+                            Cambiar contraseña
+                          </span>
+                        )}
+                      </span>
+                    </td>
+                    <td className="tuvet-cell-acciones">
+                      <button type="button" className="tuvet-icon-action" title="Editar" aria-label={`Editar ${u.nombre}`} onClick={() => abrir('editar', u)}>
+                        <Icono nombre="editar" />
                       </button>
-                      <button
-                        className="action-btn"
-                        title="Resetear contraseña"
-                        onClick={() => setModal({ type: 'reset', usuario: u })}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                          <path d="M7 11V7a5 5 0 0 1 9.9-1" />
-                        </svg>
+                      <button type="button" className="tuvet-icon-action" title="Resetear contraseña" aria-label={`Resetear contraseña de ${u.nombre}`} onClick={() => resetear(u)}>
+                        <Icono nombre="llave" />
                       </button>
-                      <button
-                        className="action-btn"
-                        title="Cambiar sucursal"
-                        onClick={() => setModal({ type: 'sucursal', usuario: u })}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                          <polyline points="9 22 9 12 15 12 15 22" />
-                        </svg>
+                      <button type="button" className="tuvet-icon-action" title="Cambiar sucursal" aria-label={`Cambiar sucursal de ${u.nombre}`} onClick={() => abrir('sucursal', u)}>
+                        <Icono nombre="edificio" />
                       </button>
                       {u.habilitado && (
-                        <button
-                          className="action-btn action-btn-danger"
-                          title="Desactivar"
-                          onClick={() => setModal({ type: 'desactivar', usuario: u })}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10" />
-                            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-                          </svg>
+                        <button type="button" className="tuvet-icon-action tuvet-icon-action-danger" title="Desactivar" aria-label={`Desactivar a ${u.nombre}`} onClick={() => desactivar(u)}>
+                          <Icono nombre="prohibido" />
                         </button>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="uk-pie" aria-live="polite">Mostrando {filtrados.length} de {usuarios.length} usuarios</p>
         </div>
-      )}
+      </EstadoCarga>
 
       {modal?.type === 'crear' && (
-        <CrearModal
-          sucursales={sucursales}
-          onSubmit={handleCreate}
-          onClose={closeModal}
-        />
+        <CrearModal sucursales={sucursales} onSubmit={handleCreate} onClose={closeModal} />
       )}
 
       {modal?.type === 'editar' && (
@@ -201,23 +251,7 @@ export default function UsuariosPage() {
         <CambiarSucursalModal
           usuario={modal.usuario}
           sucursales={sucursales}
-          onSubmit={(form) => handleCambiarSucursal(modal.usuario.id_usuario, form)}
-          onClose={closeModal}
-        />
-      )}
-
-      {modal?.type === 'desactivar' && (
-        <DesactivarModal
-          usuario={modal.usuario}
-          onConfirm={() => handleDesactivar(modal.usuario.id_usuario)}
-          onClose={closeModal}
-        />
-      )}
-
-      {modal?.type === 'reset' && (
-        <ResetModal
-          usuario={modal.usuario}
-          onConfirm={() => handleResetPassword(modal.usuario.id_usuario)}
+          onSubmit={(form) => handleCambiarSucursal(modal.usuario, form)}
           onClose={closeModal}
         />
       )}
@@ -230,40 +264,39 @@ export default function UsuariosPage() {
           onClose={closeModal}
         />
       )}
+
+      {dialogo}
     </div>
   )
 }
 
 /* ── Modales ── */
 
-function ModalWrapper({ title, onClose, children }) {
-  return (
-    <div className="modal-overlay">
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>{title}</h2>
-          <button className="modal-close" onClick={onClose}>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
-}
-
 function CrearModal({ sucursales, onSubmit, onClose }) {
   const [form, setForm] = useState({ nombre: '', email: '', id_sucursal: '' })
+  const [errores, setErrores] = useState({})
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const formRef = useRef(null)
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+  const set = (k) => (e) => {
+    setForm((f) => ({ ...f, [k]: e.target.value }))
+    setErrores((actual) => ({ ...actual, [k]: undefined }))
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+    const nuevos = {}
+    if (!form.nombre.trim()) nuevos.nombre = 'Escribe el nombre completo.'
+    if (!form.email.trim()) nuevos.email = 'Escribe el correo; ahí recibirá su contraseña temporal.'
+    else if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) nuevos.email = 'Revisa el correo; debe tener el formato nombre@dominio.com.'
+    if (!form.id_sucursal) nuevos.id_sucursal = 'Elige la sucursal donde trabajará.'
+    setErrores(nuevos)
+    if (Object.keys(nuevos).length) {
+      enfocarPrimerError(formRef.current)
+      return
+    }
     setLoading(true)
     try {
       await onSubmit({ ...form, id_sucursal: Number(form.id_sucursal) })
@@ -275,34 +308,38 @@ function CrearModal({ sucursales, onSubmit, onClose }) {
   }
 
   return (
-    <ModalWrapper title="Nuevo usuario" onClose={onClose}>
-      <form className="modal-form" onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Nombre</label>
-          <input type="text" value={form.nombre} onChange={set('nombre')} required />
-        </div>
-        <div className="form-group">
-          <label>Email</label>
-          <input type="email" value={form.email} onChange={set('email')} required />
-        </div>
-        <div className="form-group">
-          <label>Sucursal</label>
-          <select value={form.id_sucursal} onChange={set('id_sucursal')} required>
+    <Modal
+      title="Nuevo usuario"
+      subtitle="Recibirá una contraseña temporal por correo."
+      icon="persona"
+      onClose={loading ? () => {} : onClose}
+      footer={(
+        <>
+          <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={onClose} disabled={loading}>Cancelar</button>
+          <button type="submit" form="uk-crear-form" className="tuvet-btn" disabled={loading} aria-busy={loading}>
+            {loading ? 'Creando...' : 'Crear usuario'}
+          </button>
+        </>
+      )}
+    >
+      <form id="uk-crear-form" ref={formRef} className="tuvet-form" onSubmit={handleSubmit} noValidate>
+        <Aviso tipo="error">{error}</Aviso>
+        <Field label="Nombre" required error={errores.nombre}>
+          <input type="text" value={form.nombre} onChange={set('nombre')} autoComplete="off" placeholder="Ej. Ana Pérez" />
+        </Field>
+        <Field label="Email" required error={errores.email}>
+          <input type="email" value={form.email} onChange={set('email')} autoComplete="off" placeholder="nombre@empresa.com" />
+        </Field>
+        <Field label="Sucursal" required error={errores.id_sucursal}>
+          <select value={form.id_sucursal} onChange={set('id_sucursal')}>
             <option value="">Seleccionar sucursal</option>
             {sucursales.map((s) => (
               <option key={s.id_sucursal} value={s.id_sucursal}>{s.nombre}</option>
             ))}
           </select>
-        </div>
-        {error && <p className="modal-error">{error}</p>}
-        <div className="modal-footer">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Creando...' : 'Crear usuario'}
-          </button>
-        </div>
+        </Field>
       </form>
-    </ModalWrapper>
+    </Modal>
   )
 }
 
@@ -331,33 +368,36 @@ function EditarModal({ usuario, onSubmit, onClose }) {
   }
 
   return (
-    <ModalWrapper title="Editar usuario" onClose={onClose}>
-      <form className="modal-form" onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Nombre</label>
-          <input type="text" value={form.nombre} onChange={set('nombre')} required />
-        </div>
-        <div className="form-group">
-          <label>Email</label>
-          <input type="email" value={form.email} onChange={set('email')} required />
-        </div>
-        <div className="form-group form-group-inline">
-          <label>Habilitado</label>
-          <input
-            type="checkbox"
-            checked={form.habilitado}
-            onChange={(e) => setForm((f) => ({ ...f, habilitado: e.target.checked }))}
-          />
-        </div>
-        {error && <p className="modal-error">{error}</p>}
-        <div className="modal-footer">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button type="submit" className="btn-primary" disabled={loading}>
+    <Modal
+      title="Editar usuario"
+      subtitle={usuario.nombre}
+      icon="editar"
+      onClose={loading ? () => {} : onClose}
+      footer={(
+        <>
+          <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={onClose} disabled={loading}>Cancelar</button>
+          <button type="submit" form="uk-editar-form" className="tuvet-btn" disabled={loading} aria-busy={loading}>
             {loading ? 'Guardando...' : 'Guardar cambios'}
           </button>
-        </div>
+        </>
+      )}
+    >
+      <form id="uk-editar-form" className="tuvet-form" onSubmit={handleSubmit}>
+        <Aviso tipo="error">{error}</Aviso>
+        <Field label="Nombre" required>
+          <input type="text" value={form.nombre} onChange={set('nombre')} required />
+        </Field>
+        <Field label="Email" required>
+          <input type="email" value={form.email} onChange={set('email')} required />
+        </Field>
+        <Toggle
+          label="Habilitado"
+          description={form.habilitado ? 'Puede iniciar sesión.' : 'No podrá iniciar sesión.'}
+          checked={form.habilitado}
+          onChange={(valor) => setForm((f) => ({ ...f, habilitado: valor }))}
+        />
       </form>
-    </ModalWrapper>
+    </Modal>
   )
 }
 
@@ -387,124 +427,79 @@ function CambiarSucursalModal({ usuario, sucursales, onSubmit, onClose }) {
   }
 
   return (
-    <ModalWrapper title={`Cambiar sucursal — ${usuario.nombre}`} onClose={onClose}>
-      <form className="modal-form" onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Nueva sucursal</label>
+    <Modal
+      title="Cambiar sucursal"
+      subtitle={usuario.nombre}
+      icon="edificio"
+      onClose={loading ? () => {} : onClose}
+      footer={(
+        <>
+          <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={onClose} disabled={loading}>Cancelar</button>
+          <button type="submit" form="uk-sucursal-form" className="tuvet-btn" disabled={loading} aria-busy={loading}>
+            {loading ? 'Cambiando...' : 'Cambiar sucursal'}
+          </button>
+        </>
+      )}
+    >
+      <form id="uk-sucursal-form" className="tuvet-form" onSubmit={handleSubmit}>
+        <Aviso tipo="error">{error}</Aviso>
+        <p className="uk-actual">
+          <Icono nombre="edificio" className="uk-actual-icono" />
+          Sucursal actual: <strong>{usuario.sucursal_actual?.nombre ?? 'sin sucursal'}</strong>
+        </p>
+        <Field label="Nueva sucursal" required>
           <select value={form.id_sucursal} onChange={set('id_sucursal')} required>
             <option value="">Seleccionar sucursal</option>
             {sucursales.map((s) => (
               <option key={s.id_sucursal} value={s.id_sucursal}>{s.nombre}</option>
             ))}
           </select>
-        </div>
-        <div className="form-group">
-          <label>Fecha de inicio <span className="label-optional">(opcional)</span></label>
+        </Field>
+        <Field label="Fecha de inicio" hint="Opcional. Si la dejas vacía, el cambio aplica desde hoy.">
           <input type="date" value={form.fecha_inicio} onChange={set('fecha_inicio')} />
-        </div>
-        {error && <p className="modal-error">{error}</p>}
-        <div className="modal-footer">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Cambiando...' : 'Cambiar sucursal'}
-          </button>
-        </div>
+        </Field>
       </form>
-    </ModalWrapper>
-  )
-}
-
-function DesactivarModal({ usuario, onConfirm, onClose }) {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  async function handleConfirm() {
-    setLoading(true)
-    try {
-      await onConfirm()
-    } catch (err) {
-      setError(err.message)
-      setLoading(false)
-    }
-  }
-
-  return (
-    <ModalWrapper title="Desactivar usuario" onClose={onClose}>
-      <div className="modal-form">
-        <p className="modal-confirm-text">
-          ¿Estás seguro que deseas desactivar a <strong>{usuario.nombre}</strong>?
-          El usuario no podrá iniciar sesión y se cerrará su asignación de sucursal.
-        </p>
-        {error && <p className="modal-error">{error}</p>}
-        <div className="modal-footer">
-          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-danger" onClick={handleConfirm} disabled={loading}>
-            {loading ? 'Desactivando...' : 'Desactivar'}
-          </button>
-        </div>
-      </div>
-    </ModalWrapper>
-  )
-}
-
-function ResetModal({ usuario, onConfirm, onClose }) {
-  const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState('')
-
-  async function handleConfirm() {
-    setLoading(true)
-    try { await onConfirm() }
-    catch (err) { setError(err.message); setLoading(false) }
-  }
-
-  return (
-    <ModalWrapper title="Resetear contraseña" onClose={onClose}>
-      <div className="modal-form">
-        <p className="modal-confirm-text">
-          Se generará una nueva contraseña temporal para <strong>{usuario.nombre}</strong>. El usuario deberá cambiarla al iniciar sesión.
-        </p>
-        {error && <p className="modal-error">{error}</p>}
-        <div className="modal-footer">
-          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-primary" onClick={handleConfirm} disabled={loading}>
-            {loading ? 'Procesando...' : 'Resetear'}
-          </button>
-        </div>
-      </div>
-    </ModalWrapper>
+    </Modal>
   )
 }
 
 function PasswordModal({ nombre, password, correoEnviado = true, onClose }) {
-  const [copied, setCopied] = useState(false)
+  const [copiada, setCopiada] = useState(false)
 
-  function handleCopy() {
-    navigator.clipboard.writeText(password)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(password)
+      setCopiada(true)
+      setTimeout(() => setCopiada(false), 2000)
+    } catch {
+      setCopiada(false)
+    }
   }
 
   return (
-    <ModalWrapper title="Contraseña temporal" onClose={onClose}>
-      <div className="modal-form">
-        <p className="modal-confirm-text">
-          Contraseña temporal para <strong>{nombre}</strong> — no se volverá a mostrar.
-        </p>
+    <Modal
+      title="Contraseña temporal"
+      subtitle={nombre}
+      icon="llave"
+      tone="success"
+      onClose={onClose}
+      footer={<button type="button" className="tuvet-btn" onClick={onClose}>Entendido</button>}
+    >
+      <div className="tuvet-form">
+        <p>Contraseña temporal para <strong>{nombre}</strong>. Deberá cambiarla al iniciar sesión.</p>
         {!correoEnviado && (
-          <p className="modal-warning" role="alert">
+          <p className="tuvet-aviso tuvet-aviso-warning" role="alert">
             El sistema no pudo confirmar el envío del correo. Copia y comparte esta contraseña por un canal seguro.
           </p>
         )}
-        <div className="password-box">
-          <span>{password}</span>
-          <button className="copy-btn" onClick={handleCopy}>
-            {copied ? '¡Copiado!' : 'Copiar'}
+        <div className="tuvet-password-box">
+          <span className="tuvet-password" aria-label="Contraseña temporal">{password}</span>
+          <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={copiar} aria-live="polite">
+            {copiada ? <><Icono nombre="check" /> Copiada</> : 'Copiar'}
           </button>
         </div>
-        <div className="modal-footer">
-          <button className="btn-primary" onClick={onClose}>Entendido</button>
-        </div>
+        <Aviso tipo="warning">No volverá a mostrarse después de cerrar esta ventana.</Aviso>
       </div>
-    </ModalWrapper>
+    </Modal>
   )
 }

@@ -31,3 +31,11 @@ export async function createAdminMasterAssignment(body) {
   })
   return parseResponse(response, 'No se pudo crear la asignación de Admin Master.')
 }
+
+export async function revokeAdminMasterAssignment(assignmentId, body) {
+  const response = await apiRequest(`/api/v1/admin-master-assignments/${assignmentId}/revoke/`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+  return parseResponse(response, 'No se pudo revocar la asignación de Admin Master.')
+}

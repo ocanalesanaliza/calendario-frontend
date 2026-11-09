@@ -1,11 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { archiveAreaTemplate, getAreaTemplateDetail, getAreaTemplateVersionHistory, publishAreaTemplateVersion } from '../../calendarArea/services/areaTemplatesService'
 import { getTareas } from '../../tareas/services/tareasService'
 import './PlantillaAreaDetallePage.css'
 
 const items = (data) => Array.isArray(data) ? data : data?.results || []
-const idOf = (value) => value?.id_area_template ?? value?.id
 const taskIdOf = (value) => value?.task_id ?? value?.id_tarea ?? value?.id
 const taskName = (value) => value?.task_name ?? value?.tarea?.nombre ?? value?.nombre ?? value?.name ?? `Tarea ${taskIdOf(value)}`
 const versionOf = (value) => value?.version ?? value?.numero
@@ -14,6 +13,7 @@ const jornadaLabel = (task) => task?.aplica_ambas_jornadas ? 'Ambas jornadas' : 
 
 function message(error, fallback) {
   if (error?.status === 403) return 'No tienes permisos para gestionar plantillas de área.'
+  if (error?.fields?.assignment === 'future_assignment_occurrences_conflict' || error?.fields?.code === 'future_assignment_occurrences_conflict' || error?.detail?.code === 'future_assignment_occurrences_conflict') return 'No se puede cambiar o cancelar este reemplazo porque ya existen ocurrencias con evidencia terminal. Conserva o revisa esa evidencia antes de modificar la asignación.'
   if (error?.status === 409) return error.message || 'La plantilla no puede archivarse porque tiene asignaciones vigentes o futuras.'
   return error?.message || fallback
 }
@@ -40,6 +40,8 @@ function Modal({ title, children, onClose }) {
 }
 
 function PublishModal({ template, onClose, onPublished }) {
+  const templateData = template?.template ?? template
+  const templateName = templateData?.name ?? templateData?.nombre ?? 'esta plantilla'
   const [catalog, setCatalog] = useState([])
   const [rows, setRows] = useState([{ task_id: '', jornada: 'manana', aplica_ambas_jornadas: false }])
   const [loading, setLoading] = useState(true)
@@ -61,9 +63,9 @@ function PublishModal({ template, onClose, onPublished }) {
       await onPublished({ tasks: rows.map((row) => ({ task_id: Number(row.task_id), jornada: row.jornada, aplica_ambas_jornadas: row.aplica_ambas_jornadas })) })
     } catch (requestError) { setError(message(requestError, 'No se pudo publicar la nueva versión.')); setSaving(false) }
   }
-  return <Modal title={`Publicar nueva versión de ${template.name ?? template.nombre}`} onClose={onClose}>
+  return <Modal title={`Publicar nueva versión de ${templateName}`} onClose={onClose}>
     <form onSubmit={submit} className="plantilla-area-detail-form">
-      <p>La publicación crea una versión completa. Las tareas de versiones anteriores no se editan.</p>
+      <p>La publicación crea una nueva versión completa. Las versiones anteriores no se modifican. Publicar no reasigna Áreas automáticamente. La asignación o el reemplazo se realiza explícitamente desde el Área y con su fecha efectiva.</p>
       {loading ? <p role="status">Cargando tareas de área...</p> : <fieldset disabled={saving}><legend>Tareas de la nueva versión</legend>{rows.map((row, index) => <div className="version-task-row" key={index}>
         <label>Tarea<select aria-label={`Tarea ${index + 1}`} data-autofocus={index === 0 || undefined} value={row.task_id} onChange={(event) => update(index, 'task_id', event.target.value)} required><option value="">Seleccionar tarea</option>{catalog.map((task) => <option key={taskIdOf(task)} value={taskIdOf(task)}>{taskName(task)}</option>)}</select></label>
         <label>Jornada<select aria-label={`Jornada ${index + 1}`} value={row.aplica_ambas_jornadas ? 'ambas' : row.jornada} onChange={(event) => { const ambas = event.target.value === 'ambas'; update(index, 'aplica_ambas_jornadas', ambas); update(index, 'jornada', ambas ? 'manana' : event.target.value) }}><option value="manana">Mañana</option><option value="tarde">Tarde</option><option value="ambas">Ambas</option></select></label>
@@ -82,8 +84,9 @@ function ArchiveModal({ template, onClose, onArchive }) {
 
 export default function PlantillaAreaDetallePage() {
   const { id } = useParams(); const [template, setTemplate] = useState(null); const [versions, setVersions] = useState([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [modal, setModal] = useState(null)
-  async function load() { setLoading(true); setError(''); try { const [detail, history] = await Promise.all([getAreaTemplateDetail(id), getAreaTemplateVersionHistory(id)]); setTemplate(detail); setVersions(items(history)) } catch (requestError) { setError(message(requestError, 'No se pudo cargar el detalle de la plantilla.')) } finally { setLoading(false) } }
-  useEffect(() => { void load() }, [id])
+  const load = useCallback(async () => { setLoading(true); setError(''); try { const [detail, history] = await Promise.all([getAreaTemplateDetail(id), getAreaTemplateVersionHistory(id)]); setTemplate(detail); setVersions(items(history)) } catch (requestError) { setError(message(requestError, 'No se pudo cargar el detalle de la plantilla.')) } finally { setLoading(false) } }, [id])
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void load() }, [load])
   async function published(body) { await publishAreaTemplateVersion(id, body); setModal(null); await load() }
   async function archived() { await archiveAreaTemplate(id); setModal(null); await load() }
   if (loading) return <div className="plantilla-area-detail-page"><p role="status">Cargando detalle de plantilla de área...</p></div>

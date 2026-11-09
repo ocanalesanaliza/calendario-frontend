@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AdminMaestroRoute, AlmuerzosRoute, CalendarioAreaRoute, CapabilityRoute, DepositosPendientesRoute, GerentesOperacionesRoute, MisTareasRoute, OrganizacionRoute, PlantillasAreaRoute, RendimientoRoute, SystemsOnlyRoute } from './App'
+import { AdminMaestroRoute, AlmuerzosRoute, AusenciasAreaRoute, CalendarioAreaRoute, CapabilityRoute, DepositHistoryRoute, DepositosPendientesRoute, GOAreaPerformanceHistoryRoute, GerentesOperacionesRoute, MisTareasRoute, MonthlyPerformanceCorrectionsRoute, OperationalAlertsRoute, OrganizacionRoute, PendientesRoute, PerformanceHistoryRoute, PlantillasAreaRoute, RendimientoRoute, SystemsOnlyRoute } from './App'
+import Layout from './components/Layout/Layout'
 
 const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
 
@@ -9,6 +10,12 @@ vi.mock('./features/auth/context/AuthContext', () => ({
   AuthProvider: ({ children }) => children,
   useAuth,
 }))
+vi.mock('./features/apariencia/AparienciaContext', () => ({
+  AparienciaProvider: ({ children }) => children,
+  useApariencia: () => ({}),
+}))
+vi.mock('./features/trabajosCampo/services/trabajosCampoService', () => ({ getTrabajosCampo: vi.fn().mockResolvedValue({ results: [] }) }))
+vi.mock('./features/vacacionesProgramadas/services/vacacionesProgramadasService', () => ({ getSolicitudesVacacion: vi.fn().mockResolvedValue({ results: [] }) }))
 
 function renderMisTareasRoute() {
   render(
@@ -61,6 +68,24 @@ describe('MisTareasRoute', () => {
   })
 })
 
+describe('PendientesRoute', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  it.each([
+    ['GS', { type: 'gerente_sucursal' }, true],
+    ['GA', { type: 'gerente_area' }, true],
+    ['Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, true],
+    ['Admin Master', { type: 'admin_master' }, true],
+    ['GO', { type: 'gerente_operaciones' }, false],
+  ])('uses the shared pending-request capability for %s', async (_role, perfil, admitted) => {
+    useAuth.mockReturnValue({ perfil })
+    render(<MemoryRouter initialEntries={['/solicitudes-pendientes']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/solicitudes-pendientes" element={<PendientesRoute><p>Solicitudes autorizadas</p></PendientesRoute>} /></Routes></MemoryRouter>)
+
+    if (admitted) expect(screen.getByText('Solicitudes autorizadas')).toBeInTheDocument()
+    else expect(await screen.findByText('Inicio')).toBeInTheDocument()
+  })
+})
+
 describe('Sistemas-only routes', () => {
   beforeEach(() => useAuth.mockReset())
 
@@ -97,6 +122,24 @@ describe('Sistemas-only routes', () => {
     expect(screen.getByText('Asignaciones autorizadas')).toBeInTheDocument()
   })
 
+  it.each([
+    ['GA', { type: 'gerente_area', activo: true, habilitado: true }, false],
+    ['reassigned GA', { type: 'gerente_area', es_cuenta_sistemas: true, activo: true, habilitado: true }, false],
+    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, false],
+    ['Admin Master', { type: 'admin_master', activo: true, habilitado: true }, false],
+    ['Master Admin', { es_admin_maestro: true, activo: true, habilitado: true }, false],
+    ['GS', { type: 'gerente_sucursal', activo: true, habilitado: true }, false],
+    ['inactive Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: false, habilitado: true }, false],
+    ['disabled Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: false }, false],
+    ['active enabled Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, true],
+  ])('allows operational alerts only for %s', async (_actor, perfil, admitted) => {
+    useAuth.mockReturnValue({ perfil })
+    render(<MemoryRouter initialEntries={['/alertas-operativas']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/alertas-operativas" element={<OperationalAlertsRoute><p>Alertas autorizadas</p></OperationalAlertsRoute>} /></Routes></MemoryRouter>)
+
+    if (admitted) expect(screen.getByText('Alertas autorizadas')).toBeInTheDocument()
+    else expect(await screen.findByText('Inicio')).toBeInTheDocument()
+  })
+
   it('blocks lunch for a Systems account that was previously a GA', async () => {
     useAuth.mockReturnValue({ perfil: { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true } })
     render(
@@ -110,6 +153,76 @@ describe('Sistemas-only routes', () => {
 
     expect(await screen.findByText('Inicio')).toBeInTheDocument()
     expect(screen.queryByText('Almuerzo autorizado')).not.toBeInTheDocument()
+  })
+})
+
+describe('PerformanceHistoryRoute', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  it.each([
+    ['GA', { type: 'gerente_area', activo: true, habilitado: true }, false],
+    ['reassigned GA', { type: 'gerente_area', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, false],
+    ['Admin Master', { type: 'admin_master', activo: true, habilitado: true }, false],
+    ['Master Admin', { es_admin_maestro: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['GS', { type: 'gerente_sucursal', activo: true, habilitado: true }, false],
+    ['inactive Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: false, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['disabled Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: false, capabilities: { has_global_scope: true } }, false],
+    ['flag-only Systems', { es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['role-mismatched Systems', { type: 'admin_master', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['non-global Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, false],
+    ['active global Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, true],
+  ])('admits only %s', async (_name, perfil, admitted) => {
+    useAuth.mockReturnValue({ perfil })
+    render(<MemoryRouter initialEntries={['/historial-rendimiento-mensual']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/historial-rendimiento-mensual" element={<PerformanceHistoryRoute><p>Historial autorizado</p></PerformanceHistoryRoute>} /></Routes></MemoryRouter>)
+    if (admitted) expect(screen.getByText('Historial autorizado')).toBeInTheDocument()
+    else expect(await screen.findByText('Inicio')).toBeInTheDocument()
+  })
+})
+
+describe('GOAreaPerformanceHistoryRoute', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  it.each([
+    ['active enabled GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, true],
+    ['GA', { type: 'gerente_area', activo: true, habilitado: true }, false],
+    ['reassigned GA', { type: 'gerente_area', es_cuenta_sistemas: true, activo: true, habilitado: true }, false],
+    ['Admin Master', { type: 'admin_master', activo: true, habilitado: true }, false],
+    ['Master Admin', { es_admin_maestro: true, activo: true, habilitado: true }, false],
+    ['GS', { type: 'gerente_sucursal', activo: true, habilitado: true }, false],
+    ['Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, false],
+    ['inactive GO', { type: 'gerente_operaciones', activo: false, habilitado: true }, false],
+    ['disabled GO', { type: 'gerente_operaciones', activo: true, habilitado: false }, false],
+  ])('admits only %s', async (_name, perfil, admitted) => {
+    useAuth.mockReturnValue({ perfil })
+    render(<MemoryRouter initialEntries={['/historial-rendimiento-go']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/historial-rendimiento-go" element={<GOAreaPerformanceHistoryRoute><p>Historial GO autorizado</p></GOAreaPerformanceHistoryRoute>} /></Routes></MemoryRouter>)
+    if (admitted) expect(screen.getByText('Historial GO autorizado')).toBeInTheDocument()
+    else expect(await screen.findByText('Inicio')).toBeInTheDocument()
+  })
+})
+
+describe('MonthlyPerformanceCorrectionsRoute', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  it.each([
+    ['current GA', { type: 'gerente_area', activo: true, habilitado: true }, false],
+    ['reassigned GA', { type: 'gerente_area', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, false],
+    ['Admin Master', { type: 'admin_master', activo: true, habilitado: true }, false],
+    ['Master Admin', { es_admin_maestro: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['GS', { type: 'gerente_sucursal', activo: true, habilitado: true }, false],
+    ['inactive Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: false, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['disabled Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: false, capabilities: { has_global_scope: true } }, false],
+    ['flag-only Systems', { es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['role-mismatched Systems', { type: 'admin_master', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['non-global Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, false],
+    ['active enabled role-matched global Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, true],
+  ])('admits correction management only for %s', async (_actor, perfil, admitted) => {
+    useAuth.mockReturnValue({ perfil })
+    render(<MemoryRouter initialEntries={['/correcciones-rendimiento-mensual']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/correcciones-rendimiento-mensual" element={<MonthlyPerformanceCorrectionsRoute><p>Correcciones autorizadas</p></MonthlyPerformanceCorrectionsRoute>} /></Routes></MemoryRouter>)
+
+    if (admitted) expect(screen.getByText('Correcciones autorizadas')).toBeInTheDocument()
+    else expect(await screen.findByText('Inicio')).toBeInTheDocument()
   })
 })
 
@@ -186,6 +299,43 @@ describe('DepositosPendientesRoute', () => {
   })
 })
 
+describe('DepositHistoryRoute', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  it.each([
+    ['GA', { type: 'gerente_area' }],
+    ['GO', { type: 'gerente_operaciones' }],
+  ])('allows %s to consult deposit history', async (_role, perfil) => {
+    useAuth.mockReturnValue({ perfil })
+    render(<MemoryRouter initialEntries={['/analitica/historial-depositos']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/analitica/historial-depositos" element={<DepositHistoryRoute><p>Historial autorizado</p></DepositHistoryRoute>} /></Routes></MemoryRouter>)
+    expect(screen.getByText('Historial autorizado')).toBeInTheDocument()
+  })
+
+  it('redirects GS to home', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_sucursal' } })
+    render(<MemoryRouter initialEntries={['/analitica/historial-depositos']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/analitica/historial-depositos" element={<DepositHistoryRoute><p>Historial autorizado</p></DepositHistoryRoute>} /></Routes></MemoryRouter>)
+    expect(await screen.findByText('Inicio')).toBeInTheDocument()
+  })
+})
+
+describe('Deposit history navigation', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  it('shows the analytics entry to GA and GO, but not GS', () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', nombre: 'GA' }, logout: vi.fn() })
+    const { rerender } = render(<MemoryRouter><Layout /></MemoryRouter>)
+    expect(screen.getByRole('link', { name: /Historial de depósitos/i })).toHaveAttribute('href', '/analitica/historial-depositos')
+
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_operaciones', nombre: 'GO' }, logout: vi.fn() })
+    rerender(<MemoryRouter><Layout /></MemoryRouter>)
+    expect(screen.getByRole('link', { name: /Historial de depósitos/i })).toHaveAttribute('href', '/analitica/historial-depositos')
+
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_sucursal', nombre: 'GS' }, logout: vi.fn() })
+    rerender(<MemoryRouter><Layout /></MemoryRouter>)
+    expect(screen.queryByRole('link', { name: /Historial de depósitos/i })).not.toBeInTheDocument()
+  })
+})
+
 describe('CalendarioAreaRoute', () => {
   function renderCalendarioAreaRoute() {
     render(
@@ -213,6 +363,26 @@ describe('CalendarioAreaRoute', () => {
 
     expect(await screen.findByText('Inicio')).toBeInTheDocument()
      expect(screen.queryByText('Calendario autorizado')).not.toBeInTheDocument()
+  })
+})
+
+describe('AusenciasAreaRoute', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  it.each([
+    ['GA', { type: 'gerente_area' }, true],
+    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, true],
+    ['active Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, true],
+    ['plain Admin Master', { type: 'admin_master' }, true],
+    ['global Admin Master', { es_admin_maestro: true }, true],
+    ['GS', { type: 'gerente_sucursal' }, false],
+    ['inactive Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: false, habilitado: true }, false],
+  ])('uses the same area-absence capability for %s', async (_role, perfil, admitted) => {
+    useAuth.mockReturnValue({ perfil })
+    render(<MemoryRouter initialEntries={['/ausencias-area']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/ausencias-area" element={<AusenciasAreaRoute><p>Ausencias autorizadas</p></AusenciasAreaRoute>} /></Routes></MemoryRouter>)
+
+    if (admitted) expect(screen.getByText('Ausencias autorizadas')).toBeInTheDocument()
+    else expect(await screen.findByText('Inicio')).toBeInTheDocument()
   })
 })
 describe('RendimientoRoute', () => {

@@ -123,12 +123,15 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
     }
   }, [])
 
+  // Se recarga solo al cambiar la fecha o el perfil; las cargas usan contadores de versión para
+  // descartar respuestas viejas, así que no deben ser dependencias (se recrean en cada render).
   useEffect(() => {
     viewVersion.current += 1
     tareasRequestVersion.current += 1
     trabajosCampoRequestVersion.current += 1
     loadTareas()
     loadTrabajosCampo()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fecha, perfil])
 
   function handleForbidden(error) {
@@ -218,6 +221,10 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
       if (!busy) setRevisionGuardiaTask(tarea)
       return
     }
+    if (tarea.tarea?.modo_cumplimiento === 'deposit') {
+      if (tarea.disponible_para_registro && !busy) setDepositTask(tarea)
+      return
+    }
     if (!tarea.disponible_para_registro || busy) return
 
     const clickedInteractiveElement = event.target.closest(
@@ -293,6 +300,11 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
       setRevisionGuardiaTask(tarea)
       return
     }
+    if (tarea.tarea?.modo_cumplimiento === 'deposit') {
+      setSeleccionadas([])
+      setDepositTask(tarea)
+      return
+    }
     setRegistrando(tarea.id_sucursal_tarea)
     setRegError('')
   }
@@ -306,6 +318,10 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
   async function handleRegistrarSeleccionadas() {
     const isCurrentAction = getActionContext()
     const tareas = tareasFiltradas.filter((t) => seleccionadas.includes(t.id_sucursal_tarea))
+    if (tareas.some((tarea) => tarea.tarea?.modo_cumplimiento === 'deposit')) {
+      setLoteError('Los depósitos se registran individualmente desde su flujo estructurado.')
+      return
+    }
     setRegistrandoLote(true)
     setLoteError('')
     let accessRevoked = false
@@ -327,15 +343,15 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
         accessRevoked = handleForbidden(err)
         if (!accessRevoked) setLoteError(err.message)
       }
-    } finally {
-      if (!isCurrentAction()) return
-      setSeleccionadas([])
-      if (!accessRevoked) {
-        await loadTareas()
-        if (!isCurrentAction()) return
-      }
-      setRegistrandoLote(false)
     }
+    // Cierre común. Antes vivía en un `finally` con `return`, que ocultaba cualquier error inesperado.
+    if (!isCurrentAction()) return
+    setSeleccionadas([])
+    if (!accessRevoked) {
+      await loadTareas()
+      if (!isCurrentAction()) return
+    }
+    setRegistrandoLote(false)
   }
 
   const tareasDeJornada = useMemo(
@@ -349,6 +365,8 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
     [availableFilterActive, availableFilterVariant, tareasDeJornada],
   )
   const resumen = data?.resumen
+  const selectedTasks = tareasFiltradas.filter((tarea) => seleccionadas.includes(tarea.id_sucursal_tarea))
+  const mixedSelectionHasDeposit = selectedTasks.length > 1 && selectedTasks.some((tarea) => tarea.tarea?.modo_cumplimiento === 'deposit')
 
   function clearHiddenSelections(tasks) {
     const visibleTaskIds = new Set(
@@ -369,12 +387,14 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
 
   function renderTaskCard(t) {
     const isRevisionGuardiaTask = esRevisionGuardia(t)
+    const isDepositTask = t.tarea?.modo_cumplimiento === 'deposit'
+    const isDirectOpenTask = isRevisionGuardiaTask || isDepositTask
     const isSelectable = (t.disponible_para_registro || isRevisionGuardiaTask) && !busy
     const isSelected = seleccionadas.includes(t.id_sucursal_tarea)
     const taskName = t.tarea?.nombre || `Tarea #${t.id_sucursal_tarea}`
     const checkboxId = `mis-tareas-task-${t.id_sucursal_tarea}`
     const Card = selectionUxVariant && isSelectable
-      ? (isRevisionGuardiaTask ? 'button' : 'label')
+      ? (isDirectOpenTask ? 'button' : 'label')
       : 'div'
     const taskSchedule = <>{t.hora}{t.hora_fin_registro && ` - ${t.hora_fin_registro}`}</>
     const statusBadge = <span className={`badge ${ESTADO_BADGE[t.estado_ui] ?? 'badge-tipo'}`}>{t.estado_ui_label}</span>
@@ -398,12 +418,18 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
                   onClick: () => setRevisionGuardiaTask(t),
                   'aria-label': `Abrir revisión de guardia: ${taskName}`,
                 }
-              : { htmlFor: checkboxId })
+              : isDepositTask
+                ? {
+                    type: 'button',
+                    onClick: () => setDepositTask(t),
+                    'aria-label': `Abrir registro de depósito: ${taskName}`,
+                  }
+                : { htmlFor: checkboxId })
           : { onClick: (event) => handleCardClick(event, t) })}
       >
         {scanabilityVariant ? (
           <div className="tarea-card-top tarea-card-top--scanable">
-            {t.disponible_para_registro && !esRevisionGuardia(t) && (
+            {t.disponible_para_registro && !isDirectOpenTask && (
               <input
                 id={checkboxId}
                 type="checkbox"
@@ -432,7 +458,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
           </div>
         ) : (
           <div className="tarea-card-top">
-            {t.disponible_para_registro && !esRevisionGuardia(t) && (
+            {t.disponible_para_registro && !isDirectOpenTask && (
               <input
                 id={checkboxId}
                 type="checkbox"
@@ -457,7 +483,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
           </div>
         )}
 
-        {selectionUxVariant && isSelected && t.disponible_para_registro && !esRevisionGuardia(t) && (
+        {selectionUxVariant && isSelected && t.disponible_para_registro && !isDirectOpenTask && (
           <span className="tarea-selection-cue" aria-hidden="true">
             Seleccionada
           </span>
@@ -644,6 +670,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
           ) : (
             <>
               {loteError && <p className="reg-error">{loteError}</p>}
+              {mixedSelectionHasDeposit && <p className="reg-error" role="status">Los depósitos se registran individualmente desde su flujo estructurado.</p>}
               <div className="seleccion-actions">
                 <button className="btn-secondary-sm" onClick={() => setSeleccionadas([])} disabled={busy}>
                   Cancelar selección
@@ -657,7 +684,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
                       handleRegistrarSeleccionadas()
                     }
                   }}
-                  disabled={busy}
+                  disabled={busy || mixedSelectionHasDeposit}
                 >
                   {registrandoLote ? 'Registrando...' : `Registrar ${seleccionadas.length} ${seleccionadas.length === 1 ? 'tarea' : 'tareas'}`}
                 </button>

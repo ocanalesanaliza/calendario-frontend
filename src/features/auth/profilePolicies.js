@@ -10,14 +10,20 @@ export function getProfileCapabilities(profile) {
   const isAreaManager = profile?.type === 'gerente_area'
   const isBranchManager = profile?.type === 'gerente_sucursal'
   const isOperationsManager = profile?.type === 'gerente_operaciones'
+  const isAdminMaster = profile?.type === 'admin_master'
   const isMasterAdmin = profile?.es_admin_maestro === true || capabilities?.has_global_scope === true
 
   return {
     isAreaManager,
     isBranchManager,
+    isAdminMaster,
     isMasterAdmin,
     isOperationsManager,
     isSystemsAccount,
+    canAccessOperationalAlerts: isSystemsRole && isSystemsAccount,
+    canAccessPerformanceHistory: isSystemsRole && isSystemsAccount && capabilities?.has_global_scope === true,
+    canAccessGOAreaPerformanceHistory: isOperationsManager && isActiveProfile(profile),
+    canManageMonthlyPerformanceCorrections: isSystemsRole && isSystemsAccount && capabilities?.has_global_scope === true,
     hasGlobalScope: isMasterAdmin,
     canManageBranches: capabilities?.manage_branches === true,
     canManageTemplates: capabilities?.manage_templates === true,
@@ -27,12 +33,18 @@ export function getProfileCapabilities(profile) {
     canAccessOperationalDashboard: capabilities?.access_operational_dashboard === true,
     canAccessPerformanceReports: capabilities?.access_performance_reports === true,
     canAccessLunch: profile !== null && profile !== undefined && !isSystemsRole,
+    canAccessGOTeamLunch: isOperationsManager && isActiveProfile(profile),
     canAccessMyTasks: !isSystemsRole && profile?.can_access_my_tasks === true,
-    canAccessPendingRequests: isBranchManager || isAreaManager,
+    canAccessPendingRequests: isBranchManager || isAreaManager || isSystemsAccount || isAdminMaster || isMasterAdmin,
+    canDecidePendingRequests: isAreaManager || isSystemsAccount || isAdminMaster || isMasterAdmin,
     canAccessPerformance: isBranchManager || isAreaManager || isMasterAdmin,
     canAccessAreaCalendar: isAreaManager,
-    canAccessAreaAbsences: isAreaManager || isOperationsManager || isMasterAdmin || isSystemsAccount,
-    canManageAreaAbsences: isOperationsManager || isMasterAdmin || isSystemsAccount,
+    canAccessAreaAbsences: isAreaManager || isOperationsManager || isAdminMaster || isMasterAdmin || isSystemsAccount,
+    canSubmitOwnGAVacations: isAreaManager,
+    canDecideGAVacations: isOperationsManager || isAdminMaster || isMasterAdmin || isSystemsAccount,
+    canCancelOwnGAVacations: isAreaManager,
+    canManageGASpecialSituations: isOperationsManager || isAdminMaster || isMasterAdmin || isSystemsAccount,
+    canManageAreaAbsences: isOperationsManager || isAdminMaster || isMasterAdmin || isSystemsAccount,
     canAccessPendingDeposits: isAreaManager,
     canManageAreaManagers: isSystemsAccount || (isOperationsManager && isActiveProfile(profile)),
     canManageOperationsManagers: isSystemsAccount,

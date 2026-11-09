@@ -23,10 +23,15 @@ describe('calendar event adapter', () => {
       start: '2026-09-15',
       allDay: true,
       editable: false,
+      classNames: ['calendar-occurrence--pendiente'],
       extendedProps: {
         area: 'Operaciones',
         occurrence_id: 8,
         status: 'scheduled',
+        status_class: 'calendar-occurrence--pendiente',
+        status_label: 'scheduled',
+        status_marker: 'pending',
+        aria_label: 'Inventario · scheduled',
         template: { id: 7, name: 'Apertura' },
         template_version: { id: 9, number: 3 },
         coverage_snapshot: { jornada: 'morning', aplica_ambas_jornadas: false, known: true },
@@ -39,12 +44,47 @@ describe('calendar event adapter', () => {
     })
   })
 
+  it.each([
+    ['pendiente', 'calendar-occurrence--pendiente', 'Pendiente', 'pending'],
+    ['completada', 'calendar-occurrence--completada', 'Completada', 'complete'],
+    ['vencida', 'calendar-occurrence--vencida', 'Vencida', 'overdue'],
+    ['justificada', 'calendar-occurrence--justificada', 'Justificada', 'justified'],
+    ['diferida', 'calendar-occurrence--diferida', 'Diferida', 'deferred'],
+  ])('maps %s to its semantic calendar chip class, SVG marker, and accessible label', (status, className, statusLabel, marker) => {
+    const event = occurrenceToCalendarEvent({ id: 9, task: 'Apertura', status, effective_date: '2026-09-15' })
+
+    expect(event.classNames).toContain(className)
+    expect(event.extendedProps).toMatchObject({
+      status,
+      status_label: statusLabel,
+      status_marker: marker,
+      aria_label: `Apertura · ${statusLabel}`,
+    })
+  })
+
+  it('falls back safely for unknown and monthly-performance-only states', () => {
+    const unknown = occurrenceToCalendarEvent({ id: 10, task: 'Apertura', status: 'en espera', effective_date: '2026-09-15' })
+    const monthlyState = occurrenceToCalendarEvent({ id: 11, task: 'Cierre', status: 'provisional', effective_date: '2026-09-15' })
+
+    expect(unknown).toMatchObject({ classNames: ['calendar-occurrence--pendiente'], extendedProps: { status_label: 'en espera', status_marker: 'pending', aria_label: 'Apertura · en espera' } })
+    expect(monthlyState).toMatchObject({ classNames: ['calendar-occurrence--pendiente'], extendedProps: { status_label: 'Pendiente', status_marker: 'pending', aria_label: 'Cierre · Pendiente' } })
+  })
+
   it('exposes the resolved occurrence ID when the payload only provides id', () => {
     const occurrence = { id: 12, task: 'Revisión', effective_date: '2026-09-01', all_day: false }
 
     expect(occurrenceToCalendarEvent(occurrence)).toMatchObject({
       id: '12',
       extendedProps: { occurrence_id: 12 },
+    })
+  })
+
+  it('uses the opaque calendar virtual id while preserving the internal occurrence id', () => {
+    const occurrence = { id: 'occurrence-signed-opaque', occurrence_id: 117, task: 'Revisión', effective_date: '2026-09-01', all_day: false }
+
+    expect(occurrenceToCalendarEvent(occurrence)).toMatchObject({
+      id: 'occurrence-signed-opaque',
+      extendedProps: { occurrence_id: 117 },
     })
   })
 

@@ -65,6 +65,8 @@ function CalendarPage() {
     if (!tieneAgenda) return
 
     const hoy = hoyISO()
+    // Indicador de la carga de la agenda del día (sincronización con el servidor).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCargando(true)
 
     Promise.all([

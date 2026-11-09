@@ -2,15 +2,19 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CalendarioAreaPage from './CalendarioAreaPage'
 
-const { completeAreaOccurrence, getMonthlyAreaAbsences, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, rescheduleAreaOccurrence } = vi.hoisted(() => ({ completeAreaOccurrence: vi.fn(), getMonthlyAreaAbsences: vi.fn(), getMonthlyAreaOccurrences: vi.fn(), getMonthlyAreaPerformance: vi.fn(), rescheduleAreaOccurrence: vi.fn() }))
+const { completeAreaOccurrence, finalizeDepositReviewWorklist, getMonthlyAreaAbsences, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, rescheduleAreaOccurrence, getDepositReviewWorklist, recordDepositReviewDecision, useAuth } = vi.hoisted(() => ({ completeAreaOccurrence: vi.fn(), finalizeDepositReviewWorklist: vi.fn(), getMonthlyAreaAbsences: vi.fn(), getMonthlyAreaOccurrences: vi.fn(), getMonthlyAreaPerformance: vi.fn(), rescheduleAreaOccurrence: vi.fn(), getDepositReviewWorklist: vi.fn(), recordDepositReviewDecision: vi.fn(), useAuth: vi.fn() }))
 let datesSetHandler
 
 vi.mock('../services/calendarioAreaService', () => ({ completeAreaOccurrence, getMonthlyAreaAbsences, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, rescheduleAreaOccurrence }))
+vi.mock('../../calendarArea/services/depositReviewWorklistService', () => ({ finalizeDepositReviewWorklist, getDepositReviewWorklist, recordDepositReviewDecision }))
+vi.mock('../../auth/context/AuthContext', () => ({ useAuth }))
 vi.mock('@fullcalendar/react', () => ({
-  default: ({ events, datesSet, eventClick }) => {
+  default: ({ events, datesSet, eventClick, eventClassNames, eventContent }) => {
     datesSetHandler = datesSet
     return <div data-testid="full-calendar" data-read-only={String(events.every((event) => event.editable === false))}>
-      {events.map((event) => <button type="button" key={event.id} onClick={(click) => eventClick({ event: { ...event, extendedProps: event.extendedProps }, jsEvent: click.nativeEvent })}>{event.title}</button>)}
+      <div className="fc-col-header" data-testid="calendar-weekday-header" />
+      <div className="fc-daygrid-day fc-day-today" data-testid="calendar-current-day" />
+      {events.map((event) => <button type="button" aria-label={event.extendedProps?.aria_label ?? event.title} className={[event.classNames, eventClassNames?.({ event })].flat().join(' ')} key={event.id} onClick={(click) => eventClick({ event: { ...event, extendedProps: event.extendedProps }, jsEvent: click.nativeEvent })}>{eventContent?.({ event }) ?? event.title}</button>)}
       <button type="button" onClick={() => datesSet({ view: { currentStart: new Date(2026, 9, 1) } })}>Mes anterior</button>
       <button type="button" onClick={() => datesSet({ view: { currentStart: new Date(2026, 10, 1) } })}>Siguiente mes</button>
     </div>
@@ -21,6 +25,7 @@ describe('CalendarioAreaPage', () => {
   const occurrence = { occurrence_id: 4, task: 'Auditoría', status: 'pendiente', effective_date: '2026-09-03', scheduled_date: '2026-09-02', weight: 20, all_day: true, coverage_snapshot: { jornada: 'manana', aplica_ambas_jornadas: true }, template: { name: 'Apertura' }, template_version: { number: 3 } }
 
   beforeEach(() => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area' } })
     getMonthlyAreaOccurrences.mockReset()
     getMonthlyAreaAbsences.mockReset()
     getMonthlyAreaAbsences.mockResolvedValue({ month: '2026-09', absences: [] })
@@ -28,6 +33,9 @@ describe('CalendarioAreaPage', () => {
     getMonthlyAreaPerformance.mockResolvedValue({ month: '2026-09', performances: [] })
     completeAreaOccurrence.mockReset()
     rescheduleAreaOccurrence.mockReset()
+    getDepositReviewWorklist.mockReset()
+    recordDepositReviewDecision.mockReset()
+    finalizeDepositReviewWorklist.mockReset()
   })
 
   it('shows loading and then the monthly occurrences as read-only events', async () => {
@@ -36,7 +44,10 @@ describe('CalendarioAreaPage', () => {
     render(<CalendarioAreaPage />)
 
     expect(screen.getByText('Cargando calendario...')).toBeInTheDocument()
+    expect(screen.getByText('Cargando calendario...').closest('.calendario-area-state--loading')).toBeInTheDocument()
     expect(screen.getByTestId('full-calendar')).toBeInTheDocument()
+    expect(screen.getByTestId('full-calendar').closest('.calendario-area-calendar__scroll')).toBeInTheDocument()
+    expect(screen.getByTestId('full-calendar').closest('.calendario-area-calendar')).toHaveAttribute('aria-busy', 'true')
     expect(await screen.findByText('Auditoría')).toBeInTheDocument()
     expect(screen.getByTestId('full-calendar')).toHaveAttribute('data-read-only', 'true')
   })
@@ -138,7 +149,7 @@ describe('CalendarioAreaPage', () => {
   it('opens an accessible detail dialog with optional metadata', async () => {
     getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [occurrence] })
     render(<CalendarioAreaPage />)
-    const event = await screen.findByRole('button', { name: 'Auditoría' })
+    const event = await screen.findByRole('button', { name: /Auditoría/ })
     fireEvent.click(event)
     const dialog = screen.getByRole('dialog', { name: 'Auditoría' })
     expect(dialog).toHaveAttribute('aria-modal', 'true')
@@ -151,10 +162,123 @@ describe('CalendarioAreaPage', () => {
     expect(screen.getByRole('button', { name: 'Cerrar detalle de la ocurrencia' })).toHaveFocus()
   })
 
+  it('opens a deposit-review worklist using the calendar virtual id instead of the internal occurrence id', async () => {
+    const depositOccurrence = { ...occurrence, id: 'occurrence-signed-opaque', occurrence_id: 117, task: { id: 123, name: 'Deposit review', mode: 'deposit_review' } }
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [depositOccurrence] })
+    getDepositReviewWorklist.mockResolvedValue({
+      id: 'occurrence-signed-opaque',
+      state: 'pending',
+      origin_date: '2026-09-02',
+      historical_context: { scheduled_on: '2026-09-02', effective_on: '2026-09-03', attribution_month: '2026-09-01' },
+      cases: [{ id: 'case-signed-opaque', branch_code: 'BRANCH-007', closure_date: '2026-09-01', classification: 'report_available', decision: null }],
+      terminal: { state: null },
+    })
+
+    render(<CalendarioAreaPage />)
+    fireEvent.click(await screen.findByRole('button', { name: /Deposit review/ }))
+
+    expect(await screen.findByRole('dialog', { name: 'Revisión de depósitos' })).toHaveTextContent('BRANCH-007')
+    expect(screen.getByRole('dialog')).toHaveTextContent('2026-09-02')
+    expect(getDepositReviewWorklist).toHaveBeenCalledWith('occurrence-signed-opaque')
+    expect(getDepositReviewWorklist).not.toHaveBeenCalledWith(117)
+    expect(screen.queryByRole('button', { name: 'Completar' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Sin registro revisado para BRANCH-007' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Conforme para BRANCH-007' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Con observación para BRANCH-007' })).toBeInTheDocument()
+  })
+
+  it('does not offer sin_registro_revisado for a pending case', async () => {
+    const depositOccurrence = { ...occurrence, id: 'occurrence-signed-opaque', occurrence_id: undefined, task: { id: 123, name: 'Deposit review', mode: 'deposit_review' } }
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [depositOccurrence] })
+    getDepositReviewWorklist.mockResolvedValue({
+      id: 'occurrence-signed-opaque', state: 'pending', origin_date: '2026-09-02',
+      historical_context: { scheduled_on: '2026-09-02', effective_on: '2026-09-03', attribution_month: '2026-09-01' },
+      cases: [{ id: 'case-signed-opaque', branch_code: 'BRANCH-007', closure_date: '2026-09-01', classification: 'pending', decision: null }], terminal: { state: null },
+    })
+    render(<CalendarioAreaPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Deposit review/ }))
+
+    expect(await screen.findByText('Pendiente de envío')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Conforme para BRANCH-007' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Con observación para BRANCH-007' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Sin registro revisado para BRANCH-007' })).not.toBeInTheDocument()
+  })
+
+  it('preserves the ordinary occurrence dialog for a non-deposit-review task', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [{ ...occurrence, id: 'ordinary-opaque', task: { id: 9, name: 'Auditoría', mode: 'simple' } }] })
+    render(<CalendarioAreaPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Auditoría/ }))
+
+    expect(screen.getByRole('dialog', { name: 'Auditoría' })).toBeInTheDocument()
+    expect(getDepositReviewWorklist).not.toHaveBeenCalled()
+  })
+
+  it('sends exact opaque decision payloads and refreshes the calendar only after explicit finalization', async () => {
+    const depositOccurrence = { ...occurrence, id: 'occurrence-signed-opaque', occurrence_id: undefined, task: { id: 123, name: 'Deposit review', mode: 'deposit_review' } }
+    const pendingWorklist = {
+      id: 'occurrence-signed-opaque', state: 'pending', origin_date: '2026-09-02',
+      historical_context: { scheduled_on: '2026-09-02', effective_on: '2026-09-03', attribution_month: '2026-09-01' },
+      cases: [{ id: 'case-signed-opaque', branch_code: 'BRANCH-007', closure_date: '2026-09-01', classification: 'report_available', decision: null }], terminal: { state: null },
+    }
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [depositOccurrence] })
+    getDepositReviewWorklist.mockResolvedValue(pendingWorklist)
+    recordDepositReviewDecision.mockResolvedValue({ worklist: { ...pendingWorklist, cases: [{ ...pendingWorklist.cases[0], decision: 'conforme' }] } })
+    finalizeDepositReviewWorklist.mockResolvedValue({ worklist: { ...pendingWorklist, state: 'completed', cases: [{ ...pendingWorklist.cases[0], decision: 'conforme' }], terminal: { state: 'completed' } } })
+    render(<CalendarioAreaPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Deposit review/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Conforme para BRANCH-007' }))
+
+    await waitFor(() => expect(recordDepositReviewDecision).toHaveBeenCalledWith('occurrence-signed-opaque', 'case-signed-opaque', expect.objectContaining({ decision: 'conforme', comment: '' })))
+    expect(recordDepositReviewDecision.mock.calls[0][2].idempotency_key).toEqual(expect.any(String))
+    expect(getMonthlyAreaOccurrences).toHaveBeenCalledTimes(1)
+    fireEvent.click(await screen.findByRole('button', { name: 'Finalizar revisión' }))
+    await waitFor(() => expect(finalizeDepositReviewWorklist).toHaveBeenCalledWith('occurrence-signed-opaque', expect.objectContaining({ idempotency_key: expect.any(String) })))
+    expect(await screen.findByText('La revisión de depósitos quedó completada.')).toBeInTheDocument()
+    await waitFor(() => expect(getMonthlyAreaOccurrences).toHaveBeenCalledTimes(2))
+  })
+
+  it('requires and focuses a comment for sin_registro_revisado, then sends it', async () => {
+    const depositOccurrence = { ...occurrence, id: 'occurrence-signed-opaque', occurrence_id: undefined, task: { id: 123, name: 'Deposit review', mode: 'deposit_review' } }
+    const pendingWorklist = { id: 'occurrence-signed-opaque', state: 'pending', origin_date: '2026-09-02', historical_context: { scheduled_on: '2026-09-02', effective_on: '2026-09-03', attribution_month: '2026-09-01' }, cases: [{ id: 'case-signed-opaque', branch_code: 'BRANCH-007', closure_date: '2026-09-01', classification: 'sin_registro', decision: null }], terminal: { state: null } }
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [depositOccurrence] })
+    getDepositReviewWorklist.mockResolvedValue(pendingWorklist)
+    recordDepositReviewDecision.mockResolvedValue({ worklist: pendingWorklist })
+    render(<CalendarioAreaPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Deposit review/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Sin registro revisado para BRANCH-007' }))
+    const comment = screen.getByLabelText(/Comentario/)
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar decisión' }))
+    expect(await screen.findByText('El comentario es obligatorio para registrar que no hay un depósito revisado.')).toBeInTheDocument()
+    expect(comment).toHaveFocus()
+    fireEvent.change(comment, { target: { value: 'No hay comprobante disponible.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar decisión' }))
+    await waitFor(() => expect(recordDepositReviewDecision).toHaveBeenCalledWith('occurrence-signed-opaque', 'case-signed-opaque', expect.objectContaining({ decision: 'sin_registro_revisado', comment: 'No hay comprobante disponible.' })))
+  })
+
+  it('refetches a worklist after a 409 and keeps the review recoverable', async () => {
+    const depositOccurrence = { ...occurrence, id: 'occurrence-signed-opaque', occurrence_id: undefined, task: { id: 123, name: 'Deposit review', mode: 'deposit_review' } }
+    const pendingWorklist = { id: 'occurrence-signed-opaque', state: 'pending', origin_date: '2026-09-02', historical_context: { scheduled_on: '2026-09-02', effective_on: '2026-09-03', attribution_month: '2026-09-01' }, cases: [{ id: 'case-signed-opaque', branch_code: 'BRANCH-007', closure_date: '2026-09-01', classification: 'report_available', decision: null }], terminal: { state: null } }
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [depositOccurrence] })
+    getDepositReviewWorklist.mockResolvedValue(pendingWorklist)
+    recordDepositReviewDecision.mockRejectedValue(Object.assign(new Error('changed'), { status: 409 }))
+    render(<CalendarioAreaPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Deposit review/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Conforme para BRANCH-007' }))
+
+    expect(await screen.findByText('La revisión cambió o ya fue resuelta. Se recargó la bandeja.')).toBeInTheDocument()
+    await waitFor(() => expect(getDepositReviewWorklist).toHaveBeenCalledTimes(2))
+    expect(screen.getByRole('dialog', { name: 'Revisión de depósitos' })).toBeInTheDocument()
+  })
+
   it('traps Tab from the last dialog control to the first', async () => {
     getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [occurrence] })
     render(<CalendarioAreaPage />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Auditoría' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Auditoría/ }))
     const closeButton = screen.getByRole('button', { name: 'Cerrar detalle de la ocurrencia' })
     const lastButton = screen.getByRole('button', { name: 'Reprogramar' })
     lastButton.focus()
@@ -165,7 +289,7 @@ describe('CalendarioAreaPage', () => {
   it('traps Shift+Tab from the first dialog control to the last', async () => {
     getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [occurrence] })
     render(<CalendarioAreaPage />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Auditoría' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Auditoría/ }))
     const closeButton = screen.getByRole('button', { name: 'Cerrar detalle de la ocurrencia' })
     const lastButton = screen.getByRole('button', { name: 'Reprogramar' })
     closeButton.focus()
@@ -176,7 +300,7 @@ describe('CalendarioAreaPage', () => {
   it('closes on Escape and restores focus to the calendar occurrence', async () => {
     getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [occurrence] })
     render(<CalendarioAreaPage />)
-    const event = await screen.findByRole('button', { name: 'Auditoría' })
+    const event = await screen.findByRole('button', { name: /Auditoría/ })
     fireEvent.click(event)
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(event).toHaveFocus()
@@ -185,17 +309,27 @@ describe('CalendarioAreaPage', () => {
   it('labels and enables commands only for the pending public status', async () => {
     getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [occurrence] })
     render(<CalendarioAreaPage />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Auditoría' }))
-    expect(screen.getByText('Pendiente')).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: /Auditoría/ }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('Pendiente')
     expect(screen.getByRole('button', { name: 'Completar' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reprogramar' })).toBeInTheDocument()
+  })
+
+  it('allows completing a deferred occurrence without allowing it to be rescheduled again', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [{ ...occurrence, status: 'diferida' }] })
+    render(<CalendarioAreaPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Auditoría/ }))
+
+    expect(screen.getByRole('button', { name: 'Completar' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reprogramar' })).not.toBeInTheDocument()
   })
 
   it('does not expose commands for a non-pending occurrence', async () => {
     getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [{ ...occurrence, status: 'scheduled', coverage_snapshot: undefined, template: undefined, template_version: undefined }] })
     render(<CalendarioAreaPage />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Auditoría' }))
-    expect(screen.getByText('scheduled')).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: /Auditoría/ }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('scheduled')
     expect(screen.queryByRole('button', { name: 'Completar' })).not.toBeInTheDocument()
     expect(screen.queryByText('Jornada')).not.toBeInTheDocument()
   })
@@ -205,11 +339,12 @@ describe('CalendarioAreaPage', () => {
     completeAreaOccurrence.mockReturnValue(new Promise((resolve) => { resolveCommand = resolve }))
     getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [occurrence] })
     render(<CalendarioAreaPage />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Auditoría' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Auditoría/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Completar' }))
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar completar' }))
     fireEvent.click(screen.getByRole('button', { name: 'Completando...' }))
     expect(completeAreaOccurrence).toHaveBeenCalledTimes(1)
+    expect(completeAreaOccurrence).toHaveBeenCalledWith(4, expect.any(String))
     resolveCommand({})
     await waitFor(() => expect(getMonthlyAreaOccurrences).toHaveBeenCalledTimes(2))
   })
@@ -221,7 +356,7 @@ describe('CalendarioAreaPage', () => {
       .mockRejectedValueOnce(Object.assign(new Error('No autorizado'), { status: 403 }))
       .mockResolvedValueOnce({})
     render(<CalendarioAreaPage />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Auditoría' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Auditoría/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Reprogramar' }))
     fireEvent.change(screen.getByLabelText('Nueva fecha'), { target: { value: '2026-09-05' } })
     fireEvent.change(screen.getByLabelText('Motivo'), { target: { value: 'Cobertura' } })
@@ -243,7 +378,7 @@ describe('CalendarioAreaPage', () => {
     getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [occurrence] })
     completeAreaOccurrence.mockRejectedValue(Object.assign(new Error('Conflicto'), { status: 409 }))
     render(<CalendarioAreaPage />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Auditoría' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Auditoría/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Completar' }))
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar completar' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('estado de la ocurrencia cambió')
@@ -289,12 +424,97 @@ describe('CalendarioAreaPage', () => {
     expect(await screen.findByText('Rendimiento mensual')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Responsabilidad 3' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Responsabilidad 9' })).toBeInTheDocument()
-    expect(screen.getAllByText('{"id":8,"name":"Operaciones"}')).toHaveLength(2)
+    expect(screen.getAllByText('Área: Operaciones')).toHaveLength(2)
     expect(screen.getByText('Cierre mensual')).toBeInTheDocument()
     expect(screen.getByText('Cierre adicional')).toBeInTheDocument()
-    expect(screen.getAllByText('Pesos')).toHaveLength(2)
+    expect(screen.getAllByText('Peso esperado')).toHaveLength(2)
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente mes' }))
     await waitFor(() => expect(getMonthlyAreaPerformance).toHaveBeenLastCalledWith('2026-11'))
+  })
+
+  it('applies the Analiza token scope and distinct event-chip structure to calendar occurrences', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [occurrence, { ...occurrence, occurrence_id: 5, task: 'Inventario' }] })
+
+    render(<CalendarioAreaPage />)
+
+    expect((await screen.findByText('Auditoría')).closest('button')).toHaveClass('calendario-area-event-chip')
+    expect(screen.getByText('Inventario').closest('button')).toHaveClass('calendario-area-event-chip')
+    expect(screen.getByText('Auditoría').closest('button')).toHaveClass('calendario-area-event-chip--occurrence')
+    expect(screen.getByText('Auditoría').closest('.tema-analiza')).toHaveAttribute('data-responsive-breakpoints', '375 768 1024 1440')
+    expect(screen.getByTestId('full-calendar').closest('.calendario-area-calendar__surface')).toBeInTheDocument()
+    expect(screen.getByTestId('calendar-weekday-header')).toBeInTheDocument()
+    expect(screen.getByTestId('calendar-current-day')).toBeInTheDocument()
+  })
+
+  it('renders each occurrence with a visible title, compact SVG marker, and accessible status label', async () => {
+    const statuses = [
+      ['pendiente', 'Pendiente', 'pending'],
+      ['completada', 'Completada', 'complete'],
+      ['vencida', 'Vencida', 'overdue'],
+      ['justificada', 'Justificada', 'justified'],
+      ['diferida', 'Diferida', 'deferred'],
+    ]
+    getMonthlyAreaOccurrences.mockResolvedValue({
+      occurrences: statuses.map(([status], index) => ({ ...occurrence, occurrence_id: index + 10, task: `Tarea ${status}`, status })),
+    })
+
+    render(<CalendarioAreaPage />)
+
+    for (const [status, label, marker] of statuses) {
+      const task = await screen.findByText(`Tarea ${status}`)
+      const chip = task.closest('button')
+      expect(chip).toHaveClass(`calendar-occurrence--${status}`)
+      expect(chip).toHaveAccessibleName(`Tarea ${status} · ${label}`)
+      expect(chip).not.toHaveTextContent(label)
+      expect(chip.querySelector('[data-calendar-status-marker]')).toHaveAttribute('data-calendar-status-marker', marker)
+    }
+    expect(screen.getByText('Tarea diferida').closest('button')).toHaveClass('calendar-occurrence--diferida')
+    expect(screen.getByText('Tarea pendiente').closest('button')).not.toHaveClass('calendar-occurrence--diferida')
+  })
+
+  it('uses the pending chip family for an unknown occurrence status without crashing', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [{ ...occurrence, task: 'Tarea futura', status: 'en espera' }] })
+
+    render(<CalendarioAreaPage />)
+
+    const task = await screen.findByText('Tarea futura')
+    expect(task.closest('button')).toHaveClass('calendar-occurrence--pendiente')
+    expect(task.closest('button')).toHaveAccessibleName('Tarea futura · en espera')
+    expect(task.closest('button')).not.toHaveTextContent('en espera')
+    expect(task.closest('button').querySelector('[data-calendar-status-marker]')).toHaveAttribute('data-calendar-status-marker', 'pending')
+  })
+
+  it('presents separated provisional, definitive, and not-applicable performance segments without aggregation', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+    getMonthlyAreaPerformance.mockResolvedValue({
+      month: '2026-09',
+      performances: [
+        { area: { id: 8, name: 'Operaciones' }, responsibility_id: 3, month: '2026-09', state: 'provisional', weights: { expected: 40, credited: 0 }, percentage: 0 },
+        { area: { id: 8, name: 'Operaciones' }, responsibility_id: 9, month: '2026-09', state: 'closed', weights: { expected: 60, credited: 60 }, percentage: 100 },
+        { area: { id: 8, name: 'Operaciones' }, responsibility_id: 10, month: '2026-09', state: 'not_applicable', weights: { expected: 0, credited: 0 }, percentage: 0 },
+      ],
+    })
+
+    render(<CalendarioAreaPage />)
+
+    expect(await screen.findByText('Datos provisionales')).toBeInTheDocument()
+    expect(screen.getByText('Cierre definitivo disponible')).toBeInTheDocument()
+    expect(screen.getAllByText('No aplica')).toHaveLength(2)
+    expect(screen.getAllByText('Área: Operaciones')).toHaveLength(3)
+    expect(screen.getAllByText('Peso esperado')[0].parentElement).toHaveTextContent('40')
+    expect(screen.getAllByText('Peso acreditado')[1].parentElement).toHaveTextContent('60')
+    expect(screen.queryByText('Rendimiento combinado')).not.toBeInTheDocument()
+  })
+
+  it('renders the pending monthly-close response as intentional guidance rather than a technical error', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+    getMonthlyAreaPerformance.mockRejectedValue(Object.assign(new Error('monthly_performance_not_closed'), { status: 409, detail: 'monthly_performance_not_closed' }))
+
+    render(<CalendarioAreaPage />)
+
+    expect(await screen.findByText('El rendimiento definitivo de este mes todavía no está disponible.')).toBeInTheDocument()
+    expect(document.querySelector('.monthly-performance__notice--pending')).toHaveAttribute('role', 'status')
+    expect(screen.queryByRole('alert', { name: /rendimiento mensual/i })).not.toBeInTheDocument()
   })
 
   it('shows an empty performance state', async () => {
@@ -311,7 +531,7 @@ describe('CalendarioAreaPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Acceso denegado para consultar el rendimiento mensual.')
     expect(screen.queryByRole('button', { name: 'Reintentar' })).not.toBeInTheDocument()
     rerender(<CalendarioAreaPage key="not-closed" />)
-    expect(await screen.findByText('El rendimiento mensual aún no está cerrado.')).toBeInTheDocument()
+    expect(await screen.findByText('El rendimiento definitivo de este mes todavía no está disponible.')).toBeInTheDocument()
   })
 
   it('retries recoverable performance errors and omits absent optional fields', async () => {

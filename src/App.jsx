@@ -33,6 +33,24 @@ import AdminMasterAssignmentsPage from './features/adminMasterAssignments/pages/
 import Layout from "./components/Layout/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { getProfileCapabilities } from './features/auth/profilePolicies'
+import SelectorEmpresaPage from './features/empresas/pages/SelectorEmpresaPage'
+import TuvetLayout from './features/tuvet/components/TuvetLayout'
+import { AnalizaModuleRoute, TuvetCapabilityRoute, TuvetHome, TuvetModuleRoute } from './features/tuvet/TuvetRoutes'
+import TuvetMisTareasPage from './features/tuvet/pages/TuvetMisTareasPage'
+import TuvetRevisionesPage from './features/tuvet/pages/TuvetRevisionesPage'
+import TuvetTareasPage from './features/tuvet/pages/TuvetTareasPage'
+import TuvetPlantillasPage from './features/tuvet/pages/TuvetPlantillasPage'
+import TuvetEquipoPage from './features/tuvet/pages/TuvetEquipoPage'
+import TuvetRendimientoPage from './features/tuvet/pages/TuvetRendimientoPage'
+import TuvetSeguimientoPage from './features/tuvet/pages/TuvetSeguimientoPage'
+import TuvetAsignarPage from './features/tuvet/pages/TuvetAsignarPage'
+import AparienciaPage from './features/apariencia/pages/AparienciaPage'
+import { AparienciaProvider } from './features/apariencia/AparienciaContext'
+import OperationalAlertsPage from './features/operationalAlerts/pages/OperationalAlertsPage'
+import SystemsPerformanceHistoryPage from './features/performanceHistory/pages/SystemsPerformanceHistoryPage'
+import MonthlyPerformanceCorrectionsPage from './features/monthlyPerformanceCorrections/pages/MonthlyPerformanceCorrectionsPage'
+import GOAreaPerformanceHistoryPage from './features/goPerformanceHistory/pages/GOAreaPerformanceHistoryPage'
+import DepositHistoryPage from './features/calendarioArea/pages/DepositHistoryPage'
 
 export function RendimientoRoute({ children }) {
   const { perfil } = useAuth()
@@ -41,7 +59,7 @@ export function RendimientoRoute({ children }) {
   return children
 }
 
-function PendientesRoute({ children }) {
+export function PendientesRoute({ children }) {
   const { perfil } = useAuth()
   const { canAccessPendingRequests } = getProfileCapabilities(perfil)
   if (perfil && !canAccessPendingRequests) {
@@ -56,6 +74,14 @@ export function AdminMaestroRoute({ children }) {
   return children
 }
 
+// Apariencia por empresa y país: admin maestro (heredado o territorial) y sistemas; el backend acota el alcance.
+export function AparienciaRoute({ children }) {
+  const { perfil } = useAuth()
+  const { isMasterAdmin, isAdminMaster, isSystemsAccount } = getProfileCapabilities(perfil)
+  if (perfil && !isMasterAdmin && !isAdminMaster && !isSystemsAccount) return <Navigate to="/" replace />
+  return children
+}
+
 export function GerentesOperacionesRoute({ children }) {
   const { perfil } = useAuth()
   const { canManageOperationsManagers: puedeGestionarGO } = getProfileCapabilities(perfil)
@@ -66,6 +92,30 @@ export function GerentesOperacionesRoute({ children }) {
 export function SystemsOnlyRoute({ children }) {
   const { perfil } = useAuth()
   if (!getProfileCapabilities(perfil).isSystemsAccount) return <Navigate to="/" replace />
+  return children
+}
+
+export function OperationalAlertsRoute({ children }) {
+  const { perfil } = useAuth()
+  if (!getProfileCapabilities(perfil).canAccessOperationalAlerts) return <Navigate to="/" replace />
+  return children
+}
+
+export function PerformanceHistoryRoute({ children }) {
+  const { perfil } = useAuth()
+  if (!getProfileCapabilities(perfil).canAccessPerformanceHistory) return <Navigate to="/" replace />
+  return children
+}
+
+export function MonthlyPerformanceCorrectionsRoute({ children }) {
+  const { perfil } = useAuth()
+  if (!getProfileCapabilities(perfil).canManageMonthlyPerformanceCorrections) return <Navigate to="/" replace />
+  return children
+}
+
+export function GOAreaPerformanceHistoryRoute({ children }) {
+  const { perfil } = useAuth()
+  if (!getProfileCapabilities(perfil).canAccessGOAreaPerformanceHistory) return <Navigate to="/" replace />
   return children
 }
 
@@ -107,6 +157,13 @@ export function DepositosPendientesRoute({ children }) {
   return children
 }
 
+export function DepositHistoryRoute({ children }) {
+  const { perfil } = useAuth()
+  const { isAreaManager, isOperationsManager } = getProfileCapabilities(perfil)
+  if (!isAreaManager && !isOperationsManager) return <Navigate to="/" replace />
+  return children
+}
+
 export function CalendarioAreaRoute({ children }) {
   const { perfil } = useAuth()
   if (!getProfileCapabilities(perfil).canAccessAreaCalendar) return <Navigate to="/" replace />
@@ -125,9 +182,11 @@ export function AlmuerzosRoute({ children }) {
   return children
 }
 
-function HomeRoute() {
+export function HomeRoute() {
   const { perfil } = useAuth()
-  const { isBranchManager, canAccessMyTasks } = getProfileCapabilities(perfil)
+  const { isBranchManager, canAccessMyTasks, isSystemsAccount } = getProfileCapabilities(perfil)
+  // Sistemas administra varias empresas: primero elige a cuál entrar.
+  if (isSystemsAccount) return <Navigate to="/empresas" replace />
   if (isBranchManager && canAccessMyTasks) return <Navigate to="/mis-tareas" replace />
   return <CalendarPage />
 }
@@ -135,6 +194,7 @@ function HomeRoute() {
 function App() {
   return (
     <AuthProvider>
+    <AparienciaProvider>
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -148,13 +208,48 @@ function App() {
           }
         />
         <Route
+          path="/empresas"
           element={
             <ProtectedRoute>
-              <Layout />
+              <SystemsOnlyRoute>
+                <SelectorEmpresaPage />
+              </SystemsOnlyRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tuvet"
+          element={
+            <ProtectedRoute>
+              <TuvetModuleRoute>
+                <TuvetLayout />
+              </TuvetModuleRoute>
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<TuvetHome />} />
+          <Route path="seguimiento" element={<TuvetCapabilityRoute capability="canManageTasks"><TuvetSeguimientoPage /></TuvetCapabilityRoute>} />
+          <Route path="asignar" element={<TuvetCapabilityRoute capability="canManageTasks"><TuvetAsignarPage /></TuvetCapabilityRoute>} />
+          <Route path="mis-tareas" element={<TuvetCapabilityRoute capability="canAccessMyTasks"><TuvetMisTareasPage /></TuvetCapabilityRoute>} />
+          <Route path="revisiones" element={<TuvetCapabilityRoute capability="canReview"><TuvetRevisionesPage /></TuvetCapabilityRoute>} />
+          <Route path="tareas" element={<TuvetCapabilityRoute capability="canManageTasks"><TuvetTareasPage /></TuvetCapabilityRoute>} />
+          <Route path="plantillas" element={<TuvetCapabilityRoute capability="canManageTasks"><TuvetPlantillasPage /></TuvetCapabilityRoute>} />
+          <Route path="equipo" element={<TuvetCapabilityRoute capability="canAccessTeam"><TuvetEquipoPage /></TuvetCapabilityRoute>} />
+          <Route path="rendimiento" element={<TuvetCapabilityRoute capability="canAccessPerformance"><TuvetRendimientoPage /></TuvetCapabilityRoute>} />
+          <Route path="apariencia" element={<TuvetCapabilityRoute capability="canManageStructure"><AparienciaPage tema="tuvet" /></TuvetCapabilityRoute>} />
+          <Route path="*" element={<TuvetHome />} />
+        </Route>
+        <Route
+          element={
+            <ProtectedRoute>
+              <AnalizaModuleRoute>
+                <Layout />
+              </AnalizaModuleRoute>
             </ProtectedRoute>
           }
         >
           <Route path="/" element={<HomeRoute />} />
+          <Route path="/calendario" element={<CalendarPage />} />
           <Route path="/tareas" element={<TareasPage />} />
           <Route path="/inventario-demo" element={<CapabilityRoute capability="canManageBranches"><InventarioDemoPage /></CapabilityRoute>} />
           <Route path="/sucursales" element={<CapabilityRoute capability="canManageBranches"><SucursalesPage /></CapabilityRoute>} />
@@ -166,11 +261,16 @@ function App() {
           <Route path="/gerentes" element={<AreaManagerAssignmentRoute><GerentesPage /></AreaManagerAssignmentRoute>} />
           <Route path="/gerentes-operaciones" element={<GerentesOperacionesRoute><GerentesOperacionesPage /></GerentesOperacionesRoute>} />
           <Route path="/admin-master-asignaciones" element={<SystemsOnlyRoute><AdminMasterAssignmentsPage /></SystemsOnlyRoute>} />
+           <Route path="/alertas-operativas" element={<SystemsOnlyRoute><OperationalAlertsRoute><OperationalAlertsPage /></OperationalAlertsRoute></SystemsOnlyRoute>} />
+            <Route path="/historial-rendimiento-mensual" element={<PerformanceHistoryRoute><SystemsPerformanceHistoryPage /></PerformanceHistoryRoute>} />
+          <Route path="/correcciones-rendimiento-mensual" element={<MonthlyPerformanceCorrectionsRoute><MonthlyPerformanceCorrectionsPage /></MonthlyPerformanceCorrectionsRoute>} />
+          <Route path="/historial-rendimiento-go" element={<GOAreaPerformanceHistoryRoute><GOAreaPerformanceHistoryPage /></GOAreaPerformanceHistoryRoute>} />
           <Route path="/areas" element={<AreaManagerAssignmentRoute><AreasPage /></AreaManagerAssignmentRoute>} />
           <Route path="/organizacion" element={<OrganizacionRoute><OrganizacionPage /></OrganizacionRoute>} />
           <Route path="/mis-tareas" element={<MisTareasRoute><MisTareasPage /></MisTareasRoute>} />
           <Route path="/mis-tareas-v2" element={<MisTareasRoute><MisTareasPage className="mis-tareas-page mis-tareas-v2-page" groupByStartTime selectionUxVariant scanabilityVariant availableFilterVariant priorityVariant /></MisTareasRoute>} />
-          <Route path="/depositospendientes" element={<DepositosPendientesRoute><DepositosPendientesPage /></DepositosPendientesRoute>} />
+           <Route path="/depositospendientes" element={<DepositosPendientesRoute><DepositosPendientesPage /></DepositosPendientesRoute>} />
+           <Route path="/analitica/historial-depositos" element={<DepositHistoryRoute><DepositHistoryPage /></DepositHistoryRoute>} />
           <Route path="/calendario-area" element={<CalendarioAreaRoute><CalendarioAreaPage /></CalendarioAreaRoute>} />
           <Route path="/ausencias-area" element={<AusenciasAreaRoute><AusenciasAreaPage /></AusenciasAreaRoute>} />
           <Route path="/solicitudes-pendientes" element={<PendientesRoute><SolicitudesPendientesPage /></PendientesRoute>} />
@@ -182,9 +282,11 @@ function App() {
           <Route path="/reportes" element={<CapabilityRoute capability="canAccessPerformanceReports"><ReportesPage /></CapabilityRoute>} />
           <Route path="/analitica/revisiones-guardia" element={<AdminMaestroRoute><RevisionesGuardiaPage /></AdminMaestroRoute>} />
           <Route path="/configuracion" element={<AdminMaestroRoute><ConfiguracionPage /></AdminMaestroRoute>} />
+          <Route path="/apariencia" element={<AparienciaRoute><AparienciaPage /></AparienciaRoute>} />
         </Route>
       </Routes>
     </BrowserRouter>
+    </AparienciaProvider>
     </AuthProvider>
   )
 }

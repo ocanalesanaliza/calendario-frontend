@@ -2,6 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { getProfileCapabilities } from './profilePolicies'
 
 describe('getProfileCapabilities', () => {
+  it.each([
+    ['GS', { type: 'gerente_sucursal' }, true],
+    ['GA', { type: 'gerente_area' }, true],
+    ['Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, true],
+    ['Admin Master', { type: 'admin_master' }, true],
+    ['GO', { type: 'gerente_operaciones' }, false],
+  ])('sets pending-request access for %s to %s', (_role, profile, expected) => {
+    expect(getProfileCapabilities(profile).canAccessPendingRequests).toBe(expected)
+  })
+
   it('grants all planned modules to Systems with Master Admin capabilities', () => {
     const capabilities = getProfileCapabilities({
       type: 'sistemas',
@@ -37,6 +47,16 @@ describe('getProfileCapabilities', () => {
     expect(capabilities.canManageOperationsManagers).toBe(false)
   })
 
+  it.each([
+    ['active enabled GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, true],
+    ['inactive GO', { type: 'gerente_operaciones', activo: false, habilitado: true }, false],
+    ['disabled GO', { type: 'gerente_operaciones', activo: true, habilitado: false }, false],
+    ['GA', { type: 'gerente_area', activo: true, habilitado: true }, false],
+    ['Systems', { type: 'sistemas', activo: true, habilitado: true }, false],
+  ])('sets GO team-lunch mode for %s to %s', (_role, profile, expected) => {
+    expect(getProfileCapabilities(profile).canAccessGOTeamLunch).toBe(expected)
+  })
+
   it('denies module access when the server omits capabilities', () => {
     const capabilities = getProfileCapabilities({ type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true })
 
@@ -56,5 +76,86 @@ describe('getProfileCapabilities', () => {
     })
 
     expect(capabilities.canManageOrganization).toBe(false)
+  })
+
+  it.each([
+    ['active enabled Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, true],
+    ['GA', { type: 'gerente_area', activo: true, habilitado: true }, false],
+    ['reassigned GA', { type: 'gerente_area', es_cuenta_sistemas: true, activo: true, habilitado: true }, false],
+    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, false],
+    ['Admin Master', { type: 'admin_master', activo: true, habilitado: true }, false],
+    ['Master Admin', { es_admin_maestro: true, activo: true, habilitado: true }, false],
+    ['GS', { type: 'gerente_sucursal', activo: true, habilitado: true }, false],
+    ['inactive Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: false, habilitado: true }, false],
+    ['disabled Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: false }, false],
+  ])('sets operational-alert access for %s to %s', (_role, profile, expected) => {
+    expect(getProfileCapabilities(profile).canAccessOperationalAlerts).toBe(expected)
+  })
+
+  it.each([
+    ['active global Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, true],
+    ['GA', { type: 'gerente_area', activo: true, habilitado: true }, false],
+    ['reassigned GA', { type: 'gerente_area', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, false],
+    ['Admin Master', { type: 'admin_master', activo: true, habilitado: true }, false],
+    ['Master Admin', { es_admin_maestro: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['GS', { type: 'gerente_sucursal', activo: true, habilitado: true }, false],
+    ['inactive Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: false, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['disabled Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: false, capabilities: { has_global_scope: true } }, false],
+    ['flag-only Systems', { es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['role-mismatched Systems', { type: 'admin_master', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['non-global Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, false],
+  ])('sets performance-history access for %s to %s', (_role, profile, expected) => {
+    expect(getProfileCapabilities(profile).canAccessPerformanceHistory).toBe(expected)
+  })
+
+  it.each([
+    ['active enabled GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, true],
+    ['GA', { type: 'gerente_area', activo: true, habilitado: true }, false],
+    ['reassigned GA', { type: 'gerente_area', es_cuenta_sistemas: true, activo: true, habilitado: true }, false],
+    ['Admin Master', { type: 'admin_master', activo: true, habilitado: true }, false],
+    ['Master Admin', { es_admin_maestro: true, activo: true, habilitado: true }, false],
+    ['GS', { type: 'gerente_sucursal', activo: true, habilitado: true }, false],
+    ['Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, false],
+    ['inactive GO', { type: 'gerente_operaciones', activo: false, habilitado: true }, false],
+    ['disabled GO', { type: 'gerente_operaciones', activo: true, habilitado: false }, false],
+    ['role-mismatched profile', { type: 'admin_master', activo: true, habilitado: true }, false],
+  ])('sets GO Area-performance history access for %s to %s', (_role, profile, expected) => {
+    expect(getProfileCapabilities(profile).canAccessGOAreaPerformanceHistory).toBe(expected)
+  })
+
+  it.each([
+    ['active global Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, true],
+    ['GA', { type: 'gerente_area', activo: true, habilitado: true }, false],
+    ['reassigned GA', { type: 'gerente_area', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, false],
+    ['Admin Master', { type: 'admin_master', activo: true, habilitado: true }, false],
+    ['Master Admin', { es_admin_maestro: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['GS', { type: 'gerente_sucursal', activo: true, habilitado: true }, false],
+    ['inactive Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: false, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['disabled Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: false, capabilities: { has_global_scope: true } }, false],
+    ['flag-only Systems', { es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['role-mismatched Systems', { type: 'admin_master', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+    ['non-global Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, false],
+  ])('sets monthly-correction management only for %s to %s', (_role, profile, expected) => {
+    expect(getProfileCapabilities(profile).canManageMonthlyPerformanceCorrections).toBe(expected)
+  })
+
+  it.each([
+    ['GA', { type: 'gerente_area' }, true, true, false, true, false],
+    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, true, false, true, false, true],
+    ['active Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, true, false, true, false, true],
+    ['plain Admin Master', { type: 'admin_master' }, true, false, true, false, true],
+    ['global Admin Master', { es_admin_maestro: true }, true, false, true, false, true],
+    ['GS', { type: 'gerente_sucursal' }, false, false, false, false, false],
+    ['inactive Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: false, habilitado: true }, false, false, false, false, false],
+  ])('defines GA absence capabilities for %s', (_role, profile, canAccess, canSubmit, canDecide, canCancel, canManageSituations) => {
+    const capabilities = getProfileCapabilities(profile)
+
+    expect(capabilities.canAccessAreaAbsences).toBe(canAccess)
+    expect(capabilities.canSubmitOwnGAVacations).toBe(canSubmit)
+    expect(capabilities.canDecideGAVacations).toBe(canDecide)
+    expect(capabilities.canCancelOwnGAVacations).toBe(canCancel)
+    expect(capabilities.canManageGASpecialSituations).toBe(canManageSituations)
   })
 })
