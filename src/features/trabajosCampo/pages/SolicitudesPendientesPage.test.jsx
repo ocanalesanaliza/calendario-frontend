@@ -13,6 +13,9 @@ const {
   aceptarSolicitudVacacion,
   rechazarSolicitudVacacion,
   cancelarSolicitudVacacion,
+  getCoberturas,
+  aceptarCobertura,
+  rechazarCobertura,
 } = vi.hoisted(() => ({
   useAuth: vi.fn(),
   getTrabajosCampo: vi.fn(),
@@ -23,6 +26,9 @@ const {
   aceptarSolicitudVacacion: vi.fn(),
   rechazarSolicitudVacacion: vi.fn(),
   cancelarSolicitudVacacion: vi.fn(),
+  getCoberturas: vi.fn(),
+  aceptarCobertura: vi.fn(),
+  rechazarCobertura: vi.fn(),
 }))
 
 vi.mock('../../auth/context/AuthContext', () => ({ useAuth }))
@@ -38,28 +44,41 @@ vi.mock('../../vacacionesProgramadas/services/vacacionesProgramadasService', () 
   rechazarSolicitudVacacion,
   cancelarSolicitudVacacion,
 }))
+vi.mock('../../coberturas/services/coberturasService', () => ({
+  getCoberturas,
+  aceptarCobertura,
+  rechazarCobertura,
+}))
 vi.mock('../components/TrabajoCampoModal', () => ({ default: () => null }))
 vi.mock('../../vacacionesProgramadas/components/VacacionModal', () => ({ default: () => null }))
 
 const fieldWork = { id_trabajo_campo: 11, fecha: '2026-10-20', jornada: 'manana', estado: 'pendiente', estado_label: 'Pendiente', usuario: { nombre: 'GS Uno' }, solicitado_por: { id_usuario: 7 } }
 const vacation = { id_solicitud_vacacion: 21, fecha_inicio: '2026-10-21', fecha_fin: '2026-10-21', estado: 'pendiente', estado_label: 'Pendiente', usuario: { nombre: 'GS Uno' }, solicitado_por: { id_usuario: 7 } }
+const ownCoverage = { id_cobertura: 31, fecha: '2026-10-25', jornada_label: 'Jornada completa', estado: 'pendiente', usuario_reemplazo: { id_usuario: 7, nombre: 'GS Uno' }, sucursal_destino: { nombre: 'Sucursal Centro' } }
+const weekdayCoverage = { id_cobertura: 33, fecha: '2026-10-26', jornada_label: 'Mañana', estado: 'pendiente', usuario_reemplazo: { id_usuario: 7, nombre: 'GS Uno' }, sucursal_destino: { nombre: 'Sucursal Sur' } }
+const anotherCoverage = { id_cobertura: 32, fecha: '2026-10-26', jornada_label: 'Jornada completa', estado: 'pendiente', usuario_reemplazo: { id_usuario: 8, nombre: 'GS Dos' }, sucursal_destino: { nombre: 'Sucursal Norte' } }
 
-function setup(profile) {
+function setup(profile, coverages = [], coverageRefreshes = []) {
   useAuth.mockReturnValue({ perfil: profile })
   getTrabajosCampo.mockResolvedValue({ results: [fieldWork] })
   getSolicitudesVacacion.mockResolvedValue({ results: [vacation] })
+  getCoberturas.mockResolvedValueOnce({ results: coverages })
+  coverageRefreshes.forEach((items) => getCoberturas.mockResolvedValueOnce({ results: items }))
   render(<MemoryRouter><SolicitudesPendientesPage /></MemoryRouter>)
 }
 
 describe('SolicitudesPendientesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    getCoberturas.mockReset()
     aceptarTrabajoCampo.mockResolvedValue({})
     rechazarTrabajoCampo.mockResolvedValue({})
     cancelarTrabajoCampo.mockResolvedValue({})
     aceptarSolicitudVacacion.mockResolvedValue({})
     rechazarSolicitudVacacion.mockResolvedValue({})
     cancelarSolicitudVacacion.mockResolvedValue({})
+    aceptarCobertura.mockResolvedValue({})
+    rechazarCobertura.mockResolvedValue({})
   })
 
   it.each([
@@ -76,6 +95,8 @@ describe('SolicitudesPendientesPage', () => {
     expect(screen.getByText('Vacaciones programadas pendientes')).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Aceptar' })).toHaveLength(2)
     expect(screen.getAllByRole('button', { name: 'Rechazar' })).toHaveLength(2)
+    expect(screen.queryByRole('heading', { name: 'Coberturas pendientes' })).not.toBeInTheDocument()
+    expect(getCoberturas).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: 'Cancelar solicitud' })).not.toBeInTheDocument()
   })
 
@@ -89,6 +110,43 @@ describe('SolicitudesPendientesPage', () => {
     expect(screen.getAllByRole('button', { name: 'Cancelar solicitud' })).toHaveLength(2)
     expect(screen.queryByRole('button', { name: 'Aceptar' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Rechazar' })).not.toBeInTheDocument()
+  })
+
+  it('shows the logged-in GS pending weekday and Sunday coverage alongside existing own-request sections', async () => {
+    setup({ type: 'gerente_sucursal', id: 7 }, [ownCoverage, weekdayCoverage, anotherCoverage])
+
+    const coverageSection = await screen.findByRole('heading', { name: 'Coberturas pendientes' })
+    expect(screen.getByText(/Sucursal Centro/)).toBeInTheDocument()
+    expect(screen.getByText(/Sucursal Sur/)).toBeInTheDocument()
+    expect(screen.queryByText(/Sucursal Norte/)).not.toBeInTheDocument()
+    expect(within(coverageSection.closest('.solicitudes-section')).getAllByText('Pendiente de tu aceptación')).toHaveLength(2)
+    expect(screen.getByText('Mis solicitudes de trabajo de campo')).toBeInTheDocument()
+    expect(screen.getByText('Vacaciones programadas')).toBeInTheDocument()
+  })
+
+  it('accepts own pending coverage and removes it after refreshing the list', async () => {
+    setup({ type: 'gerente_sucursal', id: 7 }, [ownCoverage], [[]])
+
+    const section = (await screen.findByRole('heading', { name: 'Coberturas pendientes' })).closest('.solicitudes-section')
+    fireEvent.click(within(section).getByRole('button', { name: 'Aceptar' }))
+
+    await waitFor(() => expect(aceptarCobertura).toHaveBeenCalledWith(31))
+    await waitFor(() => expect(getCoberturas).toHaveBeenCalledTimes(2))
+    expect(await within(section).findByText('No tienes coberturas pendientes.')).toBeInTheDocument()
+  })
+
+  it('rejects own pending coverage with a reason and removes it after refreshing the list', async () => {
+    setup({ type: 'gerente_sucursal', id: 7 }, [ownCoverage], [[]])
+
+    const section = (await screen.findByRole('heading', { name: 'Coberturas pendientes' })).closest('.solicitudes-section')
+    fireEvent.click(within(section).getByRole('button', { name: 'Rechazar' }))
+    const dialog = screen.getByRole('dialog', { name: 'Rechazar solicitud' })
+    fireEvent.change(within(dialog).getByLabelText('Motivo de rechazo'), { target: { value: '  No disponible  ' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Rechazar' }))
+
+    await waitFor(() => expect(rechazarCobertura).toHaveBeenCalledWith(31, 'No disponible'))
+    await waitFor(() => expect(getCoberturas).toHaveBeenCalledTimes(2))
+    expect(await within(section).findByText('No tienes coberturas pendientes.')).toBeInTheDocument()
   })
 
   it('restores field-work-only history search, pagination, and status presentation without decision controls', async () => {

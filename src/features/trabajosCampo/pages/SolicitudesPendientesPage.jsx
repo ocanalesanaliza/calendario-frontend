@@ -13,6 +13,7 @@ import {
   getSolicitudesVacacion,
   rechazarSolicitudVacacion,
 } from '../../vacacionesProgramadas/services/vacacionesProgramadasService'
+import { aceptarCobertura, getCoberturas, rechazarCobertura } from '../../coberturas/services/coberturasService'
 import TrabajoCampoModal from '../components/TrabajoCampoModal'
 import VacacionModal from '../../vacacionesProgramadas/components/VacacionModal'
 import './SolicitudesPendientesPage.css'
@@ -198,18 +199,26 @@ function BranchManagerRequestsView() {
   const { perfil } = useAuth()
   const [fieldWork, setFieldWork] = useState([])
   const [vacations, setVacations] = useState([])
+  const [coverages, setCoverages] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [fieldWorkModalOpen, setFieldWorkModalOpen] = useState(false)
   const [vacationModalOpen, setVacationModalOpen] = useState(false)
+  const [coverageAction, setCoverageAction] = useState(null)
+  const [coverageRejection, setCoverageRejection] = useState(null)
 
   const loadRequests = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const [fieldWorkResponse, vacationResponse] = await Promise.all([getTrabajosCampo({}), getSolicitudesVacacion({})])
+      const [fieldWorkResponse, vacationResponse, coverageResponse] = await Promise.all([
+        getTrabajosCampo({}),
+        getSolicitudesVacacion({}),
+        getCoberturas({ estado: 'pendiente' }),
+      ])
       setFieldWork((fieldWorkResponse.results ?? []).filter((request) => request.solicitado_por?.id_usuario === perfil?.id))
       setVacations((vacationResponse.results ?? []).filter((request) => request.solicitado_por?.id_usuario === perfil?.id))
+      setCoverages((coverageResponse.results ?? []).filter((coverage) => coverage.usuario_reemplazo?.id_usuario === perfil?.id))
     } catch {
       setError(GENERIC_ERROR)
     } finally {
@@ -231,21 +240,56 @@ function BranchManagerRequestsView() {
     }
   }
 
+  async function decideCoverage(id, decision, reason) {
+    setCoverageAction(id)
+    setError('')
+    try {
+      await (decision === 'accept' ? aceptarCobertura(id) : rechazarCobertura(id, reason))
+      await loadRequests()
+      return true
+    } catch {
+      setError(GENERIC_ERROR)
+      return false
+    } finally {
+      setCoverageAction(null)
+    }
+  }
+
   return <div className="solicitudes-pendientes-page">
     <div className="page-header"><div><h1>Solicitudes pendientes</h1><p>Tu trabajo de campo y vacaciones programadas</p></div></div>
     {error && <p role="alert">{error}</p>}
     {loading ? <Loading /> : <>
       <OwnRequestSection title="Mis solicitudes de trabajo de campo" requests={fieldWork} idKey="id_trabajo_campo" onNew={() => setFieldWorkModalOpen(true)} onCancel={(id) => cancel(cancelarTrabajoCampo, id)} />
       <OwnRequestSection title="Vacaciones programadas" requests={vacations} idKey="id_solicitud_vacacion" onNew={() => setVacationModalOpen(true)} onCancel={(id) => cancel(cancelarSolicitudVacacion, id)} />
+      <CoverageRequestSection requests={coverages} action={coverageAction} onAccept={(id) => decideCoverage(id, 'accept')} onReject={(id) => setCoverageRejection(id)} />
     </>}
     {fieldWorkModalOpen && <TrabajoCampoModal onClose={() => setFieldWorkModalOpen(false)} onSuccess={() => { setFieldWorkModalOpen(false); loadRequests() }} />}
     {vacationModalOpen && <VacacionModal onClose={() => setVacationModalOpen(false)} onSuccess={() => { setVacationModalOpen(false); loadRequests() }} />}
+    {coverageRejection && <RejectionReasonDialog onClose={() => setCoverageRejection(null)} onConfirm={async (reason) => {
+      const succeeded = await decideCoverage(coverageRejection, 'reject', reason)
+      if (succeeded) setCoverageRejection(null)
+    }} />}
   </div>
 }
 
 function OwnRequestSection({ title, requests, idKey, onNew, onCancel }) {
   return <section className="solicitudes-section"><div className="solicitudes-section-header"><h2>{title}</h2><button className="btn-primary" onClick={onNew}>Nueva solicitud</button></div>
     {requests.length === 0 ? <div className="empty-state">No has enviado solicitudes.</div> : <div className="campo-enviadas-list">{requests.map((request) => <div key={request[idKey]} className="campo-enviada-row"><div className="campo-enviada-info"><p className="campo-enviada-nombre">{request.fecha ?? request.fecha_inicio}</p><p className="campo-enviada-meta">{request.motivo || 'Sin motivo indicado'}</p></div><span className="badge">{request.estado_label}</span>{request.estado === 'pendiente' && <button className="campo-cancel-btn" aria-label="Cancelar solicitud" title="Cancelar solicitud" onClick={() => onCancel(request[idKey])}>✕</button>}</div>)}</div>}
+  </section>
+}
+
+function CoverageRequestSection({ requests, action, onAccept, onReject }) {
+  return <section className="solicitudes-section">
+    <div className="solicitudes-section-header"><h2>Coberturas pendientes</h2></div>
+    {requests.length === 0 ? <div className="empty-state">No tienes coberturas pendientes.</div> : <div className="campo-solicitudes">
+      {requests.map((coverage) => {
+        const id = coverage.id_cobertura
+        return <div key={id} className="campo-solicitud-card">
+          <div className="campo-solicitud-info"><div><p className="campo-solicitud-titulo">Cobertura en {coverage.sucursal_destino?.nombre ?? 'sucursal asignada'}<span className="badge badge-yellow">Pendiente de tu aceptación</span></p><p className="campo-solicitud-meta">{coverage.fecha}{coverage.jornada_label ? ` · ${coverage.jornada_label}` : ''}{coverage.motivo ? ` · ${coverage.motivo}` : ''}</p></div></div>
+          <div className="campo-solicitud-actions"><button className="btn-rechazar" disabled={action === id} onClick={() => onReject(id)}>Rechazar</button><button className="btn-aceptar" disabled={action === id} onClick={() => onAccept(id)}>Aceptar</button></div>
+        </div>
+      })}
+    </div>}
   </section>
 }
 
