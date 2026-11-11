@@ -1,7 +1,7 @@
-﻿import { useCallback, useState, useEffect } from 'react'
+﻿import { useCallback, useRef, useState, useEffect } from 'react'
 import { getCoberturas, createCobertura, activarCobertura, cancelarCobertura, completarCobertura } from '../services/coberturasService'
 import { getUsuarios } from '../../usuarios/services/usuariosService'
-import { getSucursales, getTitularSucursal } from '../../sucursales/services/sucursalesService'
+import { getSucursales, getHorarios, getTitularSucursal } from '../../sucursales/services/sucursalesService'
 import Toast from '../../../components/Toast/Toast'
 import './CoberturasPage.css'
 
@@ -18,6 +18,26 @@ const JORNADA_LABEL = {
   manana:      'Mañana',
   tarde:       'Tarde',
   dia_completo:'Día completo',
+}
+
+function dayOfWeek(date) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date)
+  if (!match) return null
+  const [, year, month, day] = match.map(Number)
+  const localDate = new Date(year, month - 1, day)
+  if (localDate.getFullYear() !== year
+    || localDate.getMonth() !== month - 1
+    || localDate.getDate() !== day) return null
+  return localDate.getDay()
+}
+
+function isSunday(date) {
+  return dayOfWeek(date) === 0
+}
+
+function isWeekend(date) {
+  const day = dayOfWeek(date)
+  return day === 0 || day === 6
 }
 
 export default function CoberturasPage() {
@@ -210,6 +230,9 @@ function CoberturaModal({ onSubmit, onClose, showToast }) {
     motivo:   '',
   })
   const [loading, setLoading] = useState(false)
+  const [horarioSucursal, setHorarioSucursal] = useState({ id: '', rows: null, loading: false, error: '' })
+  const [sundayValidationError, setSundayValidationError] = useState('')
+  const horarioRequestRef = useRef(0)
 
   useEffect(() => {
     Promise.all([getUsuarios(), getSucursales()])
@@ -233,10 +256,73 @@ function CoberturaModal({ onSubmit, onClose, showToast }) {
     return () => { cancelado = true }
   }, [form.id_sucursal_destino, form.fecha])
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+  const set = (k) => (e) => {
+    const value = e.target.value
+    setSundayValidationError('')
+    setForm((f) => ({ ...f, [k]: value }))
+  }
+
+  function handleDateChange(e) {
+    const fecha = e.target.value
+    setSundayValidationError('')
+    setForm((f) => ({ ...f, fecha, jornada: isWeekend(fecha) ? 'dia_completo' : f.jornada }))
+  }
+
+  function handleJornadaChange(e) {
+    const jornada = e.target.value
+    if (isWeekend(form.fecha) && jornada !== 'dia_completo') {
+      setSundayValidationError('Los fines de semana la cobertura debe ser de día completo.')
+      setForm((f) => ({ ...f, jornada: 'dia_completo' }))
+      return
+    }
+    setSundayValidationError('')
+    setForm((f) => ({ ...f, jornada }))
+  }
+
+  async function handleSucursalChange(e) {
+    const idSucursal = e.target.value
+    const requestId = ++horarioRequestRef.current
+    setSundayValidationError('')
+    setForm((f) => ({ ...f, id_sucursal_destino: idSucursal }))
+    setHorarioSucursal({ id: idSucursal, rows: null, loading: Boolean(idSucursal), error: '' })
+    if (!idSucursal) return
+
+    try {
+      const rows = await getHorarios(idSucursal)
+      if (requestId === horarioRequestRef.current) {
+        setHorarioSucursal({ id: idSucursal, rows, loading: false, error: '' })
+      }
+    } catch {
+      if (requestId === horarioRequestRef.current) {
+        setHorarioSucursal({ id: idSucursal, rows: null, loading: false, error: 'No se pudo verificar el horario de la sucursal.' })
+      }
+    }
+  }
+
+  const esDomingo = isSunday(form.fecha)
+  const esFinDeSemana = isWeekend(form.fecha)
+  const domingoAbierto = horarioSucursal.id === form.id_sucursal_destino
+    && Array.isArray(horarioSucursal.rows)
+    && horarioSucursal.rows.some((horario) => Number(horario.dia_semana) === 7 && horario.abre === true)
 
   async function handleSubmit(e) {
     e.preventDefault()
+    if (esFinDeSemana) {
+      if (form.jornada !== 'dia_completo') {
+        setSundayValidationError('Los fines de semana la cobertura debe ser de día completo.')
+        return
+      }
+      if (esDomingo) {
+        if (horarioSucursal.loading || horarioSucursal.error || !Array.isArray(horarioSucursal.rows)) {
+          setSundayValidationError(horarioSucursal.error || 'Espera a que se verifique el horario de la sucursal para el domingo.')
+          return
+        }
+        if (!domingoAbierto) {
+          setSundayValidationError('La sucursal seleccionada no abre los domingos.')
+          return
+        }
+      }
+    }
     setLoading(true)
     try {
       const body = {
@@ -261,8 +347,8 @@ function CoberturaModal({ onSubmit, onClose, showToast }) {
     <ModalWrapper title="Nueva cobertura" onClose={onClose}>
       <form className="modal-form" onSubmit={handleSubmit}>
         <div className="form-group">
-          <label>Usuario reemplazo <span className="label-required">*</span></label>
-          <select value={form.id_usuario_reemplazo} onChange={set('id_usuario_reemplazo')} required>
+          <label htmlFor="cobertura-usuario-reemplazo">Usuario reemplazo <span className="label-required">*</span></label>
+          <select id="cobertura-usuario-reemplazo" value={form.id_usuario_reemplazo} onChange={set('id_usuario_reemplazo')} required>
             <option value="">Seleccionar usuario</option>
             {usuariosActivos.map((u) => (
               <option key={u.id_usuario} value={u.id_usuario}>{u.nombre}</option>
@@ -270,8 +356,8 @@ function CoberturaModal({ onSubmit, onClose, showToast }) {
           </select>
         </div>
         <div className="form-group">
-          <label>Sucursal destino <span className="label-required">*</span></label>
-          <select value={form.id_sucursal_destino} onChange={set('id_sucursal_destino')} required>
+          <label htmlFor="cobertura-sucursal-destino">Sucursal destino <span className="label-required">*</span></label>
+          <select id="cobertura-sucursal-destino" value={form.id_sucursal_destino} onChange={handleSucursalChange} required>
             <option value="">Seleccionar sucursal</option>
             {sucursales.filter((s) => s.activa).map((s) => (
               <option key={s.id_sucursal} value={s.id_sucursal}>{s.nombre}</option>
@@ -280,18 +366,20 @@ function CoberturaModal({ onSubmit, onClose, showToast }) {
         </div>
         <div className="form-row">
           <div className="form-group">
-            <label>Fecha <span className="label-required">*</span></label>
-            <input type="date" value={form.fecha} onChange={set('fecha')} required />
+            <label htmlFor="cobertura-fecha">Fecha <span className="label-required">*</span></label>
+            <input id="cobertura-fecha" type="date" value={form.fecha} onChange={handleDateChange} required />
           </div>
           <div className="form-group">
-            <label>Jornada</label>
-            <select value={form.jornada} onChange={set('jornada')}>
+            <label htmlFor="cobertura-jornada">Jornada</label>
+            <select id="cobertura-jornada" value={form.jornada} onChange={handleJornadaChange}>
               <option value="dia_completo">Día completo</option>
-              <option value="manana">Mañana</option>
-              <option value="tarde">Tarde</option>
+              <option value="manana" disabled={esFinDeSemana}>Mañana</option>
+              <option value="tarde" disabled={esFinDeSemana}>Tarde</option>
             </select>
           </div>
         </div>
+        {esFinDeSemana && <p role="status">Los fines de semana la cobertura debe ser de día completo.</p>}
+        {sundayValidationError && <p role="alert">{sundayValidationError}</p>}
         <div className="form-group">
           <label>Usuario titular</label>
           <input
