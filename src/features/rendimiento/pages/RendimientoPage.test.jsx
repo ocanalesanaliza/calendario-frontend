@@ -55,7 +55,7 @@ describe('RendimientoPage: consulta por usuario', () => {
     apiRequest.mockImplementation(async (path) => {
       if (path === '/api/usuarios/') return response({ results: [{ id_usuario: 12, nombre: 'GS Ana' }] })
       if (path === `/api/rendimiento/diario/?id_usuario=12&fecha=${HOY}`) {
-        return response({ rendimiento, acceso: ACCESO_LECTURA })
+        return response({ operacion_habilitada: true, rendimiento, resultado_dia: {}, acceso: ACCESO_LECTURA })
       }
       if (path === `/api/rendimiento/mensual/?id_usuario=12&anio=${ANIO}&mes=${MES}`) {
         return response({
@@ -126,6 +126,21 @@ describe('RendimientoPage: consulta por usuario', () => {
     expect(screen.queryByText('Sin datos para esta fecha.')).not.toBeInTheDocument()
   })
 
+  it('mantiene el error normal de una fecha sin tareas', async () => {
+    apiRequest.mockImplementation(async (path) => {
+      if (path === '/api/usuarios/') return response({ results: [] })
+      if (path === `/api/rendimiento/diario/?id_usuario=12&fecha=${HOY}`) {
+        return response({ detail: 'No hay tareas programadas para esta fecha.' }, 404)
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+
+    renderPage()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('No hay tareas programadas para esta fecha.')
+    expect(screen.queryByText('Sin datos para esta fecha.')).not.toBeInTheDocument()
+  })
+
   it('actualiza el parámetro al seleccionar otro GS', async () => {
     apiRequest.mockImplementation(async (path) => {
       if (path === '/api/usuarios/') return response({ results: [
@@ -141,5 +156,30 @@ describe('RendimientoPage: consulta por usuario', () => {
     fireEvent.change(screen.getByLabelText('Usuario'), { target: { value: '14' } })
 
     await waitFor(() => expect(apiRequest).toHaveBeenCalledWith(`/api/rendimiento/diario/?id_usuario=14&fecha=${HOY}`))
+  })
+
+  it('muestra la indisponibilidad dominical sin renderizar datos diarios', async () => {
+    apiRequest.mockImplementation(async (path) => {
+      if (path === '/api/usuarios/') return response({ results: [{ id_usuario: 12, nombre: 'GS Ana' }] })
+      if (path === `/api/rendimiento/diario/?id_usuario=12&fecha=${HOY}`) {
+        return response({
+          operacion_habilitada: false,
+          motivo_no_disponible: 'operacion_dominical_no_habilitada',
+        })
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+
+    renderPage()
+
+    expect(await screen.findByText('No tenés operación habilitada para este domingo.')).toBeInTheDocument()
+    expect(screen.getByText('Para operar se requiere una cobertura de jornada completa programada o activa y que la sucursal esté abierta.')).toBeInTheDocument()
+    expect(screen.queryByText('75%')).not.toBeInTheDocument()
+    expect(screen.queryByText('Programadas')).not.toBeInTheDocument()
+    expect(screen.queryByText('Detalle por tarea')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cerrar día' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reabrir día' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Sin datos para esta fecha.')).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

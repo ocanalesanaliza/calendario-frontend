@@ -141,6 +141,8 @@ function VistaDiaria({ esGerente, idUsuario }) {
   const acceso = data?.acceso
   const soloLectura = acceso?.solo_lectura === true
   const puedeGestionar = !soloLectura && acceso?.puede_registrar_tareas !== false
+  const operacionDominicalNoHabilitada = data?.operacion_habilitada === false
+    && data?.motivo_no_disponible === 'operacion_dominical_no_habilitada'
 
   async function handleReabrir(body) {
     await reabrirRendimientoDiario(body)
@@ -165,7 +167,7 @@ function VistaDiaria({ esGerente, idUsuario }) {
           aria-label="Fecha"
           onChange={(e) => setFecha(e.target.value)}
         />
-        {esGerente && data && puedeGestionar && (
+        {esGerente && data && puedeGestionar && !operacionDominicalNoHabilitada && (
           <div className="acciones-dia">
             {data.cerrado_en ? (
               <button
@@ -190,6 +192,11 @@ function VistaDiaria({ esGerente, idUsuario }) {
         <div className="loading-state">Cargando rendimiento...</div>
       ) : error ? (
         <div role="alert" className="modal-error">{error}</div>
+      ) : operacionDominicalNoHabilitada ? (
+        <div className="empty-state" data-testid="operacion-dominical-no-habilitada">
+          <p>No tenés operación habilitada para este domingo.</p>
+          <p>Para operar se requiere una cobertura de jornada completa programada o activa y que la sucursal esté abierta.</p>
+        </div>
       ) : !data ? (
         <div className="empty-state">Sin datos para esta fecha.</div>
       ) : (

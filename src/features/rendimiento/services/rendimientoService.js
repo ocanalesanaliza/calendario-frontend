@@ -18,7 +18,11 @@ export async function getRendimientoDiario(params = {}) {
   const res = await apiRequest(`/api/rendimiento/diario/${query ? `?${query}` : ''}`)
   const data = await res.json()
   if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al cargar rendimiento diario')
-  return resultadoConAcceso(data, 'rendimiento')
+  if (data.operacion_habilitada === false) return data
+
+  const rendimiento = resultadoConAcceso(data, 'rendimiento')
+  if (!rendimiento || typeof rendimiento !== 'object' || !('operacion_habilitada' in data)) return rendimiento
+  return { ...rendimiento, operacion_habilitada: data.operacion_habilitada, motivo_no_disponible: data.motivo_no_disponible }
 }
 
 export async function getRendimientoMensual(params = {}) {
