@@ -202,6 +202,8 @@ function UserCard({ user, esAdmin, onVerRendimiento }) {
   const resultadoDia = user.resultado_dia
   const tareasCumplidas   = resultadoDia?.tareas_cumplidas ?? null
   const tareasProgramadas = resultadoDia?.tareas_programadas ?? null
+  const operacionDominicalNoHabilitada = user.operacion_habilitada === false
+    && user.motivo_no_disponible === 'operacion_dominical_no_habilitada'
   const idRendimiento = user.detalle_rendimiento?.id_usuario ?? user.id_usuario
   const puedeVerRendimiento = user.detalle_rendimiento?.disponible === true
     && idRendimiento !== undefined
@@ -253,18 +255,22 @@ function UserCard({ user, esAdmin, onVerRendimiento }) {
           <span className={`dot dot-${colorClass}`} />
           {user.estado_operativo_label ?? '—'}
         </div>
-        <div className="score-wrap">
-          <div className="score-bar-bg">
-            <div
-              className={`score-bar-fill ${score >= 80 ? 'score-high' : score >= 50 ? 'score-mid' : 'score-low'}`}
-              style={{ width: `${Math.min(score, 100)}%` }}
-            />
+        {operacionDominicalNoHabilitada ? (
+          <div className="score-wrap">Operación dominical no habilitada</div>
+        ) : (
+          <div className="score-wrap">
+            <div className="score-bar-bg">
+              <div
+                className={`score-bar-fill ${score >= 80 ? 'score-high' : score >= 50 ? 'score-mid' : 'score-low'}`}
+                style={{ width: `${Math.min(score, 100)}%` }}
+              />
+            </div>
+            <span className="score-pct">{score.toFixed(0)}%</span>
+            {tareasProgramadas !== null && tareasProgramadas > 0 && (
+              <span className="score-tareas">{tareasCumplidas}/{tareasProgramadas}</span>
+            )}
           </div>
-          <span className="score-pct">{score.toFixed(0)}%</span>
-          {tareasProgramadas !== null && tareasProgramadas > 0 && (
-            <span className="score-tareas">{tareasCumplidas}/{tareasProgramadas}</span>
-          )}
-        </div>
+        )}
       </div>
     </Card>
   )
