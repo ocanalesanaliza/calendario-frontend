@@ -218,7 +218,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
 
   function handleCardClick(event, tarea){
     if (esRevisionGuardia(tarea)) {
-      if (!busy) setRevisionGuardiaTask(tarea)
+      if (tarea.disponible_para_registro && !busy) setRevisionGuardiaTask(tarea)
       return
     }
     if (tarea.tarea?.modo_cumplimiento === 'deposit') {
@@ -297,7 +297,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
 
   function startRegistration(tarea) {
     if (esRevisionGuardia(tarea)) {
-      setRevisionGuardiaTask(tarea)
+      if (tarea.disponible_para_registro && !busy) setRevisionGuardiaTask(tarea)
       return
     }
     if (tarea.tarea?.modo_cumplimiento === 'deposit') {
@@ -389,7 +389,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
     const isRevisionGuardiaTask = esRevisionGuardia(t)
     const isDepositTask = t.tarea?.modo_cumplimiento === 'deposit'
     const isDirectOpenTask = isRevisionGuardiaTask || isDepositTask
-    const isSelectable = (t.disponible_para_registro || isRevisionGuardiaTask) && !busy
+    const isSelectable = t.disponible_para_registro && !busy
     const isSelected = seleccionadas.includes(t.id_sucursal_tarea)
     const taskName = t.tarea?.nombre || `Tarea #${t.id_sucursal_tarea}`
     const checkboxId = `mis-tareas-task-${t.id_sucursal_tarea}`

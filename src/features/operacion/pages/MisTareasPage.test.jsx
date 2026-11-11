@@ -611,6 +611,96 @@ describe('MisTareasPage deposit demonstrations', () => {
     expect(registrarTareasLote).not.toHaveBeenCalled()
   })
 
+  it('keeps an unavailable guard review visible without opening its modal by card click', async () => {
+    const revisionTask = {
+      id_sucursal_tarea: 15,
+      jornada: 'manana',
+      hora: '09:00',
+      disponible_para_registro: false,
+      motivo_no_disponible: 'No disponible los domingos',
+      estado_ui: 'no_disponible',
+      estado_ui_label: 'No disponible',
+      tarea: { id_tarea: 30, nombre: 'Revisión dominical de Guardia', es_revision_guardia: true },
+    }
+    getMisTareas.mockResolvedValue({ ...taskResponse, results: [revisionTask] })
+
+    render(<MemoryRouter><MisTareasPage /></MemoryRouter>)
+    fireEvent.click(await screen.findByText('Revisión dominical de Guardia'))
+
+    expect(screen.getByText('No disponible los domingos')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Revisión de Guardia' })).not.toBeInTheDocument()
+    expect(getRevisionGuardia).not.toHaveBeenCalled()
+  })
+
+  it('does not expose an unavailable guard review as a keyboard-activatable V2 card', async () => {
+    const revisionTask = {
+      id_sucursal_tarea: 15,
+      jornada: 'manana',
+      hora: '09:00',
+      disponible_para_registro: false,
+      motivo_no_disponible: 'No disponible los domingos',
+      estado_ui: 'no_disponible',
+      estado_ui_label: 'No disponible',
+      tarea: { id_tarea: 30, nombre: 'Revisión dominical de Guardia', es_revision_guardia: true },
+    }
+    getMisTareas.mockResolvedValue({ ...taskResponse, results: [revisionTask] })
+
+    render(<MemoryRouter><MisTareasV2Page /></MemoryRouter>)
+    const taskName = await screen.findByTitle('Revisión dominical de Guardia')
+    fireEvent.keyDown(taskName.closest('.tarea-card'), { key: 'Enter' })
+
+    expect(screen.queryByRole('button', { name: 'Abrir revisión de guardia: Revisión dominical de Guardia' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Revisión de Guardia' })).not.toBeInTheDocument()
+    expect(getRevisionGuardia).not.toHaveBeenCalled()
+  })
+
+  it('keeps an available guard review opening from its V2 task card', async () => {
+    const revisionTask = {
+      id_sucursal_tarea: 15,
+      jornada: 'manana',
+      hora: '09:00',
+      disponible_para_registro: true,
+      estado_ui: 'disponible',
+      estado_ui_label: 'Disponible',
+      tarea: { id_tarea: 30, nombre: 'Revisión de Guardia V2', es_revision_guardia: true },
+    }
+    getMisTareas.mockResolvedValue({ ...taskResponse, results: [revisionTask] })
+    getRevisionGuardia.mockResolvedValue({ fecha: '2026-09-05', numero_guardias: 1, puede_guardar: true, revision: null })
+
+    render(<MemoryRouter><MisTareasV2Page /></MemoryRouter>)
+    fireEvent.click(await screen.findByRole('button', { name: 'Abrir revisión de guardia: Revisión de Guardia V2' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Revisión de Guardia' })).toBeInTheDocument()
+    expect(getRevisionGuardia).toHaveBeenCalledWith(15, '2026-09-05')
+  })
+
+  it('keeps an unavailable normal task blocked', async () => {
+    getMisTareas.mockResolvedValue({
+      ...taskResponse,
+      results: [{ ...taskResponse.results[0], disponible_para_registro: false, motivo_no_disponible: 'Fuera de horario', estado_ui: 'no_disponible', estado_ui_label: 'No disponible', tarea: { id_tarea: 18, nombre: 'Tarea normal bloqueada' } }],
+    })
+
+    render(<MemoryRouter><MisTareasPage /></MemoryRouter>)
+    fireEvent.click(await screen.findByText('Tarea normal bloqueada'))
+
+    expect(screen.getByText('Fuera de horario')).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: /Tarea normal bloqueada/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Registrar 1 tarea/i })).not.toBeInTheDocument()
+  })
+
+  it('keeps an available deposit task opening its existing V2 flow', async () => {
+    getMisTareas.mockResolvedValue({
+      ...taskResponse,
+      results: [{ ...taskResponse.results[0], tarea: { ...taskResponse.results[0].tarea, nombre: 'Depósito disponible V2', modo_cumplimiento: 'deposit' } }],
+    })
+
+    render(<MemoryRouter><MisTareasV2Page /></MemoryRouter>)
+    fireEvent.click(await screen.findByRole('button', { name: 'Abrir registro de depósito: Depósito disponible V2' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Registrar depósito' })).toBeInTheDocument()
+    expect(openDepositReport).toHaveBeenCalledWith({ sucursal_tarea_id: 44 })
+  })
+
   it('registra que el guardia no se presentó solamente cuando se escribe una nota', async () => {
     const revisionTask = {
       id_sucursal_tarea: 15,
