@@ -5,6 +5,14 @@ import InventoryHistoryPage from './InventoryHistoryPage'
 const { listHistory, getHistoryDetail } = vi.hoisted(() => ({ listHistory: vi.fn(), getHistoryDetail: vi.fn() }))
 
 vi.mock('../inventoryService', () => ({ listHistory, getHistoryDetail }))
+vi.mock('../components/InventoryExecutionModal', () => ({
+  default: ({ correction, onReload }) => (
+    <>
+      <output>correction-version:{correction.expected_version}</output>
+      <button type="button" onClick={onReload}>Recargar detalle</button>
+    </>
+  ),
+}))
 
 describe('InventoryHistoryPage', () => {
   it('muestra historial sin vocabulario de aprobación o conciliación', async () => {
@@ -28,5 +36,19 @@ describe('InventoryHistoryPage', () => {
     expect(screen.queryAllByRole('button', { name: 'Corregir' })).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: 'Corregir' }))
     expect(getHistoryDetail).toHaveBeenCalledWith(502)
+  })
+
+  it('actualiza la versión de corrección después de recargar ante un conflicto', async () => {
+    listHistory.mockResolvedValue({ submissions: [{ id: 501, inventory_type: 'inventory_branch', expected_version: 2, can_correct: true, revisions: [] }] })
+    getHistoryDetail
+      .mockResolvedValueOnce({ submission: { id: 501, inventory_type: 'inventory_branch', expected_version: 2, revisions: [] } })
+      .mockResolvedValueOnce({ submission: { id: 501, inventory_type: 'inventory_branch', expected_version: 3, revisions: [] } })
+
+    render(<InventoryHistoryPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Corregir' }))
+    expect(await screen.findByText('correction-version:2')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Recargar detalle' }))
+    expect(await screen.findByText('correction-version:3')).toBeInTheDocument()
   })
 })
