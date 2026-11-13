@@ -6,6 +6,7 @@ import { getMisTareas, listItems, marcarOcurrencia } from '../services/tuvetServ
 import { ACCEPT_EVIDENCIA, construirDocumento, formatTamano, validarArchivoEvidencia } from '../utils/archivos'
 import { ESTADOS_OCURRENCIA, formatFecha } from '../utils/formato'
 import { enfocarPrimerError, erroresDelServidor } from '../utils/formularios'
+import InventoryExecutionModal from '../../inventario/components/InventoryExecutionModal'
 import {
   PERIODOS,
   agruparPorDia,
@@ -131,6 +132,10 @@ function PeriodoSelector({ periodo, titulo, incluyeHoy, onPeriodo, onMover, onHo
   )
 }
 
+function esInventarioSucursal(ocurrencia) {
+  return (ocurrencia.modo_cumplimiento ?? ocurrencia.mode) === 'inventory_branch'
+}
+
 function AccionTarea({ ocurrencia, onMarcar }) {
   if (ocurrencia.estado === 'en_revision') return <span className="tuvet-muted">Esperando revisión</span>
   if (ocurrencia.estado !== 'pendiente') return null
@@ -143,7 +148,7 @@ function AccionTarea({ ocurrencia, onMarcar }) {
       </span>
     )
   }
-  return <button type="button" className="tuvet-btn" onClick={() => onMarcar(ocurrencia)}>Marcar realizada</button>
+  return <button type="button" className="tuvet-btn" onClick={() => onMarcar(ocurrencia)}>{esInventarioSucursal(ocurrencia) ? 'Registrar inventario' : 'Marcar realizada'}</button>
 }
 
 export default function TuvetMisTareasPage() {
@@ -292,7 +297,9 @@ export default function TuvetMisTareasPage() {
         )}
       </EstadoCarga>
 
-      {marcando && <MarcarModal ocurrencia={marcando} onClose={() => setMarcando(null)} onMarcada={onMarcada} />}
+      {marcando && (esInventarioSucursal(marcando)
+        ? <InventoryExecutionModal occurrence={marcando} mode="branch" onClose={() => setMarcando(null)} onSuccess={() => { setMarcando(null); setAviso('Inventario registrado.'); void cargar() }} />
+        : <MarcarModal ocurrencia={marcando} onClose={() => setMarcando(null)} onMarcada={onMarcada} />)}
     </div>
   )
 }

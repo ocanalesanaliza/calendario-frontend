@@ -26,6 +26,7 @@ import ReportesPage from "./features/reportes/pages/ReportesPage";
 import ConfiguracionPage from "./features/configuracion/pages/ConfiguracionPage";
 import CalendarioAreaPage from "./features/calendarioArea/pages/CalendarioAreaPage";
 import InventarioDemoPage from './features/inventario/pages/InventarioDemoPage'
+import InventoryHistoryPage from './features/inventario/pages/InventoryHistoryPage'
 import RevisionesGuardiaPage from "./features/revisionesGuardia/pages/RevisionesGuardiaPage";
 import AusenciasAreaPage from './features/ausenciasArea/pages/AusenciasAreaPage'
 import OrganizacionPage from './features/organizacion/pages/OrganizacionPage'
@@ -252,6 +253,7 @@ function App() {
           <Route path="/calendario" element={<CalendarPage />} />
           <Route path="/tareas" element={<TareasPage />} />
           <Route path="/inventario-demo" element={<CapabilityRoute capability="canManageBranches"><InventarioDemoPage /></CapabilityRoute>} />
+          <Route path="/historial-inventarios" element={<InventoryHistoryPage />} />
           <Route path="/sucursales" element={<CapabilityRoute capability="canManageBranches"><SucursalesPage /></CapabilityRoute>} />
           <Route path="/usuarios" element={<CapabilityRoute capability="canManageUsers"><UsuariosPage /></CapabilityRoute>} />
           <Route path="/plantillas" element={<CapabilityRoute capability="canManageTemplates"><PlantillasPage /></CapabilityRoute>} />
