@@ -33,10 +33,12 @@ const MODOS_CUMPLIMIENTO_POR_AMBITO = {
   sucursal: [
     { value: 'simple', label: 'Checklist simple', description: 'Mantiene el cumplimiento habitual de la tarea.' },
     { value: 'deposit', label: 'Depósito', description: 'Requiere el registro estructurado de un depósito en la sucursal.' },
+    { value: 'inventory_branch', label: 'Inventario de sucursal', description: 'Requiere el registro estructurado de inventario para la sucursal.' },
   ],
   area: [
     { value: 'simple', label: 'Checklist simple', description: 'Mantiene el cumplimiento habitual de la tarea.' },
     { value: 'deposit_review', label: 'Revisión de depósito', description: 'Permite al área revisar los depósitos enviados por sucursales.' },
+    { value: 'inventory_area', label: 'Inventario de área', description: 'Requiere el registro estructurado de inventario para una sucursal autorizada del área.' },
   ],
 }
 

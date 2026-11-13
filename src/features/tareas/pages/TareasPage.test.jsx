@@ -76,21 +76,25 @@ describe('TareasPage: catálogo', () => {
     expect(screen.getByRole('radio', { name: /Checklist simple/ })).toBeChecked()
   })
 
-  it('ofrece solo simple y depósito para Sucursal', async () => {
+  it('ofrece simple, depósito e inventario para Sucursal', async () => {
     await abrirModalCrear()
 
     expect(screen.getByRole('radio', { name: /Checklist simple/ })).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /^Depósito/ })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /Inventario de sucursal/ })).toBeInTheDocument()
     expect(screen.queryByRole('radio', { name: /Revisión de depósito/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: /Inventario de área/ })).not.toBeInTheDocument()
   })
 
-  it('ofrece solo simple y revisión de depósito para Área', async () => {
+  it('ofrece simple, revisión de depósito e inventario para Área', async () => {
     await abrirModalCrear()
     fireEvent.click(screen.getByRole('radio', { name: /^Área/ }))
 
     expect(screen.getByRole('radio', { name: /Checklist simple/ })).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /Revisión de depósito/ })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /Inventario de área/ })).toBeInTheDocument()
     expect(screen.queryByRole('radio', { name: /^Depósito/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: /Inventario de sucursal/ })).not.toBeInTheDocument()
   })
 
   it('restablece depósito a simple al cambiar de Sucursal a Área', async () => {
