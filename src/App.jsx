@@ -27,6 +27,7 @@ import ConfiguracionPage from "./features/configuracion/pages/ConfiguracionPage"
 import CalendarioAreaPage from "./features/calendarioArea/pages/CalendarioAreaPage";
 import InventarioDemoPage from './features/inventario/pages/InventarioDemoPage'
 import InventoryHistoryPage from './features/inventario/pages/InventoryHistoryPage'
+import InventoryBranchExecutionPage from './features/inventario/pages/InventoryBranchExecutionPage'
 import RevisionesGuardiaPage from "./features/revisionesGuardia/pages/RevisionesGuardiaPage";
 import AusenciasAreaPage from './features/ausenciasArea/pages/AusenciasAreaPage'
 import OrganizacionPage from './features/organizacion/pages/OrganizacionPage'
@@ -270,6 +271,7 @@ function App() {
           <Route path="/areas" element={<AreaManagerAssignmentRoute><AreasPage /></AreaManagerAssignmentRoute>} />
           <Route path="/organizacion" element={<OrganizacionRoute><OrganizacionPage /></OrganizacionRoute>} />
           <Route path="/mis-tareas" element={<MisTareasRoute><MisTareasPage /></MisTareasRoute>} />
+          <Route path="/mis-tareas/inventario/:idSucursalTarea" element={<MisTareasRoute><InventoryBranchExecutionPage /></MisTareasRoute>} />
           <Route path="/mis-tareas-v2" element={<MisTareasRoute><MisTareasPage className="mis-tareas-page mis-tareas-v2-page" groupByStartTime selectionUxVariant scanabilityVariant availableFilterVariant priorityVariant /></MisTareasRoute>} />
            <Route path="/depositospendientes" element={<DepositosPendientesRoute><DepositosPendientesPage /></DepositosPendientesRoute>} />
            <Route path="/analitica/historial-depositos" element={<DepositHistoryRoute><DepositHistoryPage /></DepositHistoryRoute>} />

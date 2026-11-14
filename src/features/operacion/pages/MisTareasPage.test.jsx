@@ -96,6 +96,63 @@ describe('MisTareasPage deposit demonstrations', () => {
     expect(screen.getByRole('button', { name: /Registrar 1 tarea/i })).toBeInTheDocument()
   })
 
+  it('routes an available branch inventory task to its dedicated flow without generic selection or registration', async () => {
+    getMisTareas.mockResolvedValue({
+      ...taskResponse,
+      results: [{ ...taskResponse.results[0], tarea: { ...taskResponse.results[0].tarea, nombre: 'Inventario de sucursal', modo_cumplimiento: 'inventory_branch' } }],
+    })
+
+    render(<MemoryRouter initialEntries={['/mis-tareas?fecha=2026-09-05']}><RouteState /><Routes>
+      <Route path="/mis-tareas" element={<MisTareasPage />} />
+      <Route path="/mis-tareas/inventario/:idSucursalTarea" element={<p>Flujo de inventario</p>} />
+    </Routes></MemoryRouter>)
+
+    const task = await screen.findByText('Inventario de sucursal')
+    expect(screen.queryByRole('checkbox', { name: /Seleccionar Inventario de sucursal/i })).not.toBeInTheDocument()
+    fireEvent.click(task)
+
+    expect(await screen.findByText('Flujo de inventario')).toBeInTheDocument()
+    expect(screen.getByTestId('route-state')).toHaveTextContent('/mis-tareas/inventario/44?fecha=2026-09-05')
+    expect(registrarTarea).not.toHaveBeenCalled()
+    expect(registrarTareasLote).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Confirmar' })).not.toBeInTheDocument()
+  })
+
+  it('uses the loaded task date when an inventory task starts without a fecha query', async () => {
+    getMisTareas.mockResolvedValue({
+      ...taskResponse,
+      meta: { ...taskResponse.meta, fecha_consultada: '2026-09-07' },
+      results: [{ ...taskResponse.results[0], tarea: { ...taskResponse.results[0].tarea, nombre: 'Inventario sin fecha', modo_cumplimiento: 'inventory_branch' } }],
+    })
+
+    render(<MemoryRouter initialEntries={['/mis-tareas']}><RouteState /><Routes>
+      <Route path="/mis-tareas" element={<MisTareasPage />} />
+      <Route path="/mis-tareas/inventario/:idSucursalTarea" element={<p>Flujo de inventario</p>} />
+    </Routes></MemoryRouter>)
+
+    fireEvent.click(await screen.findByText('Inventario sin fecha'))
+    expect(await screen.findByText('Flujo de inventario')).toBeInTheDocument()
+    expect(screen.getByTestId('route-state')).toHaveTextContent('/mis-tareas/inventario/44?fecha=2026-09-07')
+  })
+
+  it('keeps an unavailable branch inventory task outside every registration flow', async () => {
+    getMisTareas.mockResolvedValue({
+      ...taskResponse,
+      results: [{ ...taskResponse.results[0], disponible_para_registro: false, estado_ui: 'bloqueada', estado_ui_label: 'Bloqueada', tarea: { ...taskResponse.results[0].tarea, nombre: 'Inventario no disponible', modo_cumplimiento: 'inventory_branch' } }],
+    })
+
+    render(<MemoryRouter initialEntries={['/mis-tareas?fecha=2026-09-05']}><RouteState /><Routes>
+      <Route path="/mis-tareas" element={<MisTareasPage />} />
+      <Route path="/mis-tareas/inventario/:idSucursalTarea" element={<p>Flujo de inventario</p>} />
+    </Routes></MemoryRouter>)
+
+    fireEvent.click(await screen.findByText('Inventario no disponible'))
+    expect(screen.getByTestId('route-state')).toHaveTextContent('/mis-tareas?fecha=2026-09-05')
+    expect(screen.queryByRole('checkbox', { name: /Inventario no disponible/i })).not.toBeInTheDocument()
+    expect(registrarTarea).not.toHaveBeenCalled()
+    expect(registrarTareasLote).not.toHaveBeenCalled()
+  })
+
   it('renders the compact task overview with an explicit active jornada', async () => {
     render(<MemoryRouter><MisTareasPage /></MemoryRouter>)
 

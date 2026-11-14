@@ -21,6 +21,10 @@ function esRevisionGuardia(tarea) {
   return tarea.tarea?.es_revision_guardia === true
 }
 
+function esInventarioSucursal(tarea) {
+  return tarea.tarea?.modo_cumplimiento === 'inventory_branch'
+}
+
 function getStartTime(tarea) {
   const hora = typeof tarea.hora === 'string' ? tarea.hora.trim() : ''
   const match = hora.match(/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/)
@@ -109,8 +113,6 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
   const navigate = useNavigate()
   const queryFecha = new URLSearchParams(location.search).get('fecha') ?? ''
   const fecha = isValidCalendarDate(queryFecha) ? queryFecha : ''
-  perfilRef.current = perfil
-  fechaRef.current = fecha
 
   const busy = savingId !== null || registrandoLote
   const esGerenteArea = perfil?.type === 'gerente_area'
@@ -123,15 +125,9 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
     }
   }, [])
 
-  // Se recarga solo al cambiar la fecha o el perfil; las cargas usan contadores de versión para
-  // descartar respuestas viejas, así que no deben ser dependencias (se recrean en cada render).
   useEffect(() => {
-    viewVersion.current += 1
-    tareasRequestVersion.current += 1
-    trabajosCampoRequestVersion.current += 1
-    loadTareas()
-    loadTrabajosCampo()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    perfilRef.current = perfil
+    fechaRef.current = fecha
   }, [fecha, perfil])
 
   function handleForbidden(error) {
@@ -202,6 +198,24 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
     }
   }
 
+  // Se recarga solo al cambiar la fecha o el perfil; las cargas usan contadores de versión para
+  // descartar respuestas viejas, así que no deben ser dependencias (se recrean en cada render).
+  useEffect(() => {
+    let cancelled = false
+    viewVersion.current += 1
+    tareasRequestVersion.current += 1
+    trabajosCampoRequestVersion.current += 1
+    queueMicrotask(() => {
+      if (cancelled) return
+      loadTareas()
+      loadTrabajosCampo()
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fecha, perfil])
+
   async function handleAceptarCampo(id) {
     const isCurrentAction = getActionContext()
     setCampoAction(id)
@@ -223,6 +237,13 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
     }
     if (tarea.tarea?.modo_cumplimiento === 'deposit') {
       if (tarea.disponible_para_registro && !busy) setDepositTask(tarea)
+      return
+    }
+    if (esInventarioSucursal(tarea)) {
+      const effectiveDate = fecha || data?.meta?.fecha_consultada
+      if (tarea.disponible_para_registro && !busy && isValidCalendarDate(effectiveDate)) {
+        navigate({ pathname: `/mis-tareas/inventario/${tarea.id_sucursal_tarea}`, search: `?fecha=${effectiveDate}` })
+      }
       return
     }
     if (!tarea.disponible_para_registro || busy) return
@@ -251,6 +272,16 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
   }
 
   async function handleRegistrar(tarea) {
+    if (!tarea) return
+    if (esInventarioSucursal(tarea)) {
+      setSeleccionadas([])
+      setRegistrando(null)
+      const effectiveDate = fecha || data?.meta?.fecha_consultada
+      if (isValidCalendarDate(effectiveDate)) {
+        navigate({ pathname: `/mis-tareas/inventario/${tarea.id_sucursal_tarea}`, search: `?fecha=${effectiveDate}` })
+      }
+      return
+    }
     const isCurrentAction = getActionContext()
     setSavingId(tarea.id_sucursal_tarea)
     setRegError('')
@@ -296,6 +327,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
   }
 
   function startRegistration(tarea) {
+    if (!tarea) return
     if (esRevisionGuardia(tarea)) {
       if (tarea.disponible_para_registro && !busy) setRevisionGuardiaTask(tarea)
       return
@@ -303,6 +335,14 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
     if (tarea.tarea?.modo_cumplimiento === 'deposit') {
       setSeleccionadas([])
       setDepositTask(tarea)
+      return
+    }
+    if (esInventarioSucursal(tarea)) {
+      setSeleccionadas([])
+      const effectiveDate = fecha || data?.meta?.fecha_consultada
+      if (isValidCalendarDate(effectiveDate)) {
+        navigate({ pathname: `/mis-tareas/inventario/${tarea.id_sucursal_tarea}`, search: `?fecha=${effectiveDate}` })
+      }
       return
     }
     setRegistrando(tarea.id_sucursal_tarea)
@@ -318,6 +358,11 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
   async function handleRegistrarSeleccionadas() {
     const isCurrentAction = getActionContext()
     const tareas = tareasFiltradas.filter((t) => seleccionadas.includes(t.id_sucursal_tarea))
+    if (tareas.some(esInventarioSucursal)) {
+      setSeleccionadas((current) => current.filter((id) => !tareas.some((tarea) => tarea.id_sucursal_tarea === id && esInventarioSucursal(tarea))))
+      setLoteError('Los inventarios se registran individualmente desde su flujo estructurado.')
+      return
+    }
     if (tareas.some((tarea) => tarea.tarea?.modo_cumplimiento === 'deposit')) {
       setLoteError('Los depósitos se registran individualmente desde su flujo estructurado.')
       return
@@ -358,12 +403,9 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
     () => data?.results?.filter((t) => t.jornada === jornada) ?? [],
     [data, jornada],
   )
-  const tareasFiltradas = useMemo(
-    () => availableFilterVariant && availableFilterActive
-      ? tareasDeJornada.filter((t) => t.disponible_para_registro)
-      : tareasDeJornada,
-    [availableFilterActive, availableFilterVariant, tareasDeJornada],
-  )
+  const tareasFiltradas = availableFilterVariant && availableFilterActive
+    ? tareasDeJornada.filter((t) => t.disponible_para_registro)
+    : tareasDeJornada
   const resumen = data?.resumen
   const selectedTasks = tareasFiltradas.filter((tarea) => seleccionadas.includes(tarea.id_sucursal_tarea))
   const mixedSelectionHasDeposit = selectedTasks.length > 1 && selectedTasks.some((tarea) => tarea.tarea?.modo_cumplimiento === 'deposit')
@@ -371,7 +413,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
   function clearHiddenSelections(tasks) {
     const visibleTaskIds = new Set(
       tasks
-        .filter((t) => t.disponible_para_registro)
+        .filter((t) => t.disponible_para_registro && !esInventarioSucursal(t))
         .map((t) => t.id_sucursal_tarea),
     )
     setSeleccionadas((prev) => {
@@ -388,7 +430,8 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
   function renderTaskCard(t) {
     const isRevisionGuardiaTask = esRevisionGuardia(t)
     const isDepositTask = t.tarea?.modo_cumplimiento === 'deposit'
-    const isDirectOpenTask = isRevisionGuardiaTask || isDepositTask
+    const isInventoryBranchTask = esInventarioSucursal(t)
+    const isDirectOpenTask = isRevisionGuardiaTask || isDepositTask || isInventoryBranchTask
     const isSelectable = t.disponible_para_registro && !busy
     const isSelected = seleccionadas.includes(t.id_sucursal_tarea)
     const taskName = t.tarea?.nombre || `Tarea #${t.id_sucursal_tarea}`
@@ -418,12 +461,23 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
                   onClick: () => setRevisionGuardiaTask(t),
                   'aria-label': `Abrir revisión de guardia: ${taskName}`,
                 }
-              : isDepositTask
+                : isDepositTask
                 ? {
                     type: 'button',
                     onClick: () => setDepositTask(t),
                     'aria-label': `Abrir registro de depósito: ${taskName}`,
                   }
+                : isInventoryBranchTask
+                  ? {
+                      type: 'button',
+                      onClick: () => {
+                        const effectiveDate = fecha || data?.meta?.fecha_consultada
+                        if (isValidCalendarDate(effectiveDate)) {
+                          navigate({ pathname: `/mis-tareas/inventario/${t.id_sucursal_tarea}`, search: `?fecha=${effectiveDate}` })
+                        }
+                      },
+                      'aria-label': `Abrir registro de inventario: ${taskName}`,
+                    }
                 : { htmlFor: checkboxId })
           : { onClick: (event) => handleCardClick(event, t) })}
       >

@@ -1,8 +1,15 @@
 import { apiRequest } from '../../../services/apiClient'
 
 function createRequestError(data, fallback, status) {
-  const error = new Error(data.detail || fallback)
+  const message = (value) => {
+    if (typeof value === 'string') return value
+    if (Array.isArray(value)) return value.map(message).filter(Boolean).join(' ')
+    if (value && typeof value === 'object') return Object.values(value).map(message).filter(Boolean).join(' ')
+    return ''
+  }
+  const error = new Error(message(data?.detail) || message(data) || fallback)
   error.status = status
+  error.fields = data
   return error
 }
 

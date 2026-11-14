@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyInventoryGridRowUpdate, filterInventoryGridRows, getInventoryEditCellTarget, getInventoryEditCellTargetAfterCommit, isInventoryExpirationDateValid, isInventoryPhysicalStockValid, toInventoryGridRows } from './inventoryGrid'
+import { applyInventoryGridRowUpdate, filterBranchInventoryGridRows, filterInventoryGridRows, getInventoryEditCellTarget, getInventoryEditCellTargetAfterCommit, isBranchInventoryPhysicalStockValid, isInventoryExpirationDateValid, isInventoryPhysicalStockValid, toBranchInventoryGridRow, toInventoryGridRows } from './inventoryGrid'
 
 const counts = [
   { product: { code: 'A-1', product: 'Arroz', cost: 12.5, systemStock: 8 }, physicalStock: '6', expirationDate: '2026-12-31' },
@@ -66,5 +66,38 @@ describe('inventory edit-cell navigation', () => {
     expect(isInventoryPhysicalStockValid('-1')).toBe(false)
     expect(isInventoryExpirationDateValid('2027-01-01')).toBe(true)
     expect(isInventoryExpirationDateValid('')).toBe(false)
+  })
+})
+
+describe('branch inventory grid rows', () => {
+  it('keeps null physical stock pending while accepting zero without an expiration date', () => {
+    expect(toBranchInventoryGridRow({ code: 'A-1', product: 'Arroz', stock: 4, physical_stock: null }).status).toBe('pending')
+    expect(toBranchInventoryGridRow({ code: 'B-2', product: 'Frijoles', cost: 12, stock: 2, physical_stock: 0, expiration_date: null })).toMatchObject({ status: 'shortage', difference: -2, impact: -24 })
+    expect(isBranchInventoryPhysicalStockValid(0)).toBe(true)
+  })
+
+  it('supports the GS snake_case editable fields without changing the default demo fields', () => {
+    const visibleRowIds = ['B-2', 'A-1', 'C-3']
+    expect(getInventoryEditCellTarget({ field: 'physical_stock', rowId: 'A-1', visibleRowIds, shiftKey: false, physicalStockField: 'physical_stock', expirationDateField: 'expiration_date' })).toEqual({ id: 'A-1', field: 'expiration_date' })
+    expect(getInventoryEditCellTarget({ field: 'expiration_date', rowId: 'A-1', visibleRowIds, shiftKey: false, physicalStockField: 'physical_stock', expirationDateField: 'expiration_date' })).toEqual({ id: 'C-3', field: 'physical_stock' })
+    expect(getInventoryEditCellTarget({ field: 'physical_stock', rowId: 'A-1', visibleRowIds, shiftKey: true, physicalStockField: 'physical_stock', expirationDateField: 'expiration_date' })).toEqual({ id: 'B-2', field: 'expiration_date' })
+  })
+
+  it('derives preview-only impact for shortage, surplus, match, and blank physical stock', () => {
+    expect(toBranchInventoryGridRow({ stock: 5, cost: 4, physical_stock: 3 })).toMatchObject({ difference: -2, impact: -8, status: 'shortage' })
+    expect(toBranchInventoryGridRow({ stock: 5, cost: 4, physical_stock: 7 })).toMatchObject({ difference: 2, impact: 8, status: 'surplus' })
+    expect(toBranchInventoryGridRow({ stock: 5, cost: 4, physical_stock: 5 })).toMatchObject({ difference: 0, impact: 0, status: 'match' })
+    expect(toBranchInventoryGridRow({ stock: 5, cost: 4, physical_stock: '' })).toMatchObject({ difference: null, impact: null, status: 'pending' })
+  })
+
+  it('filters server preview rows without changing their editable values', () => {
+    const rows = [
+      toBranchInventoryGridRow({ code: 'A-1', product: 'Arroz', stock: 4, physical_stock: '5' }),
+      toBranchInventoryGridRow({ code: 'B-2', product: 'Frijoles', stock: 2, physical_stock: null }),
+    ]
+
+    expect(filterBranchInventoryGridRows(rows, 'arroz', '')).toEqual([rows[0]])
+    expect(filterBranchInventoryGridRows(rows, '', 'pending')).toEqual([rows[1]])
+    expect(rows[0].physical_stock).toBe('5')
   })
 })
