@@ -409,7 +409,6 @@ export function FileDrop({ accept, file, onChange, disabled, hint, formatSize, i
         onChange={(event) => onChange(event.target.files?.[0] ?? null)}
         disabled={disabled}
         tabIndex={-1}
-        aria-hidden="true"
       />
       {file ? (
         <div className="tuvet-dropzone-file">

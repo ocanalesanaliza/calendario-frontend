@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import InventoryExecutionModal from './InventoryExecutionModal'
 import { isInventoryFieldEditable } from '../inventoryExecution'
@@ -19,8 +19,14 @@ const row = {
   physical_stock: 3, difference: '-1.00', difference_cost: '-12.00', expiration_date: null,
 }
 
-function renderModal(props = {}) {
-  previewInventory.mockResolvedValue({ rows: [row], errors: [] })
+const rowWithExpiration = { ...row, expiration_date: '2026-11-14' }
+
+function selectXlsx() {
+  fireEvent.change(document.querySelector('input[type="file"]'), { target: { files: [new File(['xlsx'], 'inventory.xlsx')] } })
+}
+
+function renderModal({ previewRows = [row], ...props } = {}) {
+  previewInventory.mockResolvedValue({ rows: previewRows, errors: [] })
   discoverAreaBranches.mockResolvedValue({ branches: [{ id: 7, code: 'INV-001', name: 'Centro' }] })
   return render(<InventoryExecutionModal
     occurrence={{ id: 12, nombre: 'Inventario semanal', modo_cumplimiento: 'inventory_branch' }}
@@ -65,5 +71,41 @@ describe('InventoryExecutionModal', () => {
     expect(await screen.findByText(/Tu borrador se conserva/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Recargar detalle' }))
     expect(onReload).toHaveBeenCalledOnce()
+  })
+
+  it('renders correction previews with ISO expiration dates and preserves their canonical payload', async () => {
+    renderModal({ previewRows: [rowWithExpiration], correction: { id: 501, inventory_type: 'inventory_branch', expected_version: 2, can_correct: true, revisions: [] } })
+
+    selectXlsx()
+    expect(await screen.findByText('Vencimiento')).toBeInTheDocument()
+    fireEvent.change(screen.getAllByRole('textbox')[1], { target: { value: 'Corregir conteo' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar corrección' }))
+
+    await waitFor(() => expect(correctInventory).toHaveBeenCalledWith(expect.objectContaining({
+      rows: [expect.objectContaining({ expiration_date: '2026-11-14' })],
+    })))
+  })
+
+  it('renders initial GA previews with ISO expiration dates', async () => {
+    renderModal({ previewRows: [rowWithExpiration], mode: 'area', occurrence: { occurrence_id: 42, task: { mode: 'inventory_area' } } })
+
+    const branch = await screen.findByLabelText('Sucursal')
+    fireEvent.change(branch, { target: { value: '7' } })
+    selectXlsx()
+
+    expect(await screen.findByText('Vencimiento')).toBeInTheDocument()
+  })
+
+  it('keeps blank expiration dates optional in correction payloads', async () => {
+    renderModal({ correction: { id: 501, inventory_type: 'inventory_branch', expected_version: 2, can_correct: true, revisions: [] } })
+
+    selectXlsx()
+    await screen.findByText('Vencimiento')
+    fireEvent.change(screen.getAllByRole('textbox')[1], { target: { value: 'Corregir conteo' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar corrección' }))
+
+    await waitFor(() => expect(correctInventory).toHaveBeenCalledWith(expect.objectContaining({
+      rows: [expect.objectContaining({ expiration_date: null })],
+    })))
   })
 })
