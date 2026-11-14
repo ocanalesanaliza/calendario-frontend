@@ -1,54 +1,111 @@
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import InventoryHistoryPage from './InventoryHistoryPage'
 
 const { listHistory, getHistoryDetail } = vi.hoisted(() => ({ listHistory: vi.fn(), getHistoryDetail: vi.fn() }))
 
 vi.mock('../inventoryService', () => ({ listHistory, getHistoryDetail }))
 vi.mock('../components/InventoryExecutionModal', () => ({
-  default: ({ correction, onReload }) => (
-    <>
-      <output>correction-version:{correction.expected_version}</output>
-      <button type="button" onClick={onReload}>Recargar detalle</button>
-    </>
-  ),
+  default: ({ correction }) => <output>correction-version:{correction.expected_version}</output>,
 }))
 
+const submission = {
+  id: 501,
+  inventory_type: 'inventory_branch',
+  execution_date: '2026-11-14',
+  task_name: 'Conteo semanal',
+  branch: { id: 7, code: 'SC-01', name: 'Sucursal Centro' },
+  area: null,
+  latest_revision: 2,
+  submitted_at: '2026-11-14T10:00:00Z',
+  product_count: 12,
+  shortage_count: 2,
+  surplus_count: 1,
+  match_count: 9,
+  net_impact: -1250,
+  can_correct: true,
+}
+
+const detail = {
+  ...submission,
+  expected_version: 2,
+  revisions: [
+    { number: 1, submitted_at: '2026-11-14T10:00:00Z', comment: 'Conteo inicial', rows: [{ code: 'A-1', product: 'Arroz', cost: 100, stock: 10, physical_stock: 8, expiration_date: '2026-12-31' }] },
+    { number: 2, submitted_at: '2026-11-14T11:00:00Z', comment: 'Ajuste', correction_reason: 'Conteo repetido', rows: [{ code: 'A-1', product: 'Arroz', cost: 100, stock: 10, physical_stock: 10, expiration_date: '2026-12-31' }] },
+  ],
+}
+
 describe('InventoryHistoryPage', () => {
-  it('muestra historial sin vocabulario de aprobación o conciliación', async () => {
-    listHistory.mockResolvedValue({ submissions: [{ id: 501, inventory_type: 'inventory_branch', expected_version: 2, can_correct: false, revisions: [] }] })
+  beforeEach(() => {
+    listHistory.mockReset()
+    getHistoryDetail.mockReset()
+  })
+
+  it('renders operational summaries without JSON, snapshots, or digests', async () => {
+    listHistory.mockResolvedValue({ submissions: [submission], filter_context: {} })
     render(<InventoryHistoryPage />)
 
-    expect(await screen.findByRole('heading', { name: 'Historial de inventarios' })).toBeInTheDocument()
-    expect(screen.getByText('Inventario de sucursal')).toBeInTheDocument()
+    expect(await screen.findByText('Conteo semanal')).toBeInTheDocument()
+    expect(screen.getByLabelText('Resumen del historial visible')).toHaveTextContent('Productos contados12')
+    expect(screen.getByLabelText('Resumen del historial visible')).toHaveTextContent(/-₡1\s?250/)
+    expect(screen.queryByText(/snapshot|digest|frozen_scope|json/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/aprobado|revisado|conciliado/i)).not.toBeInTheDocument()
   })
 
-  it('oculta Corregir si can_correct es falso y lo habilita solo si el backend lo permite', async () => {
-    listHistory.mockResolvedValue({ submissions: [
-      { id: 501, inventory_type: 'inventory_branch', expected_version: 2, can_correct: false, revisions: [] },
-      { id: 502, inventory_type: 'inventory_area', expected_version: 1, can_correct: true, revisions: [] },
-    ] })
-    getHistoryDetail.mockResolvedValue({ submission: { id: 502, inventory_type: 'inventory_area', expected_version: 1, can_correct: true, revisions: [] } })
+  it('does not render a scope filter for GS', async () => {
+    listHistory.mockResolvedValue({ submissions: [submission], filter_context: {} })
     render(<InventoryHistoryPage />)
-
-    expect(await screen.findByText('Inventario de área')).toBeInTheDocument()
-    expect(screen.queryAllByRole('button', { name: 'Corregir' })).toHaveLength(1)
-    fireEvent.click(screen.getByRole('button', { name: 'Corregir' }))
-    expect(getHistoryDetail).toHaveBeenCalledWith(502)
+    await screen.findByText('Conteo semanal')
+    expect(screen.queryByLabelText('Sucursal')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Área')).not.toBeInTheDocument()
   })
 
-  it('actualiza la versión de corrección después de recargar ante un conflicto', async () => {
-    listHistory.mockResolvedValue({ submissions: [{ id: 501, inventory_type: 'inventory_branch', expected_version: 2, can_correct: true, revisions: [] }] })
-    getHistoryDetail
-      .mockResolvedValueOnce({ submission: { id: 501, inventory_type: 'inventory_branch', expected_version: 2, revisions: [] } })
-      .mockResolvedValueOnce({ submission: { id: 501, inventory_type: 'inventory_branch', expected_version: 3, revisions: [] } })
-
+  it('reloads GA history using only branch_id selected from backend context', async () => {
+    listHistory.mockResolvedValue({ submissions: [submission], filter_context: { branches: [{ id: 7, code: 'SC-01', name: 'Sucursal Centro' }] } })
     render(<InventoryHistoryPage />)
+    await screen.findByLabelText('Sucursal')
+    fireEvent.change(screen.getByLabelText('Sucursal'), { target: { value: '7' } })
+    await waitFor(() => expect(listHistory).toHaveBeenLastCalledWith({ branchId: '7' }))
+  })
+
+  it('reloads GO history using only area_id selected from backend context', async () => {
+    listHistory.mockResolvedValue({ submissions: [submission], filter_context: { areas: [{ id: 3, code: 'A-03', name: 'Área Norte' }] } })
+    render(<InventoryHistoryPage />)
+    await screen.findByLabelText('Área')
+    fireEvent.change(screen.getByLabelText('Área'), { target: { value: '3' } })
+    await waitFor(() => expect(listHistory).toHaveBeenLastCalledWith({ areaId: '3' }))
+  })
+
+  it('renders canonical rows and switches revisions in detail', async () => {
+    listHistory.mockResolvedValue({ submissions: [submission], filter_context: {} })
+    getHistoryDetail.mockResolvedValue({ submission: detail })
+    render(<InventoryHistoryPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle' }))
+    fireEvent.click(await screen.findByRole('tab', { name: 'Corrección 1' }))
+    expect(await screen.findByText(/Conteo repetido/)).toBeInTheDocument()
+    expect(screen.getByText('Arroz')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: 'Envío inicial' }))
+    expect(await screen.findByText(/Conteo inicial/)).toBeInTheDocument()
+  })
+
+  it('offers correction only from detail when the backend permits it', async () => {
+    listHistory.mockResolvedValue({ submissions: [submission], filter_context: {} })
+    getHistoryDetail.mockResolvedValue({ submission: detail })
+    render(<InventoryHistoryPage />)
+
+    expect(screen.queryByRole('button', { name: 'Corregir' })).not.toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Corregir' }))
     expect(await screen.findByText('correction-version:2')).toBeInTheDocument()
+  })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Recargar detalle' }))
-    expect(await screen.findByText('correction-version:3')).toBeInTheDocument()
+  it('does not offer correction when the loaded detail lacks backend permission', async () => {
+    listHistory.mockResolvedValue({ submissions: [{ ...submission, can_correct: false }], filter_context: {} })
+    getHistoryDetail.mockResolvedValue({ submission: { ...detail, can_correct: false } })
+    render(<InventoryHistoryPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle' }))
+    expect(screen.queryByRole('button', { name: 'Corregir' })).not.toBeInTheDocument()
   })
 })

@@ -57,8 +57,9 @@ export function correctInventory({ submissionId, inventoryType, file, rows, comm
   }, 'No se pudo registrar la corrección.')
 }
 
-export function listHistory() {
-  return request('/api/inventarios/historial/', undefined, 'No se pudo cargar el historial de inventarios.')
+export function listHistory({ branchId, areaId } = {}) {
+  const query = branchId ? `?branch_id=${encodeURIComponent(branchId)}` : areaId ? `?area_id=${encodeURIComponent(areaId)}` : ''
+  return request(`/api/inventarios/historial/${query}`, undefined, 'No se pudo cargar el historial de inventarios.')
 }
 
 export function getHistoryDetail(submissionId) {

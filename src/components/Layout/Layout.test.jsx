@@ -284,8 +284,21 @@ describe('Layout Mis tareas navigation', () => {
 
     expect(screen.getByRole('link', { name: 'Mis tareas' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Solicitudes pendientes' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Conteo de inventario' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Conteo de inventario' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Tareas' })).toBeInTheDocument()
+  })
+
+  it.each([
+    ['GS', { type: 'gerente_sucursal' }, true],
+    ['GA', { type: 'gerente_area' }, true],
+    ['GO', { type: 'gerente_operaciones' }, true],
+    ['unrelated Systems profile', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, false],
+  ])('shows inventory history only to %s', (_role, perfil, visible) => {
+    useAuth.mockReturnValue({ perfil, logout: vi.fn() })
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+
+    if (visible) expect(screen.getByRole('link', { name: 'Historial de inventarios' })).toHaveAttribute('href', '/historial-inventarios')
+    else expect(screen.queryByRole('link', { name: 'Historial de inventarios' })).not.toBeInTheDocument()
   })
 
   it.each([

@@ -6,6 +6,7 @@ vi.mock('../../services/apiClient', () => ({ apiRequest }))
 
 import {
   discoverAreaBranches,
+  listHistory,
   previewInventory,
   submitInventoryArea,
   submitInventoryBranch,
@@ -24,10 +25,13 @@ describe('inventoryService', () => {
     apiRequest.mockResolvedValue(response({ rows: [], errors: [] }))
   })
 
-  it('previsualiza con el archivo original sin analizar XLSX en el navegador', async () => {
-    await previewInventory(file)
+  it('previews with the original XLSX FormData body and parses the JSON response', async () => {
+    apiRequest.mockResolvedValueOnce(response({ rows: [{ code: 'A-1' }], errors: [] }))
+
+    await expect(previewInventory(file)).resolves.toEqual({ rows: [{ code: 'A-1' }], errors: [] })
 
     const [, options] = apiRequest.mock.calls[0]
+    expect(options.body).toBeInstanceOf(FormData)
     expect(options.body.get('file')).toBe(file)
   })
 
@@ -50,5 +54,16 @@ describe('inventoryService', () => {
 
     await expect(discoverAreaBranches(42)).resolves.toEqual({ area_occurrence_id: 42, branches: [{ id: 7, code: 'INV-001', name: 'Sucursal Centro' }] })
     expect(apiRequest).toHaveBeenCalledWith('/api/inventarios/ga/ocurrencias/42/sucursales/')
+  })
+
+  it('sends only the recognized history scope query parameter', async () => {
+    await listHistory({ branchId: 7 })
+    expect(apiRequest).toHaveBeenLastCalledWith('/api/inventarios/historial/?branch_id=7')
+
+    await listHistory({ areaId: 3 })
+    expect(apiRequest).toHaveBeenLastCalledWith('/api/inventarios/historial/?area_id=3')
+
+    await listHistory({ branchId: 7, areaId: 3 })
+    expect(apiRequest).toHaveBeenLastCalledWith('/api/inventarios/historial/?branch_id=7')
   })
 })

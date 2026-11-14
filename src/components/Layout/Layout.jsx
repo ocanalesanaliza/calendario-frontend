@@ -284,20 +284,20 @@ function Layout() {
             </svg>
           ),
         },
-        {
+        /* {
           to: '/inventario-demo',
           label: 'Conteo de inventario',
           visible: !hideRestrictedNavigation && canManageBranches,
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              {/* Caja con lista: inventario que se cuenta. */}
+              {/* Caja con lista: inventario que se cuenta. *//* }
               <path d="M21 8V6a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 6v10a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 1 .27" />
               <path d="M3.3 6.5L12 11.5l8.7-5" />
               <path d="M12 22V11.5" />
               <path d="M16 15h6M16 18.5h6M16 22h4" />
             </svg>
           ),
-        },
+        }, */
         {
           to: '/sucursales',
           label: 'Sucursales',
@@ -548,6 +548,17 @@ function Layout() {
           icon: (
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 3v18h18" /><path d="M7 15h3v3H7zM14 10h3v8h-3z" />
+            </svg>
+          ),
+        },
+        {
+          to: '/historial-inventarios',
+          label: 'Historial de inventarios',
+          visible: esSucursal || esGerenteArea || esGerenteOperaciones,
+          icon: (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 3v18h18" />
+              <path d="M7 15h3v3H7zM14 10h3v8h-3z" />
             </svg>
           ),
         },
