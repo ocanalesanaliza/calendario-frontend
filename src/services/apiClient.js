@@ -59,15 +59,19 @@ async function doRefresh() {
 export async function apiRequest(path, options = {}) {
   const access = getAccessToken()
   const organizationContext = getOrganizationContext()
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
+  const requestHeaders = Object.fromEntries(
+    Object.entries(options.headers ?? {}).filter(([name]) => !isFormData || name.toLowerCase() !== 'content-type'),
+  )
 
   const headers = {
-    'Content-Type': 'application/json',
+    ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
     ...(access ? { Authorization: `Bearer ${access}` } : {}),
     ...(organizationContext ? {
       'X-Calendar-Company-ID': String(organizationContext.company_id),
       'X-Calendar-Country-ID': String(organizationContext.country_id),
     } : {}),
-    ...options.headers,
+    ...requestHeaders,
   }
 
   let res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
