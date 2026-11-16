@@ -2,9 +2,10 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import InventoryHistoryPage from './InventoryHistoryPage'
 
-const { listHistory, getHistoryDetail } = vi.hoisted(() => ({ listHistory: vi.fn(), getHistoryDetail: vi.fn() }))
+const { listHistory, getHistoryDetail, useAuth } = vi.hoisted(() => ({ listHistory: vi.fn(), getHistoryDetail: vi.fn(), useAuth: vi.fn() }))
 
 vi.mock('../inventoryService', () => ({ listHistory, getHistoryDetail }))
+vi.mock('../../auth/context/AuthContext', () => ({ useAuth }))
 vi.mock('../components/InventoryExecutionModal', () => ({
   default: ({ correction }) => <output>correction-version:{correction.expected_version}</output>,
 }))
@@ -39,6 +40,7 @@ describe('InventoryHistoryPage', () => {
   beforeEach(() => {
     listHistory.mockReset()
     getHistoryDetail.mockReset()
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area' } })
   })
 
   it('renders operational summaries without JSON, snapshots, or digests', async () => {
@@ -47,7 +49,7 @@ describe('InventoryHistoryPage', () => {
 
     expect(await screen.findByText('Conteo semanal')).toBeInTheDocument()
     expect(screen.getByLabelText('Resumen del historial visible')).toHaveTextContent('Productos contados12')
-    expect(screen.getByLabelText('Resumen del historial visible')).toHaveTextContent(/-₡1\s?250/)
+    expect(screen.getByLabelText('Resumen del historial visible')).toHaveTextContent('L -1,250.00')
     expect(screen.queryByText(/snapshot|digest|frozen_scope|json/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/aprobado|revisado|conciliado/i)).not.toBeInTheDocument()
   })
@@ -58,6 +60,16 @@ describe('InventoryHistoryPage', () => {
     await screen.findByText('Conteo semanal')
     expect(screen.queryByLabelText('Sucursal')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Área')).not.toBeInTheDocument()
+  })
+
+  it('does not render the inventory type selector for GS', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_sucursal' } })
+    listHistory.mockResolvedValue({ submissions: [submission], filter_context: {} })
+    render(<InventoryHistoryPage />)
+
+    await screen.findByText('Conteo semanal')
+    expect(screen.queryByLabelText('Tipo')).not.toBeInTheDocument()
+    expect(screen.getByText('Inventario de sucursal')).toBeInTheDocument()
   })
 
   it('reloads GA history using only branch_id selected from backend context', async () => {

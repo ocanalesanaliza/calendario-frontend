@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { DataGrid } from '@mui/x-data-grid'
 import { Aviso, EstadoCarga, PageHeader } from '../../tuvet/components/TuvetUi'
+import { useAuth } from '../../auth/context/AuthContext'
 import InventoryExecutionModal from '../components/InventoryExecutionModal'
 import { getHistoryDetail, listHistory } from '../inventoryService'
 import './InventoryHistoryPage.css'
 
-const money = new Intl.NumberFormat('es-CR', { style: 'currency', currency: 'CRC', maximumFractionDigits: 0 })
+const money = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const formatMoney = (value) => `L ${money.format(Number(value ?? 0))}`
 const number = new Intl.NumberFormat('es-CR')
 
 function label(type) {
@@ -49,7 +51,7 @@ function DetailKpis({ rows }) {
     <Kpi label="Productos" value={number.format(summary.products)} />
     <Kpi label="Faltantes" value={number.format(summary.shortages)} tone="shortage" />
     <Kpi label="Sobrantes" value={number.format(summary.surpluses)} tone="surplus" />
-    <Kpi label="Impacto neto" value={money.format(summary.impact)} tone={summary.impact < 0 ? 'shortage' : summary.impact > 0 ? 'surplus' : 'match'} />
+    <Kpi label="Impacto neto" value={formatMoney(summary.impact)} tone={summary.impact < 0 ? 'shortage' : summary.impact > 0 ? 'surplus' : 'match'} />
   </div>
 }
 
@@ -58,6 +60,7 @@ function Kpi({ label: title, value, tone = '' }) {
 }
 
 export default function InventoryHistoryPage() {
+  const { perfil } = useAuth()
   const [history, setHistory] = useState([])
   const [filterContext, setFilterContext] = useState({})
   const [loading, setLoading] = useState(true)
@@ -70,6 +73,7 @@ export default function InventoryHistoryPage() {
   const [date, setDate] = useState('')
   const [branchId, setBranchId] = useState('')
   const [areaId, setAreaId] = useState('')
+  const isBranchManager = perfil?.type === 'gerente_sucursal'
 
   async function load(scope = {}) {
     setLoading(true); setError('')
@@ -130,13 +134,13 @@ export default function InventoryHistoryPage() {
   const columns = [
     { field: 'code', headerName: 'Código', width: 110 },
     { field: 'product', headerName: 'Producto', flex: 1, minWidth: 180 },
-    { field: 'cost', headerName: 'Costo', width: 125, valueFormatter: (value) => money.format(Number(value ?? 0)) },
+    { field: 'cost', headerName: 'Costo', width: 125, valueFormatter: (value) => formatMoney(value) },
     { field: 'stock', headerName: 'Esperado', width: 105, valueGetter: (_value, row) => row.stock ?? row.system_stock ?? row.expected_stock ?? 0 },
     { field: 'physical_stock', headerName: 'Existencia física', width: 145 },
     { field: 'expiration_date', headerName: 'Vencimiento', width: 125, valueFormatter: (value) => formatDate(value) },
     { field: 'difference', headerName: 'Diferencia', width: 110, valueFormatter: (value) => value == null ? '—' : number.format(value) },
     { field: 'label', headerName: 'Estado', width: 125, renderCell: (params) => <span className={`inventory-history-status ${params.row.tone}`}>{params.value}</span> },
-    { field: 'impact', headerName: 'Impacto', width: 135, valueFormatter: (value) => value == null ? '—' : money.format(value) },
+    { field: 'impact', headerName: 'Impacto', width: 135, valueFormatter: (value) => value == null ? '—' : formatMoney(value) },
   ]
 
   return <section className="tema-analiza tuvet-page inventory-history-page">
@@ -145,7 +149,7 @@ export default function InventoryHistoryPage() {
     <EstadoCarga loading={loading} error={error} onRetry={load}>
       <section className="inventory-history-toolbar" aria-label="Filtros de historial">
         <label>Buscar<input className="tuvet-input" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tarea, sucursal o área" /></label>
-        <label>Tipo<select className="tuvet-input" value={type} onChange={(event) => setType(event.target.value)}><option value="">Todos</option><option value="inventory_branch">Inventario de sucursal</option><option value="inventory_area">Inventario de área</option></select></label>
+        {!isBranchManager && <label>Tipo<select className="tuvet-input" value={type} onChange={(event) => setType(event.target.value)}><option value="">Todos</option><option value="inventory_branch">Inventario de sucursal</option><option value="inventory_area">Inventario de área</option></select></label>}
         <label>Fecha<input className="tuvet-input" type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>
         {Array.isArray(filterContext.branches) && <label>Sucursal<select className="tuvet-input" value={branchId} onChange={(event) => { const next = event.target.value; setBranchId(next); void load(next ? { branchId: next } : {}) }}><option value="">Todas las sucursales</option>{filterContext.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.code} · {branch.name}</option>)}</select></label>}
         {Array.isArray(filterContext.areas) && <label>Área<select className="tuvet-input" value={areaId} onChange={(event) => { const next = event.target.value; setAreaId(next); void load(next ? { areaId: next } : {}) }}><option value="">Todas las áreas</option>{filterContext.areas.map((area) => <option key={area.id} value={area.id}>{area.code} · {area.name}</option>)}</select></label>}
@@ -155,7 +159,7 @@ export default function InventoryHistoryPage() {
         <Kpi label="Productos contados" value={number.format(summary.products)} />
         <Kpi label="Faltantes" value={number.format(summary.shortages)} tone="shortage" />
         <Kpi label="Sobrantes" value={number.format(summary.surpluses)} tone="surplus" />
-        <Kpi label="Impacto neto" value={money.format(summary.impact)} tone={summary.impact < 0 ? 'shortage' : summary.impact > 0 ? 'surplus' : 'match'} />
+        <Kpi label="Impacto neto" value={formatMoney(summary.impact)} tone={summary.impact < 0 ? 'shortage' : summary.impact > 0 ? 'surplus' : 'match'} />
       </div>
       {visibleHistory.length === 0 ? <p className="tuvet-muted">No hay inventarios que coincidan con los filtros.</p> : <div className="inventory-history-list" role="table" aria-label="Historial de inventarios"><div className="inventory-history-list-head" role="row"><span>Fecha</span><span>Tarea</span><span>Alcance</span><span>Tipo</span><span>Productos</span><span>Faltantes</span><span>Sobrantes</span><span>Impacto neto</span><span>Versión</span><span /></div>{visibleHistory.map((item) => <div className="inventory-history-list-row" role="row" key={item.id}><span>{formatDate(item.execution_date)}</span><strong>{item.task_name}</strong><span>{scopeLabel(item)}</span><span>{label(item.inventory_type)}</span><span>{number.format(item.product_count ?? 0)}</span><span className="inventory-history-negative">{number.format(item.shortage_count ?? 0)}</span><span className="inventory-history-positive">{number.format(item.surplus_count ?? 0)}</span><span>{money.format(item.net_impact ?? 0)}</span><span>v{item.latest_revision}</span><button className="tuvet-btn tuvet-btn-secondary" type="button" onClick={() => void openDetail(item.id)}>Ver detalle</button></div>)}</div>}
     </EstadoCarga>
