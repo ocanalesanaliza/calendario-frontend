@@ -104,9 +104,15 @@ describe('InventoryBranchExecutionPage', () => {
     expect(statusCell.querySelector('.inventory-branch-status')).toHaveClass('shortage')
 
     const physical = await editCell('A-1', 'physical_stock', 'Existencia física para Arroz')
-    fireEvent.change(physical, { target: { value: '0' } })
+    fireEvent.change(physical, { target: { value: '3' } })
     fireEvent.keyDown(physical, { key: 'Tab' })
     expect(await screen.findByLabelText('Vencimiento para Arroz')).toHaveFocus()
+    await waitFor(() => {
+      const firstRow = document.querySelector('.MuiDataGrid-row[data-id="A-1"]')
+      expect(firstRow.querySelector('[data-field="status"]')).toHaveTextContent('Faltante')
+      expect(firstRow.querySelector('[data-field="difference"]')).toHaveTextContent('-1')
+      expect(firstRow.querySelector('[data-field="impact"]')).toHaveTextContent('L -10.00')
+    })
 
     const expiration = screen.getByLabelText('Vencimiento para Arroz')
     fireEvent.keyDown(expiration, { key: 'Tab' })

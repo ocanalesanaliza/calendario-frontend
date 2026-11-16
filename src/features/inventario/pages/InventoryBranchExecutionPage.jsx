@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { DataGrid, gridPaginatedVisibleSortedGridRowIdsSelector, useGridApiRef } from '@mui/x-data-grid'
 import { getMisTareas } from '../../operacion/services/operacionService'
@@ -46,7 +46,7 @@ function StatusBadge({ value }) {
   return <span className={`inventory-branch-status ${value}`}>{STATUS_LABELS[value]}</span>
 }
 
-function GridEditCell({ id, field, value, api, row, type, disabled }) {
+function GridEditCell({ id, field, value, api, onValueChange, row, type, disabled }) {
   async function handleKeyDown(event) {
     if (event.key !== 'Tab') return
 
@@ -65,9 +65,10 @@ function GridEditCell({ id, field, value, api, row, type, disabled }) {
       physicalStockField: 'physical_stock',
       expirationDateField: 'expiration_date',
     })
-    if (!target || (target.id === id && target.field === field)) return
+    if (!target) return
 
     api.stopCellEditMode({ id, field })
+    if (target.id === id && target.field === field) return
     api.startCellEditMode(target)
   }
 
@@ -82,7 +83,7 @@ function GridEditCell({ id, field, value, api, row, type, disabled }) {
     disabled={disabled}
     value={value ?? ''}
     onKeyDown={handleKeyDown}
-    onChange={(event) => api.setEditCellValue({ id, field, value: event.target.value }, event)}
+    onChange={(event) => { onValueChange(id, field, event.target.value); api.setEditCellValue({ id, field, value: event.target.value }, event) }}
   />
 }
 
@@ -151,17 +152,22 @@ export default function InventoryBranchExecutionPage() {
   }, { shortageImpact: 0, surplusImpact: 0, netImpact: 0 }), [gridRows])
   const unavailable = !loading && (!task || !task.disponible_para_registro || !isInventoryBranchTask(task))
 
+  const updateRow = useCallback((id, field, value) => {
+    if (!isInventoryFieldEditable(field)) return
+    setRows((current) => current.map((row) => row.__id === id ? { ...row, [field]: value } : row))
+  }, [])
+  const processRowUpdate = useCallback((updatedRow) => updatedRow, [])
   const columns = useMemo(() => [
     { field: 'code', headerName: 'Código', minWidth: 120, flex: 0.7 },
     { field: 'product', headerName: 'Producto', minWidth: 230, flex: 1.5 },
     { field: 'cost', headerName: 'Costo', minWidth: 110, flex: 0.65, valueFormatter: (value) => formatCost(value) },
     { field: 'expectedStock', headerName: 'Esperado', minWidth: 115, type: 'number', flex: 0.6 },
-    { field: 'physical_stock', headerName: 'Existencia física', minWidth: 160, editable: true, flex: 0.9, renderEditCell: (params) => <GridEditCell {...params} type="number" disabled={sending} /> },
-    { field: 'expiration_date', headerName: 'Vencimiento manual', minWidth: 175, editable: true, flex: 1, renderEditCell: (params) => <GridEditCell {...params} type="date" disabled={sending} /> },
+    { field: 'physical_stock', headerName: 'Existencia física', minWidth: 160, editable: true, flex: 0.9, renderEditCell: (params) => <GridEditCell {...params} type="number" disabled={sending} onValueChange={updateRow} /> },
+    { field: 'expiration_date', headerName: 'Vencimiento manual', minWidth: 175, editable: true, flex: 1, renderEditCell: (params) => <GridEditCell {...params} type="date" disabled={sending} onValueChange={updateRow} /> },
     { field: 'difference', headerName: 'Diferencia', minWidth: 115, type: 'number', flex: 0.6, valueFormatter: (value) => value ?? '—' },
     { field: 'status', headerName: 'Estado', minWidth: 125, flex: 0.7, cellClassName: 'inventory-branch-status-cell', renderCell: ({ value }) => <StatusBadge value={value} /> },
     { field: 'impact', headerName: 'Impacto', minWidth: 130, flex: 0.75, valueFormatter: (value) => value === null ? '—' : formatCost(value) },
-  ], [sending])
+  ], [sending, updateRow])
 
   function returnToTasks() {
     navigate({ pathname: '/mis-tareas', search: fecha ? `?fecha=${fecha}` : '' })
@@ -207,17 +213,6 @@ export default function InventoryBranchExecutionPage() {
     setSearch('')
     setStatusFilter('')
     if (fileInputRef.current) fileInputRef.current.value = ''
-  }
-
-  function updateRow(id, field, value) {
-    if (!isInventoryFieldEditable(field)) return
-    setRows((current) => current.map((row) => row.__id === id ? { ...row, [field]: value } : row))
-  }
-
-  function processRowUpdate(updatedRow) {
-    updateRow(updatedRow.id, 'physical_stock', updatedRow.physical_stock)
-    updateRow(updatedRow.id, 'expiration_date', updatedRow.expiration_date)
-    return updatedRow
   }
 
   async function submit(event) {
