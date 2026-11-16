@@ -28,6 +28,7 @@ import CalendarioAreaPage from "./features/calendarioArea/pages/CalendarioAreaPa
 import InventarioDemoPage from './features/inventario/pages/InventarioDemoPage'
 import InventoryHistoryPage from './features/inventario/pages/InventoryHistoryPage'
 import InventoryBranchExecutionPage from './features/inventario/pages/InventoryBranchExecutionPage'
+import InventoryAreaExecutionPage from './features/inventario/pages/InventoryAreaExecutionPage'
 import RevisionesGuardiaPage from "./features/revisionesGuardia/pages/RevisionesGuardiaPage";
 import AusenciasAreaPage from './features/ausenciasArea/pages/AusenciasAreaPage'
 import OrganizacionPage from './features/organizacion/pages/OrganizacionPage'
@@ -276,6 +277,7 @@ function App() {
            <Route path="/depositospendientes" element={<DepositosPendientesRoute><DepositosPendientesPage /></DepositosPendientesRoute>} />
            <Route path="/analitica/historial-depositos" element={<DepositHistoryRoute><DepositHistoryPage /></DepositHistoryRoute>} />
           <Route path="/calendario-area" element={<CalendarioAreaRoute><CalendarioAreaPage /></CalendarioAreaRoute>} />
+          <Route path="/calendario-area/inventario/:idOcurrencia" element={<CalendarioAreaRoute><InventoryAreaExecutionPage /></CalendarioAreaRoute>} />
           <Route path="/ausencias-area" element={<AusenciasAreaRoute><AusenciasAreaPage /></AusenciasAreaRoute>} />
           <Route path="/solicitudes-pendientes" element={<PendientesRoute><SolicitudesPendientesPage /></PendientesRoute>} />
           <Route path="/almuerzos" element={<AlmuerzosRoute><AlmuerzosPage /></AlmuerzosRoute>} />

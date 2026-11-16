@@ -2,12 +2,13 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CalendarioAreaPage from './CalendarioAreaPage'
 
-const { completeAreaOccurrence, finalizeDepositReviewWorklist, getMonthlyAreaAbsences, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, rescheduleAreaOccurrence, getDepositReviewWorklist, recordDepositReviewDecision, useAuth } = vi.hoisted(() => ({ completeAreaOccurrence: vi.fn(), finalizeDepositReviewWorklist: vi.fn(), getMonthlyAreaAbsences: vi.fn(), getMonthlyAreaOccurrences: vi.fn(), getMonthlyAreaPerformance: vi.fn(), rescheduleAreaOccurrence: vi.fn(), getDepositReviewWorklist: vi.fn(), recordDepositReviewDecision: vi.fn(), useAuth: vi.fn() }))
+const { completeAreaOccurrence, finalizeDepositReviewWorklist, getMonthlyAreaAbsences, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, navigate, rescheduleAreaOccurrence, getDepositReviewWorklist, recordDepositReviewDecision, useAuth } = vi.hoisted(() => ({ completeAreaOccurrence: vi.fn(), finalizeDepositReviewWorklist: vi.fn(), getMonthlyAreaAbsences: vi.fn(), getMonthlyAreaOccurrences: vi.fn(), getMonthlyAreaPerformance: vi.fn(), navigate: vi.fn(), rescheduleAreaOccurrence: vi.fn(), getDepositReviewWorklist: vi.fn(), recordDepositReviewDecision: vi.fn(), useAuth: vi.fn() }))
 let datesSetHandler
 
 vi.mock('../services/calendarioAreaService', () => ({ completeAreaOccurrence, getMonthlyAreaAbsences, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, rescheduleAreaOccurrence }))
 vi.mock('../../calendarArea/services/depositReviewWorklistService', () => ({ finalizeDepositReviewWorklist, getDepositReviewWorklist, recordDepositReviewDecision }))
 vi.mock('../../auth/context/AuthContext', () => ({ useAuth }))
+vi.mock('react-router-dom', async (importActual) => ({ ...(await importActual()), useNavigate: () => navigate }))
 vi.mock('@fullcalendar/react', () => ({
   default: ({ events, datesSet, eventClick, eventClassNames, eventContent }) => {
     datesSetHandler = datesSet
@@ -36,6 +37,7 @@ describe('CalendarioAreaPage', () => {
     getDepositReviewWorklist.mockReset()
     recordDepositReviewDecision.mockReset()
     finalizeDepositReviewWorklist.mockReset()
+    navigate.mockReset()
   })
 
   it('shows loading and then the monthly occurrences as read-only events', async () => {
@@ -185,6 +187,17 @@ describe('CalendarioAreaPage', () => {
     expect(screen.queryByRole('button', { name: 'Sin registro revisado para BRANCH-007' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Conforme para BRANCH-007' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Con observación para BRANCH-007' })).toBeInTheDocument()
+  })
+
+  it('navigates an area inventory occurrence to its dedicated workspace instead of opening a modal', async () => {
+    const inventoryOccurrence = { ...occurrence, occurrence_id: 117, effective_date: '2026-09-03', task: { id: 21, name: 'Inventario de área', mode: 'inventory_area' } }
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [inventoryOccurrence] })
+
+    render(<CalendarioAreaPage />)
+    fireEvent.click(await screen.findByRole('button', { name: /Inventario de área/ }))
+
+    expect(navigate).toHaveBeenCalledWith('/calendario-area/inventario/117?fecha=2026-09-03')
+    expect(screen.queryByRole('dialog', { name: 'Registrar inventario' })).not.toBeInTheDocument()
   })
 
   it('does not offer sin_registro_revisado for a pending case', async () => {
