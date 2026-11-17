@@ -289,6 +289,8 @@ function TareaModal({ inicial, onSubmit, onClose }) {
     es_recordatorio:          inicial?.es_recordatorio ?? false,
     bloquea_jornada_posterior: inicial?.bloquea_jornada_posterior ?? false,
     modo_cumplimiento:        inicial?.modo_cumplimiento ?? 'simple',
+    manual_planning_enabled:  inicial?.manual_planning_enabled ?? false,
+    manual_planning_kind:     inicial?.manual_planning_kind ?? '',
   })
   const [errores, setErrores] = useState({})
   const [errorGeneral, setErrorGeneral] = useState('')
@@ -318,6 +320,14 @@ function TareaModal({ inicial, onSubmit, onClose }) {
         modo_cumplimiento: modosValidos.includes(actual.modo_cumplimiento) ? actual.modo_cumplimiento : 'simple',
       }
     })
+  }
+
+  function handleManualPlanningChange(enabled) {
+    setForm((actual) => ({
+      ...actual,
+      manual_planning_enabled: enabled,
+      manual_planning_kind: enabled ? actual.manual_planning_kind || 'quantitative' : '',
+    }))
   }
 
   async function handleSubmit(event) {
@@ -394,6 +404,28 @@ function TareaModal({ inicial, onSubmit, onClose }) {
           <Aviso tipo="info">
             Este cambio aplica prospectivamente: no modifica el historial ni convierte ocurrencias existentes, y no activa un flujo de usuario ni una bandera.
           </Aviso>
+        </FormSection>
+
+        <FormSection
+          title="Planificación manual GA"
+          description="Define si los gerentes de área pueden agregar esta tarea manualmente a su calendario."
+        >
+          <Toggle
+            label="Habilitar planificación manual GA"
+            checked={form.manual_planning_enabled}
+            onChange={handleManualPlanningChange}
+          />
+          {form.manual_planning_enabled && (
+            <Field label="Clasificación de planificación manual GA">
+              <select
+                value={form.manual_planning_kind}
+                onChange={(event) => set('manual_planning_kind', event.target.value)}
+              >
+                <option value="quantitative">Cuantitativa</option>
+                <option value="qualitative">Cualitativa</option>
+              </select>
+            </Field>
+          )}
         </FormSection>
 
         <FormSection title="¿Cuándo se repite?">

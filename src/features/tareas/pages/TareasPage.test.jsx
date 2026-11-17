@@ -29,6 +29,8 @@ const tarea = (extra = {}) => ({
   peso: '2.00',
   es_recordatorio: false,
   bloquea_jornada_posterior: true,
+  manual_planning_enabled: false,
+  manual_planning_kind: '',
   activa: true,
   ...extra,
 })
@@ -58,6 +60,70 @@ describe('TareasPage: catálogo', () => {
     expect(screen.getByText(/aplica prospectivamente/)).toBeInTheDocument()
     expect(screen.getByText(/no modifica el historial ni convierte ocurrencias existentes/i)).toBeInTheDocument()
     expect(screen.getByText(/no activa un flujo de usuario ni una bandera/i)).toBeInTheDocument()
+  })
+
+  it('inicia la creación con la planificación manual GA deshabilitada', async () => {
+    await abrirModalCrear()
+
+    expect(screen.getByRole('switch', { name: 'Habilitar planificación manual GA' })).not.toBeChecked()
+    expect(screen.queryByLabelText('Clasificación de planificación manual GA')).not.toBeInTheDocument()
+  })
+
+  it('muestra la clasificación y envía ambos campos de planificación manual GA al crear', async () => {
+    await abrirModalCrear()
+    completarFormulario()
+    fireEvent.click(screen.getByRole('switch', { name: 'Habilitar planificación manual GA' }))
+    fireEvent.change(screen.getByLabelText('Clasificación de planificación manual GA'), { target: { value: 'qualitative' } })
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Crear tarea' }))
+
+    await waitFor(() => expect(createTarea).toHaveBeenCalledWith(expect.objectContaining({
+      manual_planning_enabled: true,
+      manual_planning_kind: 'qualitative',
+    })))
+  })
+
+  it('inicializa la planificación manual GA existente al editar', async () => {
+    getTareas.mockResolvedValue([tarea({ manual_planning_enabled: true, manual_planning_kind: 'quantitative' })])
+    render(<TareasPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar' }))
+
+    expect(screen.getByRole('switch', { name: 'Habilitar planificación manual GA' })).toBeChecked()
+    expect(screen.getByLabelText('Clasificación de planificación manual GA')).toHaveValue('quantitative')
+  })
+
+  it('envía planificación manual GA deshabilitada sin clasificación al editar', async () => {
+    getTareas.mockResolvedValue([tarea({ manual_planning_enabled: true, manual_planning_kind: 'qualitative' })])
+    render(<TareasPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'Habilitar planificación manual GA' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Guardar cambios' }))
+
+    await waitFor(() => expect(updateTarea).toHaveBeenCalledWith(7, expect.objectContaining({
+      manual_planning_enabled: false,
+      manual_planning_kind: '',
+    })))
+  })
+
+  it('preserva los campos de catálogo no relacionados al enviar planificación manual GA', async () => {
+    getTareas.mockResolvedValue([tarea({
+      ambito: 'area',
+      modo_cumplimiento: 'inventory_area',
+      peso: '3.50',
+      es_recordatorio: true,
+      manual_planning_enabled: true,
+      manual_planning_kind: 'quantitative',
+    })])
+    render(<TareasPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Guardar cambios' }))
+
+    await waitFor(() => expect(updateTarea).toHaveBeenCalledWith(7, expect.objectContaining({
+      ambito: 'area',
+      modo_cumplimiento: 'inventory_area',
+      peso: '3.50',
+      es_recordatorio: true,
+      bloquea_jornada_posterior: true,
+    })))
   })
 
   it('muestra el modo devuelto por el servidor al editar', async () => {
