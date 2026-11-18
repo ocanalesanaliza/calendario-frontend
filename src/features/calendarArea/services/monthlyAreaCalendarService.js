@@ -1,4 +1,4 @@
-import { commandCalendarArea, getCalendarArea, postCalendarArea } from './calendarAreaApi'
+import { commandCalendarArea, getCalendarArea, patchCalendarArea, postCalendarArea } from './calendarAreaApi'
 import { normalizeMonthlyAreaOccurrencesResponse } from './monthlyAreaOccurrence'
 
 export async function getMonthlyAreaOccurrences(month) {
@@ -20,6 +20,57 @@ export function completeAreaOccurrence(occurrenceId, idempotencyKey) {
 
 export function rescheduleAreaOccurrence(occurrenceId, body, idempotencyKey) {
   return commandCalendarArea(`/api/calendar/my-area/occurrences/${occurrenceId}/reschedule/`, body, 'No se pudo reprogramar la tarea del área.', idempotencyKey)
+}
+
+export async function getManualPlanningContext() {
+  const [areas, branches] = await Promise.all([
+    getCalendarArea('/api/sucursales/areas-elegibles/', 'No se pudieron cargar las áreas disponibles.'),
+    getCalendarArea('/api/sucursales/', 'No se pudieron cargar las sucursales disponibles.'),
+  ])
+  return {
+    areas: Array.isArray(areas?.results) ? areas.results : [],
+    branches: Array.isArray(branches?.results) ? branches.results : [],
+  }
+}
+
+export function createManualCatalogEntry(body, idempotencyKey) {
+  return commandCalendarArea('/api/calendar/my-area/manual-catalog-entries/', body, 'No se pudo crear la tarea manual de catálogo.', idempotencyKey)
+}
+
+export function createAdHocActivity(body, idempotencyKey) {
+  return commandCalendarArea('/api/calendar/my-area/ad-hoc-activities/', body, 'No se pudo crear la actividad ad hoc.', idempotencyKey)
+}
+
+export function updateManualCatalogEntry(entryId, body, idempotencyKey) {
+  return patchCalendarArea(`/api/calendar/my-area/manual-catalog-entries/${entryId}/`, body, 'No se pudo actualizar la tarea manual de catálogo.', idempotencyKey)
+}
+
+export function completeManualCatalogEntry(entryId, body, idempotencyKey) {
+  return commandCalendarArea(`/api/calendar/my-area/manual-catalog-entries/${entryId}/complete/`, body, 'No se pudo completar la tarea manual de catálogo.', idempotencyKey)
+}
+
+export function rescheduleManualCatalogEntry(entryId, body, idempotencyKey) {
+  return commandCalendarArea(`/api/calendar/my-area/manual-catalog-entries/${entryId}/reschedule/`, body, 'No se pudo reprogramar la tarea manual de catálogo.', idempotencyKey)
+}
+
+export function cancelManualCatalogEntry(entryId, body, idempotencyKey) {
+  return commandCalendarArea(`/api/calendar/my-area/manual-catalog-entries/${entryId}/cancel/`, body, 'No se pudo cancelar la tarea manual de catálogo.', idempotencyKey)
+}
+
+export function justifyManualCatalogEntryScopeLoss(entryId, body, idempotencyKey) {
+  return commandCalendarArea(`/api/calendar/my-area/manual-catalog-entries/${entryId}/justify-scope-loss/`, body, 'No se pudo justificar la pérdida de alcance.', idempotencyKey)
+}
+
+export function updateAdHocActivity(activityId, body, idempotencyKey) {
+  return patchCalendarArea(`/api/calendar/my-area/ad-hoc-activities/${activityId}/`, body, 'No se pudo actualizar la actividad ad hoc.', idempotencyKey)
+}
+
+export function completeAdHocActivity(activityId, body, idempotencyKey) {
+  return commandCalendarArea(`/api/calendar/my-area/ad-hoc-activities/${activityId}/complete/`, body, 'No se pudo completar la actividad ad hoc.', idempotencyKey)
+}
+
+export function cancelAdHocActivity(activityId, body, idempotencyKey) {
+  return commandCalendarArea(`/api/calendar/my-area/ad-hoc-activities/${activityId}/cancel/`, body, 'No se pudo cancelar la actividad ad hoc.', idempotencyKey)
 }
 
 export function closeMonthlyAreaPerformance(body) {

@@ -1,7 +1,18 @@
 export {
   completeAreaOccurrence,
+  completeAdHocActivity,
+  completeManualCatalogEntry,
+  cancelAdHocActivity,
+  cancelManualCatalogEntry,
+  createAdHocActivity,
+  createManualCatalogEntry,
+  getManualPlanningContext,
   getMonthlyAreaAbsences,
   getMonthlyAreaOccurrences,
   getMonthlyAreaPerformance,
+  justifyManualCatalogEntryScopeLoss,
+  rescheduleManualCatalogEntry,
   rescheduleAreaOccurrence,
+  updateAdHocActivity,
+  updateManualCatalogEntry,
 } from '../../calendarArea/services/monthlyAreaCalendarService'

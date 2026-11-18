@@ -184,6 +184,26 @@ describe('GOAreaPerformanceHistoryPage', () => {
     expect(document.activeElement).toBe(trigger)
   })
 
+  it('renders server-exposed manual provenance as read-only evidence without requesting an automatic occurrence detail', async () => {
+    service.getGOOccurrences.mockResolvedValueOnce({
+      results: [],
+      manual_results: [
+        { id: 42, provenance: 'manual_catalog', task: { title: 'Auditoría manual' }, origin_date_local: '2026-10-04', created_at: '2026-10-04T09:00:00Z', classification: 'quantitative', frozen_weight: '2.50', planning_note: 'Visita', latest_status: 'pendiente' },
+        { id: 43, provenance: 'ad_hoc', name: 'Reunión local', description: 'Seguimiento', origin_date_local: '2026-10-05', created_at: '2026-10-05T09:00:00Z', cancelled_at: '2026-10-06T09:00:00Z', latest_status: 'cancelled' },
+      ],
+    })
+    render(<GOAreaPerformanceHistoryPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver evidencia de ocurrencias' }))
+
+    expect(await screen.findByText('Auditoría manual')).toBeInTheDocument()
+    expect(screen.getByText('Origen: Tarea manual de catálogo')).toBeInTheDocument()
+    expect(screen.getByText('Origen: Actividad ad hoc')).toBeInTheDocument()
+    expect(screen.getByText('Peso congelado')).toBeInTheDocument()
+    expect(screen.getByText('Descripción')).toBeInTheDocument()
+    expect(service.getGOOccurrenceDetail).not.toHaveBeenCalled()
+  })
+
   it('renders the normalized canonical occurrence detail without exposing opaque identifiers', async () => {
     service.getGOOccurrenceDetail.mockResolvedValueOnce({
       task: { title: 'Occurrence detail task' },

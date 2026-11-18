@@ -36,6 +36,15 @@ export async function commandCalendarArea(path, body, fallbackMessage, idempoten
   }), fallbackMessage)
 }
 
+export async function patchCalendarArea(path, body, fallbackMessage, idempotencyKey) {
+  const key = idempotencyKey ?? createIdempotencyKey()
+  return parseCalendarAreaResponse(await apiRequest(path, {
+    method: 'PATCH',
+    headers: { 'Idempotency-Key': key },
+    body: JSON.stringify(body),
+  }), fallbackMessage)
+}
+
 export async function postCalendarArea(path, body, fallbackMessage) {
   return parseCalendarAreaResponse(await apiRequest(path, {
     method: 'POST',

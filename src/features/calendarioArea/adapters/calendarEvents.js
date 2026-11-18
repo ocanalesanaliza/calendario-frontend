@@ -150,3 +150,36 @@ export function occurrenceToCalendarEvent(occurrence) {
 export function occurrencesToCalendarEvents(occurrences = []) {
   return occurrences.map(occurrenceToCalendarEvent)
 }
+
+function manualEvent(item, provenance) {
+  const statusPresentation = occurrenceStatusPresentation(item.status)
+  const title = provenance === 'ad_hoc' ? item.name : taskTitle(item.task, item.id)
+  const provenanceLabel = provenance === 'ad_hoc' ? 'Actividad ad hoc' : 'Tarea manual de catálogo'
+  return {
+    id: `${provenance}-${item.id}`,
+    title,
+    start: item.effective_date,
+    allDay: true,
+    editable: false,
+    classNames: [statusPresentation.className],
+    extendedProps: {
+      ...item,
+      occurrence_id: item.id,
+      manual_id: item.id,
+      provenance,
+      provenance_label: provenanceLabel,
+      task: provenance === 'ad_hoc' ? { name: item.name } : item.task,
+      status_label: statusPresentation.label,
+      status_marker: statusPresentation.marker,
+      aria_label: `${title} · ${provenanceLabel} · ${statusPresentation.label}`,
+    },
+  }
+}
+
+export function manualCatalogEntriesToCalendarEvents(entries = []) {
+  return entries.map((entry) => manualEvent(entry, 'manual_catalog'))
+}
+
+export function adHocActivitiesToCalendarEvents(activities = []) {
+  return activities.map((activity) => manualEvent(activity, 'ad_hoc'))
+}

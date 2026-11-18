@@ -50,5 +50,7 @@ export function normalizeMonthlyAreaOccurrencesResponse(response = {}) {
     occurrences: Array.isArray(response.occurrences)
       ? response.occurrences.map(normalizeMonthlyAreaOccurrence)
       : [],
+    ...(Array.isArray(response.manual_catalog_entries) ? { manual_catalog_entries: response.manual_catalog_entries } : {}),
+    ...(Array.isArray(response.ad_hoc_activities) ? { ad_hoc_activities: response.ad_hoc_activities } : {}),
   }
 }

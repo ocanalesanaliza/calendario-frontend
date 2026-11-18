@@ -2,10 +2,11 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CalendarioAreaPage from './CalendarioAreaPage'
 
-const { completeAreaOccurrence, finalizeDepositReviewWorklist, getMonthlyAreaAbsences, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, navigate, rescheduleAreaOccurrence, getDepositReviewWorklist, recordDepositReviewDecision, useAuth } = vi.hoisted(() => ({ completeAreaOccurrence: vi.fn(), finalizeDepositReviewWorklist: vi.fn(), getMonthlyAreaAbsences: vi.fn(), getMonthlyAreaOccurrences: vi.fn(), getMonthlyAreaPerformance: vi.fn(), navigate: vi.fn(), rescheduleAreaOccurrence: vi.fn(), getDepositReviewWorklist: vi.fn(), recordDepositReviewDecision: vi.fn(), useAuth: vi.fn() }))
+const { cancelAdHocActivity, cancelManualCatalogEntry, completeAdHocActivity, completeAreaOccurrence, completeManualCatalogEntry, createAdHocActivity, createManualCatalogEntry, finalizeDepositReviewWorklist, getManualPlanningContext, getMonthlyAreaAbsences, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, getTareas, justifyManualCatalogEntryScopeLoss, navigate, rescheduleAreaOccurrence, rescheduleManualCatalogEntry, updateAdHocActivity, updateManualCatalogEntry, getDepositReviewWorklist, recordDepositReviewDecision, useAuth } = vi.hoisted(() => ({ cancelAdHocActivity: vi.fn(), cancelManualCatalogEntry: vi.fn(), completeAdHocActivity: vi.fn(), completeAreaOccurrence: vi.fn(), completeManualCatalogEntry: vi.fn(), createAdHocActivity: vi.fn(), createManualCatalogEntry: vi.fn(), finalizeDepositReviewWorklist: vi.fn(), getManualPlanningContext: vi.fn(), getMonthlyAreaAbsences: vi.fn(), getMonthlyAreaOccurrences: vi.fn(), getMonthlyAreaPerformance: vi.fn(), getTareas: vi.fn(), justifyManualCatalogEntryScopeLoss: vi.fn(), navigate: vi.fn(), rescheduleAreaOccurrence: vi.fn(), rescheduleManualCatalogEntry: vi.fn(), updateAdHocActivity: vi.fn(), updateManualCatalogEntry: vi.fn(), getDepositReviewWorklist: vi.fn(), recordDepositReviewDecision: vi.fn(), useAuth: vi.fn() }))
 let datesSetHandler
 
-vi.mock('../services/calendarioAreaService', () => ({ completeAreaOccurrence, getMonthlyAreaAbsences, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, rescheduleAreaOccurrence }))
+vi.mock('../services/calendarioAreaService', () => ({ cancelAdHocActivity, cancelManualCatalogEntry, completeAdHocActivity, completeAreaOccurrence, completeManualCatalogEntry, createAdHocActivity, createManualCatalogEntry, getManualPlanningContext, getMonthlyAreaAbsences, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, justifyManualCatalogEntryScopeLoss, rescheduleAreaOccurrence, rescheduleManualCatalogEntry, updateAdHocActivity, updateManualCatalogEntry }))
+vi.mock('../../tareas/services/tareasService', () => ({ getTareas }))
 vi.mock('../../calendarArea/services/depositReviewWorklistService', () => ({ finalizeDepositReviewWorklist, getDepositReviewWorklist, recordDepositReviewDecision }))
 vi.mock('../../auth/context/AuthContext', () => ({ useAuth }))
 vi.mock('react-router-dom', async (importActual) => ({ ...(await importActual()), useNavigate: () => navigate }))
@@ -33,7 +34,21 @@ describe('CalendarioAreaPage', () => {
     getMonthlyAreaPerformance.mockReset()
     getMonthlyAreaPerformance.mockResolvedValue({ month: '2026-09', performances: [] })
     completeAreaOccurrence.mockReset()
+    completeAdHocActivity.mockReset()
+    completeManualCatalogEntry.mockReset()
+    cancelAdHocActivity.mockReset()
+    cancelManualCatalogEntry.mockReset()
+    justifyManualCatalogEntryScopeLoss.mockReset()
+    createAdHocActivity.mockReset()
+    createManualCatalogEntry.mockReset()
+    getManualPlanningContext.mockReset()
+    getManualPlanningContext.mockResolvedValue({ areas: [{ id: 8, nombre: 'Operaciones' }], branches: [{ id_sucursal: 11, nombre: 'Centro' }] })
+    getTareas.mockReset()
+    getTareas.mockResolvedValue([{ id_tarea: 123, nombre: 'Auditoría manual', manual_planning_enabled: true, manual_planning_kind: 'quantitative' }])
     rescheduleAreaOccurrence.mockReset()
+    rescheduleManualCatalogEntry.mockReset()
+    updateAdHocActivity.mockReset()
+    updateManualCatalogEntry.mockReset()
     getDepositReviewWorklist.mockReset()
     recordDepositReviewDecision.mockReset()
     finalizeDepositReviewWorklist.mockReset()
@@ -52,6 +67,162 @@ describe('CalendarioAreaPage', () => {
     expect(screen.getByTestId('full-calendar').closest('.calendario-area-calendar')).toHaveAttribute('aria-busy', 'true')
     expect(await screen.findByText('Auditoría')).toBeInTheDocument()
     expect(screen.getByTestId('full-calendar')).toHaveAttribute('data-read-only', 'true')
+  })
+
+  it('creates a quantitative catalog entry with optional branch context and refreshes the visible month', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+    createManualCatalogEntry.mockResolvedValue({ entry: { id: 10 } })
+
+    render(<CalendarioAreaPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Planificar tarea manual' }))
+    expect(await screen.findByLabelText('Área')).toHaveValue('8')
+    fireEvent.change(screen.getByLabelText('Tipo de entrada'), { target: { value: 'catalog' } })
+    fireEvent.change(screen.getByLabelText('Tarea de catálogo'), { target: { value: '123' } })
+    fireEvent.change(screen.getByLabelText('Fecha programada'), { target: { value: '2026-10-10' } })
+    fireEvent.change(screen.getByLabelText('Sucursal'), { target: { value: '11' } })
+    fireEvent.change(screen.getByLabelText('Nota de planificación'), { target: { value: 'Visita' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Crear entrada' }))
+
+    await waitFor(() => expect(createManualCatalogEntry).toHaveBeenCalledWith({ area_id: 8, task_id: 123, scheduled_date: '2026-10-10', branch_id: 11, planning_note: 'Visita' }, expect.any(String)))
+    await waitFor(() => expect(getMonthlyAreaOccurrences).toHaveBeenCalledTimes(2))
+  })
+
+  it('offers only permitted pending quantitative catalog actions and refreshes after updating its note and branch', async () => {
+    const manual = { id: 41, task: { name: 'Catálogo cuantitativo' }, status: 'pendiente', effective_date: '2026-10-10', planning_note: 'Antes', branch_id: 11, classification: 'quantitative' }
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [], manual_catalog_entries: [manual] })
+    updateManualCatalogEntry.mockResolvedValue({})
+    render(<CalendarioAreaPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Catálogo cuantitativo/ }))
+    expect(screen.getByRole('button', { name: 'Actualizar' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Completar' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reprogramar' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancelar entrada' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Justificar pérdida de alcance' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }))
+    await screen.findByLabelText('Sucursal')
+    fireEvent.change(screen.getByLabelText('Nota de planificación'), { target: { value: 'Después' } })
+    fireEvent.change(screen.getByLabelText('Sucursal'), { target: { value: '11' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    await waitFor(() => expect(updateManualCatalogEntry).toHaveBeenCalledWith(41, { planning_note: 'Después', branch_id: 11 }, expect.any(String)))
+    await waitFor(() => expect(getMonthlyAreaOccurrences).toHaveBeenCalledTimes(2))
+  })
+
+  it('runs quantitative catalog completion and reschedule commands with distinct idempotency keys', async () => {
+    const manual = { id: 42, task: { name: 'Catálogo cuantitativo' }, status: 'pendiente', effective_date: '2026-10-10', planning_note: '', classification: 'quantitative' }
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [], manual_catalog_entries: [manual] })
+    completeManualCatalogEntry.mockResolvedValue({})
+    rescheduleManualCatalogEntry.mockResolvedValue({})
+    render(<CalendarioAreaPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Catálogo cuantitativo/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Completar' }))
+    fireEvent.change(screen.getByLabelText('Motivo'), { target: { value: 'Terminada' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar completar' }))
+    await waitFor(() => expect(completeManualCatalogEntry).toHaveBeenCalledWith(42, { reason: 'Terminada' }, expect.any(String)))
+
+    fireEvent.click(await screen.findByRole('button', { name: /Catálogo cuantitativo/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reprogramar' }))
+    fireEvent.change(screen.getByLabelText('Nueva fecha'), { target: { value: '2026-10-11' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar reprogramación' }))
+    await waitFor(() => expect(rescheduleManualCatalogEntry).toHaveBeenCalledWith(42, { target_date: '2026-10-11' }, expect.any(String)))
+    expect(rescheduleManualCatalogEntry.mock.calls[0][2]).not.toBe(completeManualCatalogEntry.mock.calls[0][2])
+  })
+
+  it('offers qualitative cancellation and scope-loss only when the returned state permits each action', async () => {
+    const qualitative = { id: 43, task: { name: 'Catálogo cualitativo' }, status: 'pendiente', effective_date: '2026-10-10', classification: 'qualitative' }
+    const scopeLoss = { id: 44, task: { name: 'Catálogo sin alcance' }, status: 'pendiente', effective_date: '2026-10-10', classification: 'quantitative', scope_loss_justification_available: true }
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [], manual_catalog_entries: [qualitative, scopeLoss] })
+    cancelManualCatalogEntry.mockResolvedValue({})
+    justifyManualCatalogEntryScopeLoss.mockResolvedValue({})
+    render(<CalendarioAreaPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Catálogo cualitativo/ }))
+    expect(screen.getByRole('button', { name: 'Cancelar entrada' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reprogramar' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Justificar pérdida de alcance' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar entrada' }))
+    fireEvent.change(screen.getByLabelText('Motivo'), { target: { value: 'No corresponde' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar cancelación' }))
+    await waitFor(() => expect(cancelManualCatalogEntry).toHaveBeenCalledWith(43, { reason: 'No corresponde' }, expect.any(String)))
+
+    fireEvent.click(await screen.findByRole('button', { name: /Catálogo sin alcance/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Justificar pérdida de alcance' }))
+    fireEvent.change(screen.getByLabelText('Justificación'), { target: { value: 'Sucursal transferida' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar justificación' }))
+    await waitFor(() => expect(justifyManualCatalogEntryScopeLoss).toHaveBeenCalledWith(44, { comment: 'Sucursal transferida' }, expect.any(String)))
+  })
+
+  it('shows scope-loss only for an exactly true server flag and retries a rejected justification with a new key', async () => {
+    const hidden = { id: 45, task: { name: 'Sin permiso explícito' }, status: 'pendiente', effective_date: '2026-10-10', classification: 'quantitative', scope_loss_justification_available: 'true' }
+    const visible = { id: 46, task: { name: 'Con permiso explícito' }, status: 'pendiente', effective_date: '2026-10-10', classification: 'quantitative', scope_loss_justification_available: true }
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [], manual_catalog_entries: [hidden, visible] })
+    justifyManualCatalogEntryScopeLoss.mockRejectedValueOnce(Object.assign(new Error('Justificación inválida'), { status: 400 })).mockResolvedValueOnce({})
+    render(<CalendarioAreaPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Sin permiso explícito/ }))
+    expect(screen.queryByRole('button', { name: 'Justificar pérdida de alcance' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar detalle de la ocurrencia' }))
+
+    fireEvent.click(await screen.findByRole('button', { name: /Con permiso explícito/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Justificar pérdida de alcance' }))
+    expect(screen.getByLabelText('Justificación')).toHaveAttribute('maxlength', '100')
+    fireEvent.change(screen.getByLabelText('Justificación'), { target: { value: 'Sucursal transferida' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar justificación' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Error de validación: Justificación inválida')
+    const rejectedKey = justifyManualCatalogEntryScopeLoss.mock.calls[0][2]
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar justificación' }))
+    await waitFor(() => expect(justifyManualCatalogEntryScopeLoss).toHaveBeenLastCalledWith(46, { comment: 'Sucursal transferida' }, expect.any(String)))
+    expect(justifyManualCatalogEntryScopeLoss.mock.calls[1][2]).not.toBe(rejectedKey)
+    await waitFor(() => expect(getMonthlyAreaOccurrences).toHaveBeenCalledTimes(2))
+  })
+
+  it('updates, completes, and cancels pending ad hoc activities while surfacing recoverable errors', async () => {
+    const adHoc = { id: 50, name: 'Actividad local', description: 'Antes', status: 'pendiente', effective_date: '2026-10-10' }
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [], ad_hoc_activities: [adHoc] })
+    updateAdHocActivity.mockRejectedValueOnce(Object.assign(new Error('Nombre inválido'), { status: 400 })).mockResolvedValueOnce({})
+    completeAdHocActivity.mockResolvedValue({})
+    cancelAdHocActivity.mockResolvedValue({})
+    render(<CalendarioAreaPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Actividad local/ }))
+    expect(screen.queryByRole('button', { name: 'Reprogramar' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }))
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Actividad corregida' } })
+    fireEvent.change(screen.getByLabelText('Descripción'), { target: { value: 'Después' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Error de validación: Nombre inválido')
+    const rejectedKey = updateAdHocActivity.mock.calls[0][2]
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    await waitFor(() => expect(updateAdHocActivity).toHaveBeenLastCalledWith(50, { name: 'Actividad corregida', description: 'Después' }, expect.any(String)))
+    expect(updateAdHocActivity.mock.calls[1][2]).not.toBe(rejectedKey)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Actividad local/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Completar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar completar' }))
+    await waitFor(() => expect(completeAdHocActivity).toHaveBeenCalledWith(50, { reason: '' }, expect.any(String)))
+
+    fireEvent.click(await screen.findByRole('button', { name: /Actividad local/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar entrada' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar cancelación' }))
+    await waitFor(() => expect(cancelAdHocActivity).toHaveBeenCalledWith(50, { reason: '' }, expect.any(String)))
+  })
+
+  it('reloads the month without retrying a conflicting manual command', async () => {
+    const manual = { id: 51, name: 'Actividad en conflicto', description: '', status: 'pendiente', effective_date: '2026-10-10' }
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [], ad_hoc_activities: [manual] })
+    completeAdHocActivity.mockRejectedValue(Object.assign(new Error('changed'), { status: 409 }))
+    render(<CalendarioAreaPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Actividad en conflicto/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Completar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar completar' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('estado de la ocurrencia cambió')
+    expect(completeAdHocActivity).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(getMonthlyAreaOccurrences).toHaveBeenCalledTimes(2))
   })
 
   it('keeps the calendar mounted with old task and absence events while previous and next month loads complete', async () => {

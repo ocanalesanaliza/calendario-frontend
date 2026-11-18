@@ -140,6 +140,7 @@ export default function GOAreaPerformanceHistoryPage() {
   const [occurrenceModal, setOccurrenceModal] = useState(null)
   const [occurrences, setOccurrences] = useState([])
   const [occurrenceCursor, setOccurrenceCursor] = useState(null)
+  const [manualOccurrences, setManualOccurrences] = useState([])
   const [occurrencesLoading, setOccurrencesLoading] = useState(false)
   const [occurrencesLoadingMore, setOccurrencesLoadingMore] = useState(false)
   const [occurrencesError, setOccurrencesError] = useState('')
@@ -246,6 +247,7 @@ export default function GOAreaPerformanceHistoryPage() {
   function resetOccurrences() {
     setOccurrences([])
     setOccurrenceCursor(null)
+    setManualOccurrences([])
     setOccurrenceDetail(null)
     setOccurrencesError('')
     setOccurrencesLoadMoreError('')
@@ -270,6 +272,7 @@ export default function GOAreaPerformanceHistoryPage() {
       if (requestId !== latestOccurrencesRequest.current) return
       const nextOccurrences = append ? uniqueOccurrences(occurrenceItems(data), occurrences) : uniqueOccurrences(occurrenceItems(data))
       setOccurrences(nextOccurrences)
+      if (!append) setManualOccurrences(Array.isArray(data?.manual_results) ? data.manual_results : [])
       setIssuedOccurrenceIds(new Set(nextOccurrences.map(occurrenceId).filter(Boolean)))
       setOccurrenceCursor(data?.next_cursor ?? null)
     } catch (error) {
@@ -386,10 +389,26 @@ export default function GOAreaPerformanceHistoryPage() {
             <h4 id="go-evidence-detail-history-title">Historial de revisiones</h4>
             <ul className="go-evidence-revision-list">{(occurrenceDetail?.revision_history ?? []).map((revision, index) => <li key={`${revision?.effective_at ?? 'revision'}-${index}`}><span>{revision?.status ?? 'Revisión registrada'}</span><span>{formatDate(revision?.effective_at)}</span></li>)}</ul>
           </section>
-        </div> : <EstadoCarga loading={occurrencesLoading || detailLoading} error={occurrencesError || detailError} onRetry={() => { if (detailError) setOccurrenceDetail(null); else openOccurrences(occurrenceModal) }} empty={!occurrencesLoading && !occurrencesError && occurrences.length === 0} emptyText="No hay ocurrencias autorizadas para este segmento.">
+        </div> : <EstadoCarga loading={occurrencesLoading || detailLoading} error={occurrencesError || detailError} onRetry={() => { if (detailError) setOccurrenceDetail(null); else openOccurrences(occurrenceModal) }} empty={!occurrencesLoading && !occurrencesError && occurrences.length === 0 && manualOccurrences.length === 0} emptyText="No hay ocurrencias autorizadas para este segmento.">
           <ul className="go-evidence-list">{occurrences.map((occurrence) => {
             const status = occurrenceStatus(occurrence?.latest_status)
             return <li key={occurrenceId(occurrence)}><button type="button" className="tuvet-btn tuvet-btn-secondary go-evidence-record" onClick={() => void openOccurrenceDetail(occurrence)}><span className="go-evidence-record-title">{occurrence?.task?.title ?? 'Ocurrencia autorizada'}</span><span className="go-evidence-record-meta"><span className="go-evidence-record-date-meta"><span>Fecha de origen</span><time className="go-evidence-record-date" dateTime={occurrence?.origin_date_local ?? undefined}>{formatDate(occurrence?.origin_date_local)}</time></span><span className={`go-evidence-record-status go-evidence-record-status-${status.tone}`} aria-label={`Estado: ${status.label}`}>{status.label}</span></span></button></li>
+          })}{manualOccurrences.map((occurrence, index) => {
+            const adHoc = occurrence?.provenance === 'ad_hoc'
+            const title = adHoc ? occurrence?.name : occurrence?.task?.title
+            const status = occurrenceStatus(occurrence?.latest_status)
+            return (
+              <li key={`manual-${occurrence?.provenance ?? 'unknown'}-${occurrence?.id ?? index}`} className="go-evidence-record go-evidence-record--manual">
+                <span className="go-evidence-record-title">{title ?? 'Entrada manual'}</span>
+                <span className="go-evidence-record-meta"><span>Origen: {adHoc ? 'Actividad ad hoc' : 'Tarea manual de catálogo'}</span><span>Fecha de origen: {formatDate(occurrence?.origin_date_local)}</span><span className={`go-evidence-record-status go-evidence-record-status-${status.tone}`} aria-label={`Estado: ${status.label}`}>{status.label}</span></span>
+                <dl className="go-evidence-manual-details">
+                  {!adHoc && <><dt>Clasificación</dt><dd>{occurrence?.classification ?? '—'}</dd><dt>Peso congelado</dt><dd>{displayValue(occurrence?.frozen_weight)}</dd>{occurrence?.planning_note ? <><dt>Nota de planificación</dt><dd>{occurrence.planning_note}</dd></> : null}</>}
+                  {adHoc && occurrence?.description ? <><dt>Descripción</dt><dd>{occurrence.description}</dd></> : null}
+                  <dt>Creada el</dt><dd>{formatDate(occurrence?.created_at)}</dd>
+                  {occurrence?.cancelled_at ? <><dt>Cancelada el</dt><dd>{formatDate(occurrence.cancelled_at)}</dd></> : null}
+                </dl>
+              </li>
+            )
           })}</ul>
           {occurrenceCursor && <div className="go-evidence-pagination">
             {occurrencesLoadMoreError && <Aviso tipo="warning">{occurrencesLoadMoreError}</Aviso>}
