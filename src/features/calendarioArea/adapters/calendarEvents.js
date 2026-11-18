@@ -21,6 +21,8 @@ const OCCURRENCE_STATUS_PRESENTATIONS = {
   vencida: { className: 'calendar-occurrence--vencida', label: 'Vencida', marker: 'overdue' },
   justificada: { className: 'calendar-occurrence--justificada', label: 'Justificada', marker: 'justified' },
   diferida: { className: 'calendar-occurrence--diferida', label: 'Diferida', marker: 'deferred' },
+  cancelada: { className: 'calendar-occurrence--cancelada', label: 'Cancelada', marker: 'cancelled' },
+  reprogramada: { className: 'calendar-occurrence--reprogramada', label: 'Reprogramada', marker: 'rescheduled' },
 }
 
 const MONTHLY_PERFORMANCE_STATES = new Set(['provisional', 'closed', 'corrected', 'not_applicable'])

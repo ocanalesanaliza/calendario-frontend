@@ -50,6 +50,8 @@ describe('calendar event adapter', () => {
     ['vencida', 'calendar-occurrence--vencida', 'Vencida', 'overdue'],
     ['justificada', 'calendar-occurrence--justificada', 'Justificada', 'justified'],
     ['diferida', 'calendar-occurrence--diferida', 'Diferida', 'deferred'],
+    ['cancelada', 'calendar-occurrence--cancelada', 'Cancelada', 'cancelled'],
+    ['reprogramada', 'calendar-occurrence--reprogramada', 'Reprogramada', 'rescheduled'],
   ])('maps %s to its semantic calendar chip class, SVG marker, and accessible label', (status, className, statusLabel, marker) => {
     const event = occurrenceToCalendarEvent({ id: 9, task: 'Apertura', status, effective_date: '2026-09-15' })
 
