@@ -1,27 +1,50 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CalendarioAreaPage from './CalendarioAreaPage'
+import { normalizeMonthlyAreaOccurrencesResponse } from '../../calendarArea/services/monthlyAreaOccurrence'
 
-const { cancelAdHocActivity, cancelManualCatalogEntry, completeAdHocActivity, completeAreaOccurrence, completeManualCatalogEntry, createAdHocActivity, createManualCatalogEntry, finalizeDepositReviewWorklist, getManualPlanningContext, getMonthlyAreaAbsences, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, getTareas, justifyManualCatalogEntryScopeLoss, navigate, rescheduleAreaOccurrence, rescheduleManualCatalogEntry, updateAdHocActivity, updateManualCatalogEntry, getDepositReviewWorklist, recordDepositReviewDecision, useAuth } = vi.hoisted(() => ({ cancelAdHocActivity: vi.fn(), cancelManualCatalogEntry: vi.fn(), completeAdHocActivity: vi.fn(), completeAreaOccurrence: vi.fn(), completeManualCatalogEntry: vi.fn(), createAdHocActivity: vi.fn(), createManualCatalogEntry: vi.fn(), finalizeDepositReviewWorklist: vi.fn(), getManualPlanningContext: vi.fn(), getMonthlyAreaAbsences: vi.fn(), getMonthlyAreaOccurrences: vi.fn(), getMonthlyAreaPerformance: vi.fn(), getTareas: vi.fn(), justifyManualCatalogEntryScopeLoss: vi.fn(), navigate: vi.fn(), rescheduleAreaOccurrence: vi.fn(), rescheduleManualCatalogEntry: vi.fn(), updateAdHocActivity: vi.fn(), updateManualCatalogEntry: vi.fn(), getDepositReviewWorklist: vi.fn(), recordDepositReviewDecision: vi.fn(), useAuth: vi.fn() }))
+const { cancelAdHocActivity, cancelManualCatalogEntry, completeAdHocActivity, completeAreaOccurrence, completeManualCatalogEntry, createAdHocActivity, createManualCatalogEntry, finalizeDepositReviewWorklist, getManualPlanningContext, getMonthlyAreaAbsences, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, getTareas, gotoDate, justifyManualCatalogEntryScopeLoss, navigate, rescheduleAreaOccurrence, rescheduleManualCatalogEntry, updateAdHocActivity, updateManualCatalogEntry, getDepositReviewWorklist, recordDepositReviewDecision, useAuth } = vi.hoisted(() => ({ cancelAdHocActivity: vi.fn(), cancelManualCatalogEntry: vi.fn(), completeAdHocActivity: vi.fn(), completeAreaOccurrence: vi.fn(), completeManualCatalogEntry: vi.fn(), createAdHocActivity: vi.fn(), createManualCatalogEntry: vi.fn(), finalizeDepositReviewWorklist: vi.fn(), getManualPlanningContext: vi.fn(), getMonthlyAreaAbsences: vi.fn(), getMonthlyAreaOccurrences: vi.fn(), getMonthlyAreaPerformance: vi.fn(), getTareas: vi.fn(), gotoDate: vi.fn(), justifyManualCatalogEntryScopeLoss: vi.fn(), navigate: vi.fn(), rescheduleAreaOccurrence: vi.fn(), rescheduleManualCatalogEntry: vi.fn(), updateAdHocActivity: vi.fn(), updateManualCatalogEntry: vi.fn(), getDepositReviewWorklist: vi.fn(), recordDepositReviewDecision: vi.fn(), useAuth: vi.fn() }))
 let datesSetHandler
+
+const toIsoDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+
+const isoDate = (offsetDays = 0) => {
+  const date = new Date()
+  date.setDate(date.getDate() + offsetDays)
+  return toIsoDate(date)
+}
+
+const dayCellClickDate = isoDate(3)
+
+// The real service returns the normalized payload; fixtures keep the raw backend contract.
+function serviceResponse(payload = {}) {
+  return normalizeMonthlyAreaOccurrencesResponse({ occurrences: [], ...payload })
+}
 
 vi.mock('../services/calendarioAreaService', () => ({ cancelAdHocActivity, cancelManualCatalogEntry, completeAdHocActivity, completeAreaOccurrence, completeManualCatalogEntry, createAdHocActivity, createManualCatalogEntry, getManualPlanningContext, getMonthlyAreaAbsences, getMonthlyAreaOccurrences, getMonthlyAreaPerformance, justifyManualCatalogEntryScopeLoss, rescheduleAreaOccurrence, rescheduleManualCatalogEntry, updateAdHocActivity, updateManualCatalogEntry }))
 vi.mock('../../tareas/services/tareasService', () => ({ getTareas }))
 vi.mock('../../calendarArea/services/depositReviewWorklistService', () => ({ finalizeDepositReviewWorklist, getDepositReviewWorklist, recordDepositReviewDecision }))
 vi.mock('../../auth/context/AuthContext', () => ({ useAuth }))
 vi.mock('react-router-dom', async (importActual) => ({ ...(await importActual()), useNavigate: () => navigate }))
-vi.mock('@fullcalendar/react', () => ({
-  default: ({ events, datesSet, eventClick, eventClassNames, eventContent }) => {
-    datesSetHandler = datesSet
-    return <div data-testid="full-calendar" data-read-only={String(events.every((event) => event.editable === false))}>
-      <div className="fc-col-header" data-testid="calendar-weekday-header" />
-      <div className="fc-daygrid-day fc-day-today" data-testid="calendar-current-day" />
-      {events.map((event) => <button type="button" aria-label={event.extendedProps?.aria_label ?? event.title} className={[event.classNames, eventClassNames?.({ event })].flat().join(' ')} key={event.id} onClick={(click) => eventClick({ event: { ...event, extendedProps: event.extendedProps }, jsEvent: click.nativeEvent })}>{eventContent?.({ event }) ?? event.title}</button>)}
-      <button type="button" onClick={() => datesSet({ view: { currentStart: new Date(2026, 9, 1) } })}>Mes anterior</button>
-      <button type="button" onClick={() => datesSet({ view: { currentStart: new Date(2026, 10, 1) } })}>Siguiente mes</button>
-    </div>
-  },
-}))
+vi.mock('@fullcalendar/react', async () => {
+  const { forwardRef, useImperativeHandle } = await import('react')
+  return {
+    default: forwardRef(({ events, datesSet, eventClick, eventClassNames, eventContent, dateClick }, ref) => {
+      useImperativeHandle(ref, () => ({ getApi: () => ({ gotoDate }) }))
+      datesSetHandler = datesSet
+      return <div data-testid="full-calendar" data-read-only={String(events.every((event) => event.editable === false))}>
+        <div className="fc-col-header" data-testid="calendar-weekday-header" />
+        <div className="fc-daygrid-day fc-day-today" data-testid="calendar-current-day" />
+        {events.map((event) => <button type="button" aria-label={event.extendedProps?.aria_label ?? event.title} className={[event.classNames, eventClassNames?.({ event })].flat().join(' ')} key={event.id} onClick={(click) => eventClick({ event: { ...event, extendedProps: event.extendedProps }, jsEvent: click.nativeEvent })}>{eventContent?.({ event }) ?? event.title}</button>)}
+        <button type="button" onClick={() => dateClick?.({ dateStr: dayCellClickDate, allDay: true })}>Día futuro</button>
+        <button type="button" onClick={() => dateClick?.({ dateStr: isoDate(-3), allDay: true })}>Día pasado</button>
+        <button type="button" onClick={() => dateClick?.({ dateStr: '2026-09-18T09:00:00', allDay: false })}>Hora 9</button>
+        <button type="button" onClick={() => datesSet({ view: { currentStart: new Date(2026, 9, 1) } })}>Mes anterior</button>
+        <button type="button" onClick={() => datesSet({ view: { currentStart: new Date(2026, 10, 1) } })}>Siguiente mes</button>
+      </div>
+    }),
+  }
+})
 
 describe('CalendarioAreaPage', () => {
   const occurrence = { occurrence_id: 4, task: 'Auditoría', status: 'pendiente', effective_date: '2026-09-03', scheduled_date: '2026-09-02', weight: 20, all_day: true, coverage_snapshot: { jornada: 'manana', aplica_ambas_jornadas: true }, template: { name: 'Apertura' }, template_version: { number: 3 } }
@@ -53,6 +76,7 @@ describe('CalendarioAreaPage', () => {
     recordDepositReviewDecision.mockReset()
     finalizeDepositReviewWorklist.mockReset()
     navigate.mockReset()
+    gotoDate.mockReset()
   })
 
   it('shows loading and then the monthly occurrences as read-only events', async () => {
@@ -78,18 +102,178 @@ describe('CalendarioAreaPage', () => {
     expect(await screen.findByLabelText('Área')).toHaveValue('8')
     fireEvent.change(screen.getByLabelText('Tipo de entrada'), { target: { value: 'catalog' } })
     fireEvent.change(screen.getByLabelText('Tarea de catálogo'), { target: { value: '123' } })
-    fireEvent.change(screen.getByLabelText('Fecha programada'), { target: { value: '2026-10-10' } })
+    fireEvent.change(screen.getByLabelText('Fecha programada'), { target: { value: isoDate(0) } })
     fireEvent.change(screen.getByLabelText('Sucursal'), { target: { value: '11' } })
     fireEvent.change(screen.getByLabelText('Nota de planificación'), { target: { value: 'Visita' } })
     fireEvent.click(screen.getByRole('button', { name: 'Crear entrada' }))
 
-    await waitFor(() => expect(createManualCatalogEntry).toHaveBeenCalledWith({ area_id: 8, task_id: 123, scheduled_date: '2026-10-10', branch_id: 11, planning_note: 'Visita' }, expect.any(String)))
+    await waitFor(() => expect(createManualCatalogEntry).toHaveBeenCalledWith({ area_id: 8, task_id: 123, scheduled_date: isoDate(0), branch_id: 11, planning_note: 'Visita' }, expect.any(String)))
     await waitFor(() => expect(getMonthlyAreaOccurrences).toHaveBeenCalledTimes(2))
+    expect(gotoDate).not.toHaveBeenCalled()
+  })
+
+  it('opens manual planning from a day cell click with the clicked date prefilled', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+    createManualCatalogEntry.mockResolvedValue({ entry: { id: 12 } })
+
+    render(<CalendarioAreaPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Día futuro' }))
+
+    expect(await screen.findByLabelText('Fecha programada')).toHaveValue(dayCellClickDate)
+    fireEvent.change(screen.getByLabelText('Tarea de catálogo'), { target: { value: '123' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Crear entrada' }))
+
+    await waitFor(() => expect(createManualCatalogEntry).toHaveBeenCalledWith({ area_id: 8, task_id: 123, scheduled_date: dayCellClickDate }, expect.any(String)))
+  })
+
+  it('ignores timed cells and day clicks while a detail dialog is open', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [occurrence] })
+
+    render(<CalendarioAreaPage />)
+    await screen.findByText('Auditoría')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hora 9' }))
+    expect(screen.queryByRole('dialog', { name: 'Planificar tarea manual' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Auditoría/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Día futuro' }))
+    expect(screen.getByRole('dialog', { name: 'Auditoría' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Planificar tarea manual' })).not.toBeInTheDocument()
+  })
+
+  it('offers Crear como completada only for a qualitative task scheduled today', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+    getTareas.mockResolvedValue([{ id_tarea: 321, nombre: 'Cualitativa', manual_planning_enabled: true, manual_planning_kind: 'qualitative' }])
+
+    render(<CalendarioAreaPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Planificar tarea manual' }))
+    fireEvent.change(await screen.findByLabelText('Tarea de catálogo'), { target: { value: '321' } })
+
+    expect(screen.getByLabelText('Fecha programada')).toHaveValue(isoDate(0))
+    expect(screen.getByLabelText('Crear como completada')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Fecha programada'), { target: { value: isoDate(1) } })
+    expect(screen.queryByLabelText('Crear como completada')).not.toBeInTheDocument()
+  })
+
+  it('sends starts_completed when a qualitative task is created as completed today', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+    getTareas.mockResolvedValue([{ id_tarea: 321, nombre: 'Cualitativa', manual_planning_enabled: true, manual_planning_kind: 'qualitative' }])
+    createManualCatalogEntry.mockResolvedValue({ entry: { id: 71 } })
+
+    render(<CalendarioAreaPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Planificar tarea manual' }))
+    fireEvent.change(await screen.findByLabelText('Tarea de catálogo'), { target: { value: '321' } })
+    fireEvent.click(screen.getByLabelText('Crear como completada'))
+    fireEvent.click(screen.getByRole('button', { name: 'Crear entrada' }))
+
+    await waitFor(() => expect(createManualCatalogEntry).toHaveBeenCalledTimes(1))
+    expect(createManualCatalogEntry.mock.calls[0][0]).toMatchObject({ scheduled_date: isoDate(0), starts_completed: true })
+  })
+
+  it('omits starts_completed from a future qualitative payload', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+    getTareas.mockResolvedValue([{ id_tarea: 321, nombre: 'Cualitativa', manual_planning_enabled: true, manual_planning_kind: 'qualitative' }])
+    createManualCatalogEntry.mockResolvedValue({ entry: { id: 72 } })
+
+    render(<CalendarioAreaPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Planificar tarea manual' }))
+    fireEvent.change(await screen.findByLabelText('Tarea de catálogo'), { target: { value: '321' } })
+    fireEvent.change(screen.getByLabelText('Fecha programada'), { target: { value: isoDate(1) } })
+    expect(screen.queryByLabelText('Crear como completada')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Crear entrada' }))
+
+    await waitFor(() => expect(createManualCatalogEntry).toHaveBeenCalledTimes(1))
+    expect(createManualCatalogEntry.mock.calls[0][0].scheduled_date).toBe(isoDate(1))
+    expect(createManualCatalogEntry.mock.calls[0][0]).not.toHaveProperty('starts_completed')
+  })
+
+  it('opens the dialog for a past day and disables catalog creation with an inline message', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+
+    render(<CalendarioAreaPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Día pasado' }))
+
+    expect(await screen.findByLabelText('Fecha programada')).toHaveValue(isoDate(-3))
+    expect(screen.getByText('Las tareas de catálogo solo admiten hoy o fechas futuras.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Crear entrada' })).toBeDisabled()
+  })
+
+  it('allows an ad hoc entry on that past day and sends the past scheduled date', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+    createAdHocActivity.mockResolvedValue({ activity: { id: 73 } })
+
+    render(<CalendarioAreaPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Día pasado' }))
+    await screen.findByLabelText('Fecha programada')
+    fireEvent.change(screen.getByLabelText('Tipo de entrada'), { target: { value: 'ad_hoc' } })
+
+    expect(screen.queryByText('Las tareas de catálogo solo admiten hoy o fechas futuras.')).not.toBeInTheDocument()
+    const submit = screen.getByRole('button', { name: 'Crear entrada' })
+    expect(submit).toBeEnabled()
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Actividad pasada' } })
+    fireEvent.click(submit)
+
+    await waitFor(() => expect(createAdHocActivity).toHaveBeenCalledWith({ area_id: 8, name: 'Actividad pasada', description: '', scheduled_date: isoDate(-3) }, expect.any(String)))
+  })
+
+  it('warns about an absence on the selected date without disabling submission', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+    getMonthlyAreaAbsences.mockResolvedValue({ month: '2026-09', absences: [{ id: 10, source: 'vacation', type: 'approved', date: dayCellClickDate, slot: 'full_day' }] })
+
+    render(<CalendarioAreaPage />)
+    await screen.findByTestId('full-calendar')
+    fireEvent.click(screen.getByRole('button', { name: 'Día futuro' }))
+
+    expect(await screen.findByLabelText('Fecha programada')).toHaveValue(dayCellClickDate)
+    expect(screen.getByText('Ese día tenés una ausencia registrada. No se puede planificar en esa fecha.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Crear entrada' })).toBeEnabled()
+  })
+
+  it('maps the absence conflict to Spanish and keeps the dialog open', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+    createManualCatalogEntry.mockRejectedValue(Object.assign(new Error('manual_creation_blocked_by_absence'), { status: 409, detail: 'manual_creation_blocked_by_absence' }))
+
+    render(<CalendarioAreaPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Planificar tarea manual' }))
+    fireEvent.change(await screen.findByLabelText('Tarea de catálogo'), { target: { value: '123' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Crear entrada' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ese día tenés una ausencia registrada. No se puede planificar en esa fecha.')
+    expect(document.body).not.toHaveTextContent('manual_creation_blocked_by_absence')
+    expect(screen.getByRole('dialog', { name: 'Planificar tarea manual' })).toBeInTheDocument()
+  })
+
+  it('exposes the today min attribute for catalog dates only', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+
+    render(<CalendarioAreaPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Planificar tarea manual' }))
+
+    expect(await screen.findByLabelText('Fecha programada')).toHaveAttribute('min', isoDate(0))
+    fireEvent.change(screen.getByLabelText('Tipo de entrada'), { target: { value: 'ad_hoc' } })
+    expect(screen.getByLabelText('Fecha programada')).not.toHaveAttribute('min')
+  })
+
+  it('navigates to the created entry month instead of reloading the current one', async () => {
+    const today = new Date()
+    const created = new Date(today.getFullYear(), today.getMonth() + 2, 1)
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [] })
+    createManualCatalogEntry.mockResolvedValue({ entry: { id: 13 } })
+
+    render(<CalendarioAreaPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Planificar tarea manual' }))
+    fireEvent.change(await screen.findByLabelText('Tarea de catálogo'), { target: { value: '123' } })
+    fireEvent.change(screen.getByLabelText('Fecha programada'), { target: { value: toIsoDate(created) } })
+    fireEvent.click(screen.getByRole('button', { name: 'Crear entrada' }))
+
+    await waitFor(() => expect(gotoDate).toHaveBeenCalledWith(created))
+    expect(getMonthlyAreaOccurrences).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('offers only permitted pending quantitative catalog actions and refreshes after updating its note and branch', async () => {
-    const manual = { id: 41, task: { name: 'Catálogo cuantitativo' }, status: 'pendiente', effective_date: '2026-10-10', planning_note: 'Antes', branch_id: 11, classification: 'quantitative' }
-    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [], manual_catalog_entries: [manual] })
+    const manual = { id: 41, task: { name: 'Catálogo cuantitativo' }, status: 'pending', effective_date: '2026-10-10', planning_note: 'Antes', branch_id: 11, classification: 'quantitative' }
+    getMonthlyAreaOccurrences.mockResolvedValue(serviceResponse({ manual_catalog_entries: [manual] }))
     updateManualCatalogEntry.mockResolvedValue({})
     render(<CalendarioAreaPage />)
 
@@ -110,8 +294,8 @@ describe('CalendarioAreaPage', () => {
   })
 
   it('runs quantitative catalog completion and reschedule commands with distinct idempotency keys', async () => {
-    const manual = { id: 42, task: { name: 'Catálogo cuantitativo' }, status: 'pendiente', effective_date: '2026-10-10', planning_note: '', classification: 'quantitative' }
-    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [], manual_catalog_entries: [manual] })
+    const manual = { id: 42, task: { name: 'Catálogo cuantitativo' }, status: 'pending', effective_date: '2026-10-10', planning_note: '', classification: 'quantitative' }
+    getMonthlyAreaOccurrences.mockResolvedValue(serviceResponse({ manual_catalog_entries: [manual] }))
     completeManualCatalogEntry.mockResolvedValue({})
     rescheduleManualCatalogEntry.mockResolvedValue({})
     render(<CalendarioAreaPage />)
@@ -130,10 +314,29 @@ describe('CalendarioAreaPage', () => {
     expect(rescheduleManualCatalogEntry.mock.calls[0][2]).not.toBe(completeManualCatalogEntry.mock.calls[0][2])
   })
 
+  it('labels the manual catalog classification in Spanish', async () => {
+    const qualitative = { id: 81, task: { name: 'Catálogo cualitativo' }, status: 'pending', effective_date: '2026-10-10', classification: 'qualitative' }
+    const quantitative = { id: 82, task: { name: 'Catálogo cuantitativo' }, status: 'pending', effective_date: '2026-10-10', classification: 'quantitative' }
+    getMonthlyAreaOccurrences.mockResolvedValue(serviceResponse({ manual_catalog_entries: [qualitative, quantitative] }))
+    render(<CalendarioAreaPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Catálogo cualitativo/ }))
+    const qualitativeDialog = screen.getByRole('dialog', { name: 'Catálogo cualitativo' })
+    expect(qualitativeDialog).toHaveTextContent('Clasificación')
+    expect(qualitativeDialog).toHaveTextContent('Cualitativa')
+    expect(qualitativeDialog).not.toHaveTextContent('qualitative')
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar detalle de la ocurrencia' }))
+
+    fireEvent.click(await screen.findByRole('button', { name: /Catálogo cuantitativo/ }))
+    const quantitativeDialog = screen.getByRole('dialog', { name: 'Catálogo cuantitativo' })
+    expect(quantitativeDialog).toHaveTextContent('Cuantitativa')
+    expect(quantitativeDialog).not.toHaveTextContent('quantitative')
+  })
+
   it('offers qualitative cancellation and scope-loss only when the returned state permits each action', async () => {
-    const qualitative = { id: 43, task: { name: 'Catálogo cualitativo' }, status: 'pendiente', effective_date: '2026-10-10', classification: 'qualitative' }
-    const scopeLoss = { id: 44, task: { name: 'Catálogo sin alcance' }, status: 'pendiente', effective_date: '2026-10-10', classification: 'quantitative', scope_loss_justification_available: true }
-    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [], manual_catalog_entries: [qualitative, scopeLoss] })
+    const qualitative = { id: 43, task: { name: 'Catálogo cualitativo' }, status: 'pending', effective_date: '2026-10-10', classification: 'qualitative' }
+    const scopeLoss = { id: 44, task: { name: 'Catálogo sin alcance' }, status: 'pending', effective_date: '2026-10-10', classification: 'quantitative', scope_loss_justification_available: true }
+    getMonthlyAreaOccurrences.mockResolvedValue(serviceResponse({ manual_catalog_entries: [qualitative, scopeLoss] }))
     cancelManualCatalogEntry.mockResolvedValue({})
     justifyManualCatalogEntryScopeLoss.mockResolvedValue({})
     render(<CalendarioAreaPage />)
@@ -155,9 +358,9 @@ describe('CalendarioAreaPage', () => {
   })
 
   it('shows scope-loss only for an exactly true server flag and retries a rejected justification with a new key', async () => {
-    const hidden = { id: 45, task: { name: 'Sin permiso explícito' }, status: 'pendiente', effective_date: '2026-10-10', classification: 'quantitative', scope_loss_justification_available: 'true' }
-    const visible = { id: 46, task: { name: 'Con permiso explícito' }, status: 'pendiente', effective_date: '2026-10-10', classification: 'quantitative', scope_loss_justification_available: true }
-    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [], manual_catalog_entries: [hidden, visible] })
+    const hidden = { id: 45, task: { name: 'Sin permiso explícito' }, status: 'pending', effective_date: '2026-10-10', classification: 'quantitative', scope_loss_justification_available: 'true' }
+    const visible = { id: 46, task: { name: 'Con permiso explícito' }, status: 'pending', effective_date: '2026-10-10', classification: 'quantitative', scope_loss_justification_available: true }
+    getMonthlyAreaOccurrences.mockResolvedValue(serviceResponse({ manual_catalog_entries: [hidden, visible] }))
     justifyManualCatalogEntryScopeLoss.mockRejectedValueOnce(Object.assign(new Error('Justificación inválida'), { status: 400 })).mockResolvedValueOnce({})
     render(<CalendarioAreaPage />)
 
@@ -180,8 +383,8 @@ describe('CalendarioAreaPage', () => {
   })
 
   it('updates, completes, and cancels pending ad hoc activities while surfacing recoverable errors', async () => {
-    const adHoc = { id: 50, name: 'Actividad local', description: 'Antes', status: 'pendiente', effective_date: '2026-10-10' }
-    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [], ad_hoc_activities: [adHoc] })
+    const adHoc = { id: 50, name: 'Actividad local', description: 'Antes', status: 'pending', effective_date: '2026-10-10' }
+    getMonthlyAreaOccurrences.mockResolvedValue(serviceResponse({ ad_hoc_activities: [adHoc] }))
     updateAdHocActivity.mockRejectedValueOnce(Object.assign(new Error('Nombre inválido'), { status: 400 })).mockResolvedValueOnce({})
     completeAdHocActivity.mockResolvedValue({})
     cancelAdHocActivity.mockResolvedValue({})
@@ -211,8 +414,8 @@ describe('CalendarioAreaPage', () => {
   })
 
   it('reloads the month without retrying a conflicting manual command', async () => {
-    const manual = { id: 51, name: 'Actividad en conflicto', description: '', status: 'pendiente', effective_date: '2026-10-10' }
-    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [], ad_hoc_activities: [manual] })
+    const manual = { id: 51, name: 'Actividad en conflicto', description: '', status: 'pending', effective_date: '2026-10-10' }
+    getMonthlyAreaOccurrences.mockResolvedValue(serviceResponse({ ad_hoc_activities: [manual] }))
     completeAdHocActivity.mockRejectedValue(Object.assign(new Error('changed'), { status: 409 }))
     render(<CalendarioAreaPage />)
 
@@ -654,6 +857,51 @@ describe('CalendarioAreaPage', () => {
     }
     expect(screen.getByText('Tarea diferida').closest('button')).toHaveClass('calendar-occurrence--diferida')
     expect(screen.getByText('Tarea pendiente').closest('button')).not.toHaveClass('calendar-occurrence--diferida')
+  })
+
+  it('presents a completed manual catalog entry with the completed chip family and no actions', async () => {
+    const manual = { id: 47, task: { name: 'Catálogo completado' }, status: 'completed', effective_date: '2026-10-10', classification: 'qualitative' }
+    getMonthlyAreaOccurrences.mockResolvedValue(serviceResponse({ manual_catalog_entries: [manual] }))
+
+    render(<CalendarioAreaPage />)
+
+    const chip = (await screen.findByText('Catálogo completado')).closest('button')
+    expect(chip).toHaveClass('calendar-occurrence--completada')
+    expect(chip).toHaveAccessibleName('Catálogo completado · Tarea manual de catálogo · Completada')
+    expect(chip.querySelector('[data-calendar-status-marker]')).toHaveAttribute('data-calendar-status-marker', 'complete')
+    fireEvent.click(chip)
+    expect(screen.getByRole('dialog', { name: 'Catálogo completado' })).toHaveTextContent('Completada')
+    expect(screen.queryByRole('button', { name: 'Actualizar' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Completar' })).not.toBeInTheDocument()
+  })
+
+  it('renders overdue, cancelled, and rescheduled manual entries with their own chip families and no actions', async () => {
+    const entries = [
+      { id: 61, task: { name: 'Vencida manual' }, status: 'overdue', effective_date: '2026-10-10', classification: 'qualitative' },
+      { id: 62, task: { name: 'Cancelada manual' }, status: 'cancelled', effective_date: '2026-10-10', classification: 'qualitative' },
+      { id: 63, task: { name: 'Reprogramada manual' }, status: 'rescheduled', effective_date: '2026-10-10', classification: 'quantitative' },
+    ]
+    getMonthlyAreaOccurrences.mockResolvedValue(serviceResponse({ manual_catalog_entries: entries }))
+
+    render(<CalendarioAreaPage />)
+
+    for (const [title, className, label, marker] of [
+      ['Vencida manual', 'calendar-occurrence--vencida', 'Vencida', 'overdue'],
+      ['Cancelada manual', 'calendar-occurrence--cancelada', 'Cancelada', 'cancelled'],
+      ['Reprogramada manual', 'calendar-occurrence--reprogramada', 'Reprogramada', 'rescheduled'],
+    ]) {
+      const chip = (await screen.findByText(title)).closest('button')
+      expect(chip).toHaveClass(className)
+      expect(chip).toHaveAccessibleName(`${title} · Tarea manual de catálogo · ${label}`)
+      expect(chip.querySelector('[data-calendar-status-marker]')).toHaveAttribute('data-calendar-status-marker', marker)
+      fireEvent.click(chip)
+      expect(screen.getByRole('dialog', { name: title })).toHaveTextContent(label)
+      expect(screen.queryByRole('button', { name: 'Actualizar' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Completar' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Reprogramar' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Cancelar entrada' })).not.toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Cerrar detalle de la ocurrencia' }))
+    }
   })
 
   it('uses the pending chip family for an unknown occurrence status without crashing', async () => {

@@ -39,11 +39,26 @@ const STATUS_LABELS = {
   vencida: 'Vencida',
   justificada: 'Justificada',
   diferida: 'Diferida',
+  cancelada: 'Cancelada',
+  reprogramada: 'Reprogramada',
 }
 const JORNADA_LABELS = { manana: 'Mañana', tarde: 'Tarde' }
+const CLASSIFICATION_LABELS = { qualitative: 'Cualitativa', quantitative: 'Cuantitativa' }
+const ABSENCE_CONFLICT_MESSAGE = 'Ese día tenés una ausencia registrada. No se puede planificar en esa fecha.'
+const PAST_CATALOG_MESSAGE = 'Las tareas de catálogo solo admiten hoy o fechas futuras.'
 
 function monthFromDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+function localIsoDate(date = new Date()) {
+  return `${monthFromDate(date)}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function parseIsoDate(value) {
+  const [year, month, day] = String(value ?? '').split('-').map(Number)
+  if (!year || !month || !day) return null
+  return new Date(year, month - 1, day)
 }
 
 function occurrenceTitle(occurrence) {
@@ -55,6 +70,7 @@ function occurrenceTitle(occurrence) {
 function errorMessage(error) {
   if (error.status === 400) return `Error de validación: ${error.message}`
   if (error.status === 403) return 'Acceso denegado para esta acción.'
+  if (error.detail === 'manual_creation_blocked_by_absence') return ABSENCE_CONFLICT_MESSAGE
   return error.message
 }
 
@@ -85,6 +101,8 @@ function OccurrenceStatusMarker({ marker, label }) {
     overdue: <><path d="M8 2.25 14.25 13H1.75L8 2.25Z" {...common} /><path d="M8 6v3.25M8 11.25h.01" {...common} /></>,
     justified: <><path d="M4 1.75h5l3 3v9.5H4z" {...common} /><path d="M9 1.75v3h3M5.75 9l1.1 1.1L10.5 6.5" {...common} /></>,
     deferred: <><circle cx="8" cy="8" r="5.75" {...common} /><path d="M8 4.75V8l2.5 1.5M11.5 2.75v2.5H9" {...common} /></>,
+    cancelled: <><circle cx="8" cy="8" r="6" {...common} /><path d="m5.75 5.75 4.5 4.5M10.25 5.75l-4.5 4.5" {...common} /></>,
+    rescheduled: <><path d="M13.5 8a5.5 5.5 0 1 1-2.1-4.33" {...common} /><path d="M13.75 2.5v3.25h-3.25" {...common} /></>,
   }
 
   return <svg className="calendario-area-event-chip__marker" data-calendar-status-marker={marker ?? 'pending'} viewBox="0 0 16 16" aria-hidden="true" focusable="false" title={label}>{paths[marker] ?? paths.pending}</svg>
@@ -149,12 +167,13 @@ function MonthlyPerformancePanel({ loading, month, performance, error, onRetry }
   )
 }
 
-function ManualPlanningDialog({ onClose, onCreated }) {
+function ManualPlanningDialog({ onClose, onCreated, initialDate = '', absenceDates = [] }) {
   const [context, setContext] = useState({ areas: [], branches: [], tasks: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [form, setForm] = useState({ type: 'catalog', areaId: '', taskId: '', date: '', branchId: '', note: '', startsCompleted: false, name: '', description: '' })
+  const [form, setForm] = useState({ type: 'catalog', areaId: '', taskId: '', date: initialDate, branchId: '', note: '', startsCompleted: false, name: '', description: '' })
+  const today = localIsoDate()
 
   useEffect(() => {
     let active = true
@@ -174,6 +193,9 @@ function ManualPlanningDialog({ onClose, onCreated }) {
     return String(taskId) === form.taskId
   })
   const classification = selectedTask?.manual_planning_kind
+  const startsCompletedAvailable = classification === 'qualitative' && form.date === today
+  const pastCatalogDate = form.type === 'catalog' && form.date !== '' && form.date < today
+  const absentDate = form.date !== '' && absenceDates.includes(form.date)
   const update = (name) => (event) => setForm((current) => ({ ...current, [name]: event.target.type === 'checkbox' ? event.target.checked : event.target.value }))
 
   async function submit(event) {
@@ -188,12 +210,12 @@ function ManualPlanningDialog({ onClose, onCreated }) {
         const body = { area_id: Number(form.areaId), task_id: Number(taskId), scheduled_date: form.date }
         if (form.branchId) body.branch_id = Number(form.branchId)
         if (form.note) body.planning_note = form.note
-        if (classification === 'qualitative' && form.startsCompleted) body.starts_completed = true
+        if (startsCompletedAvailable && form.startsCompleted) body.starts_completed = true
         await createManualCatalogEntry(body, key)
       } else {
         await createAdHocActivity({ area_id: Number(form.areaId), name: form.name, description: form.description, scheduled_date: form.date }, key)
       }
-      await onCreated()
+      await onCreated(form.date)
     } catch (requestError) {
       setError(errorMessage(requestError))
       setSubmitting(false)
@@ -211,10 +233,12 @@ function ManualPlanningDialog({ onClose, onCreated }) {
           <div className="calendar-modal__field"><label className="calendar-modal__label" htmlFor="manual-task">Tarea de catálogo</label><select className="calendar-modal__control" id="manual-task" aria-label="Tarea de catálogo" value={form.taskId} onChange={update('taskId')} required disabled={submitting}><option value="">Seleccionar tarea</option>{context.tasks.map((task) => { const taskId = task.id_tarea ?? task.id; return <option key={taskId} value={taskId}>{task.nombre ?? task.name}</option> })}</select></div>
           {classification === 'quantitative' && <div className="calendar-modal__field"><label className="calendar-modal__label" htmlFor="manual-branch">Sucursal</label><select className="calendar-modal__control" id="manual-branch" aria-label="Sucursal" value={form.branchId} onChange={update('branchId')} disabled={submitting}><option value="">Sin sucursal específica</option>{context.branches.map((branch) => <option key={branch.id_sucursal ?? branch.id} value={branch.id_sucursal ?? branch.id}>{branch.nombre ?? branch.name}</option>)}</select></div>}
           <div className="calendar-modal__field"><label className="calendar-modal__label" htmlFor="manual-note">Nota de planificación</label><textarea className="calendar-modal__control calendar-modal__control--textarea" id="manual-note" aria-label="Nota de planificación" maxLength={classification === 'qualitative' ? 200 : undefined} value={form.note} onChange={update('note')} disabled={submitting} /></div>
-          {classification === 'qualitative' && <label className="calendar-modal__label"><input type="checkbox" checked={form.startsCompleted} onChange={update('startsCompleted')} disabled={submitting} /> Crear como completada</label>}
+          {startsCompletedAvailable && <label className="calendar-modal__checkbox"><input type="checkbox" checked={form.startsCompleted} onChange={update('startsCompleted')} disabled={submitting} /> Crear como completada</label>}
         </> : <><div className="calendar-modal__field"><label className="calendar-modal__label" htmlFor="manual-name">Nombre</label><input className="calendar-modal__control" id="manual-name" aria-label="Nombre" maxLength="100" value={form.name} onChange={update('name')} required disabled={submitting} /></div><div className="calendar-modal__field"><label className="calendar-modal__label" htmlFor="manual-description">Descripción</label><textarea className="calendar-modal__control calendar-modal__control--textarea" id="manual-description" aria-label="Descripción" maxLength="200" value={form.description} onChange={update('description')} disabled={submitting} /></div></>}
-        <div className="calendar-modal__field"><label className="calendar-modal__label" htmlFor="manual-date">Fecha programada</label><input className="calendar-modal__control" id="manual-date" aria-label="Fecha programada" type="date" value={form.date} onChange={update('date')} required disabled={submitting} /></div>
-        <div className="calendar-modal__footer"><button type="button" className="calendar-modal__button calendar-modal__button--secondary" onClick={onClose} disabled={submitting}>Cancelar</button><button type="submit" className="calendar-modal__button calendar-modal__button--primary" disabled={submitting}>{submitting ? 'Creando...' : 'Crear entrada'}</button></div>
+        <div className="calendar-modal__field"><label className="calendar-modal__label" htmlFor="manual-date">Fecha programada</label><input className="calendar-modal__control" id="manual-date" aria-label="Fecha programada" type="date" value={form.date} onChange={update('date')} min={form.type === 'catalog' ? today : undefined} required disabled={submitting} /></div>
+        {pastCatalogDate && <p className="calendar-modal__warning" role="status">{PAST_CATALOG_MESSAGE}</p>}
+        {absentDate && <p className="calendar-modal__warning" role="status">{ABSENCE_CONFLICT_MESSAGE}</p>}
+        <div className="calendar-modal__footer"><button type="button" className="calendar-modal__button calendar-modal__button--secondary" onClick={onClose} disabled={submitting}>Cancelar</button><button type="submit" className="calendar-modal__button calendar-modal__button--primary" disabled={submitting || pastCatalogDate}>{submitting ? 'Creando...' : 'Crear entrada'}</button></div>
       </form>}
     </section>
   </div>
@@ -330,7 +354,7 @@ function OccurrenceDialog({ occurrence, onClose, onComplete, onReschedule, onMan
           <dt>Estado</dt><dd>{STATUS_LABELS[occurrence.status] ?? occurrence.status}</dd>
           {occurrence.provenance_label && <><dt>Procedencia</dt><dd>{occurrence.provenance_label}</dd></>}
           {occurrence.provenance === 'manual_catalog' && <>
-            <dt>Clasificación</dt><dd>{occurrence.classification}</dd>
+            <dt>Clasificación</dt><dd>{CLASSIFICATION_LABELS[occurrence.classification] ?? occurrence.classification}</dd>
             {occurrence.planning_note ? <><dt>Nota de planificación</dt><dd>{occurrence.planning_note}</dd></> : null}
           </>}
           {occurrence.provenance === 'ad_hoc' && occurrence.description && <><dt>Descripción</dt><dd>{occurrence.description}</dd></>}
@@ -407,9 +431,10 @@ export default function CalendarioAreaPage() {
   const [performanceLoading, setPerformanceLoading] = useState(true)
   const [performanceError, setPerformanceError] = useState(null)
   const [selected, setSelected] = useState(null)
-  const [manualPlanningOpen, setManualPlanningOpen] = useState(false)
+  const [manualPlanningDraft, setManualPlanningDraft] = useState(null)
   const [depositTerminal, setDepositTerminal] = useState('')
   const triggerRef = useRef(null)
+  const calendarRef = useRef(null)
   const currentMonthRef = useRef(month)
   const monthRequestRef = useRef(0)
   const absenceRequestRef = useRef(0)
@@ -527,6 +552,21 @@ export default function CalendarioAreaPage() {
     return runCommand(() => commands[action](entryId, body, key))
   }
 
+  async function handleManualPlanningCreated(createdDate) {
+    setManualPlanningDraft(null)
+    const created = parseIsoDate(createdDate)
+    if (created && monthFromDate(created) !== month) {
+      calendarRef.current?.getApi?.().gotoDate(created)
+      return
+    }
+    await loadMonth()
+  }
+
+  const absenceDates = absences
+    .filter((absence) => absence && absence.active !== false)
+    .map((absence) => absence.date ?? absence.fecha ?? absence.effective_date)
+    .filter(Boolean)
+
   async function handleDepositTerminal(worklist) {
     setSelected(null)
     const state = worklist.state ?? worklist.terminal?.state
@@ -540,7 +580,7 @@ export default function CalendarioAreaPage() {
 
   return (
     <section className="tema-analiza tuvet-page calendario-area-page" data-responsive-breakpoints="375 768 1024 1440">
-      <div className="page-header"><h1>Calendario del área</h1><button type="button" className="calendar-modal__button calendar-modal__button--primary" onClick={() => setManualPlanningOpen(true)}>Planificar tarea manual</button></div>
+      <div className="page-header"><h1>Calendario del área</h1><button type="button" className="calendar-modal__button calendar-modal__button--secondary" onClick={() => setManualPlanningDraft({ date: localIsoDate() })}>Planificar tarea manual</button></div>
       <MonthlyPerformancePanel loading={performanceLoading} month={month} performance={performance} error={performanceError} onRetry={() => loadPerformance()} />
       {error && <div className="calendario-area-state calendario-area-state--error" role="alert"><p>{error}</p><button type="button" onClick={() => loadMonth()}>Reintentar</button></div>}
       {depositTerminal && <div className="calendario-area-state calendario-area-state--success" role="status"><p>{depositTerminal}</p></div>}
@@ -548,10 +588,10 @@ export default function CalendarioAreaPage() {
       {loading && <div className="calendario-area-state calendario-area-state--loading" role="status" aria-busy="true"><span className="calendario-area-skeleton" aria-hidden="true" /><span className="calendario-area-skeleton calendario-area-skeleton--short" aria-hidden="true" /><span className="sr-only">Cargando calendario...</span></div>}
       <>
         {!loading && occurrences.length + manualCatalogEntries.length + adHocActivities.length === 0 && <div className="calendario-area-state calendario-area-state--empty" role="status"><strong>Mes sin tareas programadas</strong><p>No hay tareas programadas para este mes.</p></div>}
-        <div className="calendario-area-calendar calendario-area-calendar__surface" aria-busy={loading}><div className="calendario-area-calendar__scroll"><FullCalendar plugins={[dayGridPlugin, interactionPlugin, timeGridPlugin, listPlugin, multiMonthPlugin]} headerToolbar={{ start: 'prev,today,next', center: 'title', end: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek,multiMonthYear' }} views={{ listWeek: { buttonText: 'Lista semanal' }, multiMonthYear: { buttonText: 'Año' } }} initialView="dayGridMonth" locale="es" buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día', list: 'Lista', year: 'Año' }} events={[...occurrencesToCalendarEvents(selectVisibleOccurrences(occurrences, absences)), ...manualCatalogEntriesToCalendarEvents(manualCatalogEntries), ...adHocActivitiesToCalendarEvents(adHocActivities), ...absencesToCalendarEvents(absences)]} eventClassNames={(info) => info.event.extendedProps.calendar_event_type === 'absence' ? 'calendario-area-event-chip calendario-area-event-chip--absence' : 'calendario-area-event-chip calendario-area-event-chip--occurrence'} eventContent={(info) => info.event.extendedProps.calendar_event_type === 'absence' ? info.event.title : <span className="calendario-area-event-chip__content"><span className="calendario-area-event-chip__title">{info.event.title}</span><OccurrenceStatusMarker marker={info.event.extendedProps.status_marker} label={info.event.extendedProps.status_label} /></span>} eventDidMount={(info) => { if (info.event.extendedProps.calendar_event_type !== 'absence') { info.el.setAttribute('aria-label', info.event.extendedProps.aria_label); info.el.setAttribute('title', info.event.extendedProps.aria_label) } }} eventClick={(info) => { if (info.event.extendedProps.calendar_event_type === 'absence') return; const occurrence = { ...info.event.extendedProps, id: info.event.id, occurrence_id: info.event.extendedProps.occurrence_id, task: info.event.extendedProps.task }; if (occurrence.task?.mode === 'inventory_area') { navigate(`/calendario-area/inventario/${encodeURIComponent(occurrence.occurrence_id ?? occurrence.id)}?fecha=${encodeURIComponent(occurrence.effective_date ?? occurrence.scheduled_date ?? '')}`); return } triggerRef.current = info.el ?? info.jsEvent?.target; setSelected(occurrence) }} datesSet={handleDatesSet} height="auto" /></div></div>
+        <div className="calendario-area-calendar calendario-area-calendar__surface" aria-busy={loading}><div className="calendario-area-calendar__scroll"><FullCalendar ref={calendarRef} plugins={[dayGridPlugin, interactionPlugin, timeGridPlugin, listPlugin, multiMonthPlugin]} headerToolbar={{ start: 'prev,today,next', center: 'title', end: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek,multiMonthYear' }} views={{ listWeek: { buttonText: 'Lista semanal' }, multiMonthYear: { buttonText: 'Año' } }} initialView="dayGridMonth" locale="es" buttonText={{ today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día', list: 'Lista', year: 'Año' }} events={[...occurrencesToCalendarEvents(selectVisibleOccurrences(occurrences, absences)), ...manualCatalogEntriesToCalendarEvents(manualCatalogEntries), ...adHocActivitiesToCalendarEvents(adHocActivities), ...absencesToCalendarEvents(absences)]} eventClassNames={(info) => info.event.extendedProps.calendar_event_type === 'absence' ? 'calendario-area-event-chip calendario-area-event-chip--absence' : 'calendario-area-event-chip calendario-area-event-chip--occurrence'} eventContent={(info) => info.event.extendedProps.calendar_event_type === 'absence' ? info.event.title : <span className="calendario-area-event-chip__content"><span className="calendario-area-event-chip__title">{info.event.title}</span><OccurrenceStatusMarker marker={info.event.extendedProps.status_marker} label={info.event.extendedProps.status_label} /></span>} eventDidMount={(info) => { if (info.event.extendedProps.calendar_event_type !== 'absence') { info.el.setAttribute('aria-label', info.event.extendedProps.aria_label); info.el.setAttribute('title', info.event.extendedProps.aria_label) } }} eventClick={(info) => { if (info.event.extendedProps.calendar_event_type === 'absence') return; const occurrence = { ...info.event.extendedProps, id: info.event.id, occurrence_id: info.event.extendedProps.occurrence_id, task: info.event.extendedProps.task }; if (occurrence.task?.mode === 'inventory_area') { navigate(`/calendario-area/inventario/${encodeURIComponent(occurrence.occurrence_id ?? occurrence.id)}?fecha=${encodeURIComponent(occurrence.effective_date ?? occurrence.scheduled_date ?? '')}`); return } triggerRef.current = info.el ?? info.jsEvent?.target; setSelected(occurrence) }} datesSet={handleDatesSet} dateClick={(arg) => { if (!arg?.allDay || selected || manualPlanningDraft) return; setManualPlanningDraft({ date: arg.dateStr.slice(0, 10) }) }} height="auto" /></div></div>
       </>
       {selected?.task?.mode === 'deposit_review' ? <DepositReviewWorklistModal occurrenceVirtualId={selected.id} onClose={() => setSelected(null)} onTerminal={handleDepositTerminal} /> : selected && <OccurrenceDialog occurrence={selected} onClose={() => setSelected(null)} onComplete={(id, key) => runCommand(() => completeAreaOccurrence(id, key))} onReschedule={(id, body, key) => runCommand(() => rescheduleAreaOccurrence(id, body, key))} onManualCommand={runManualCommand} />}
-      {manualPlanningOpen && <ManualPlanningDialog onClose={() => setManualPlanningOpen(false)} onCreated={async () => { setManualPlanningOpen(false); await loadMonth() }} />}
+      {manualPlanningDraft && <ManualPlanningDialog initialDate={manualPlanningDraft.date} absenceDates={absenceDates} onClose={() => setManualPlanningDraft(null)} onCreated={handleManualPlanningCreated} />}
     </section>
   )
 }
