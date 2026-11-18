@@ -111,6 +111,23 @@ describe('RendimientoPage: consulta por usuario', () => {
     expect(apiRequest).toHaveBeenCalledWith(`/api/rendimiento/mensual/?id_usuario=12&anio=${ANIO}&mes=${MES}`)
   })
 
+  it('shows a GA only the current monthly evaluation without correction history', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', activo: true, habilitado: true } })
+    apiRequest.mockImplementation(async (path) => {
+      if (path === '/api/usuarios/') return response({ results: [] })
+      if (path === `/api/rendimiento/diario/?fecha=${HOY}`) return response({ rendimiento, acceso: ACCESO_LECTURA })
+      if (path === `/api/rendimiento/mensual/?anio=${ANIO}&mes=${MES}`) return response({ resumen: { porcentaje_mes: '88.00', dias_con_tareas: 10, dias_cerrados: 8, peso_total_cumplido: '88.00', peso_total_programado: '100.00', dias: [] }, acceso: ACCESO_LECTURA })
+      if (path === `/api/calendar/ga-monthly-evaluations/?month=${ANIO}-${String(MES).padStart(2, '0')}`) return response({ evaluations: [{ id: 8, score: '87.50', comment: 'Initial', issuer_go: { name: 'GO Ana' } }] })
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    renderPage('/rendimiento')
+    fireEvent.click(await screen.findByRole('button', { name: 'Mensual' }))
+
+    expect(await screen.findByText('GO Ana')).toBeInTheDocument()
+    expect(screen.getByText('Initial')).toBeInTheDocument()
+    expect(screen.queryByText(/historial completo|Versión/i)).not.toBeInTheDocument()
+  })
+
   it('muestra el 403 de otro área en lugar de indicar que no hay datos', async () => {
     apiRequest.mockImplementation(async (path) => {
       if (path === '/api/usuarios/') return response({ results: [] })

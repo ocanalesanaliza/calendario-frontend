@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Aviso, EstadoCarga, Modal, PageHeader } from '../../tuvet/components/TuvetUi'
 import { getGOAllAreasPerformanceHistory, getGOAreaPerformanceHistory, getGOAuthorizedAreas, getGOOccurrenceDetail, getGOOccurrences, getGOResponsibilityGaps } from '../services/goPerformanceHistoryService'
+import GAMonthlyEvaluationPanel from '../../gaMonthlyEvaluations/components/GAMonthlyEvaluationPanel'
 import '../../tuvet/tuvet.css'
 import './GOAreaPerformanceHistoryPage.css'
 
@@ -105,7 +106,7 @@ function uniqueOccurrences(items, existing = []) {
   })]
 }
 
-function HistoryRow({ row, onOccurrences, showArea }) {
+function HistoryRow({ row, onOccurrences, onEvaluation, showArea }) {
   const performance = row?.performance ?? {}
   const definitive = performance.kind === 'definitive'
   const notApplicable = isNotApplicable(performance)
@@ -120,7 +121,7 @@ function HistoryRow({ row, onOccurrences, showArea }) {
       <td><span className={`go-performance-state go-performance-state-${definitive ? 'definitive' : 'provisional'}`} aria-label={`${definitive ? 'Definitivo' : 'Provisional'} · ${state}`}><strong>{definitive ? 'Definitivo' : 'Provisional'}</strong><span aria-hidden="true"> · </span><span>{state}</span></span></td>
       <td className="go-performance-number">{notApplicable ? 'No aplica' : displayValue(performance.percentage, '%')}</td>
       <td className="go-performance-updated">{updated ? <><span>{updated.date}</span><span>{updated.time}</span></> : '—'}</td>
-      <td><button type="button" className="tuvet-btn tuvet-btn-secondary go-performance-row-action" onClick={() => onOccurrences(row)}>Ver evidencia de ocurrencias</button></td>
+      <td><button type="button" className="tuvet-btn tuvet-btn-secondary go-performance-row-action" onClick={() => onOccurrences(row)}>Ver evidencia de ocurrencias</button>{row?.responsibility?.manager?.id ? <button type="button" className="tuvet-btn tuvet-btn-secondary go-performance-row-action" onClick={() => onEvaluation(row)}>Gestionar evaluación mensual</button> : null}</td>
     </tr>
   )
 }
@@ -150,6 +151,7 @@ export default function GOAreaPerformanceHistoryPage() {
   const [detailError, setDetailError] = useState('')
   const [issuedOccurrenceIds, setIssuedOccurrenceIds] = useState(() => new Set())
   const [gapModalOpen, setGapModalOpen] = useState(false)
+  const [evaluationModal, setEvaluationModal] = useState(null)
   const [gaps, setGaps] = useState([])
   const [gapCursor, setGapCursor] = useState(null)
   const [gapsLoading, setGapsLoading] = useState(false)
@@ -167,6 +169,7 @@ export default function GOAreaPerformanceHistoryPage() {
     setOccurrenceModal(null)
     resetOccurrences()
     setGapModalOpen(false)
+    setEvaluationModal(null)
     setGaps([])
     setGapCursor(null)
     setGapsError('')
@@ -341,6 +344,11 @@ export default function GOAreaPerformanceHistoryPage() {
     void loadGaps()
   }
 
+  function openEvaluation(row) {
+    if (!row?.responsibility?.manager?.id || !row?.period) return
+    setEvaluationModal(row)
+  }
+
   return (
     <main className="tema-analiza tuvet-page go-area-performance-history" data-responsive-breakpoints="375 768 1024 1440">
       <PageHeader title="Rendimiento de áreas" />
@@ -367,7 +375,7 @@ export default function GOAreaPerformanceHistoryPage() {
           <div className="go-performance-table-wrap" tabIndex="0" aria-label="Resultados del historial de rendimiento de áreas">
             <table className="go-performance-table">
               <thead><tr>{allAreasSelected && <th className="go-performance-area">Área</th>}<th className="go-performance-manager">Gerente de Área</th><th className="go-performance-period">Período</th><th>Estado</th><th>Porcentaje</th><th className="go-performance-updated">Actualizado</th><th className="go-performance-evidence">Evidencia</th></tr></thead>
-              <tbody>{rows.map((row, index) => <HistoryRow key={`${row?.area?.id ?? 'area'}-${row?.responsibility?.id ?? index}-${row?.period ?? 'period'}`} row={row} onOccurrences={openOccurrences} showArea={allAreasSelected} />)}</tbody>
+              <tbody>{rows.map((row, index) => <HistoryRow key={`${row?.area?.id ?? 'area'}-${row?.responsibility?.id ?? index}-${row?.period ?? 'period'}`} row={row} onOccurrences={openOccurrences} onEvaluation={openEvaluation} showArea={allAreasSelected} />)}</tbody>
             </table>
           </div>
         )}
@@ -421,6 +429,9 @@ export default function GOAreaPerformanceHistoryPage() {
           <ul className="go-gap-list">{gaps.map((gap, index) => <li key={`${gap?.detected_at ?? 'gap'}-${index}`}><dl><dt>Inicio efectivo</dt><dd>{formatDate(gap?.effective_start)}</dd><dt>Fecha de detección</dt><dd>{formatDate(gap?.detected_at)}</dd><dt>Estado</dt><dd>{gap?.status ?? '—'}</dd><dt>Motivo de apertura</dt><dd>{gap?.opening_reason ?? '—'}</dd><dt>Procedencia de apertura</dt><dd>{gap?.opening_provenance ?? '—'}</dd>{gap?.resolution && <><dt>Resolución registrada</dt><dd>{gap.resolution?.reason ?? gap.resolution?.status ?? '—'}</dd></>}</dl></li>)}</ul>
           {gapCursor && <button type="button" className="tuvet-btn tuvet-btn-secondary go-performance-load-more" onClick={() => void loadGaps({ cursor: gapCursor, append: true })} disabled={gapsLoading}>{gapsLoading ? 'Cargando más…' : 'Cargar más'}</button>}
         </EstadoCarga>
+      </Modal>}
+      {evaluationModal && <Modal title="Evaluación mensual" subtitle="La autorización final y el estado de cierre se verifican en el servidor." icon="archivo" wide onClose={() => setEvaluationModal(null)} footer={<button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => setEvaluationModal(null)}>Cerrar</button>}>
+        <GAMonthlyEvaluationPanel gaId={evaluationModal.responsibility.manager.id} month={evaluationModal.period} mode="go" />
       </Modal>}
     </main>
   )

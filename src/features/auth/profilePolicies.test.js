@@ -142,6 +142,16 @@ describe('getProfileCapabilities', () => {
   })
 
   it.each([
+    ['active GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, true],
+    ['active global Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, true],
+    ['GA', { type: 'gerente_area', activo: true, habilitado: true }, false],
+    ['Admin Master', { type: 'admin_master', activo: true, habilitado: true }, false],
+    ['Master Admin', { es_admin_maestro: true, activo: true, habilitado: true, capabilities: { has_global_scope: true } }, false],
+  ])('exposes monthly GA-evaluation history only to %s when appropriate', (_role, profile, expected) => {
+    expect(getProfileCapabilities(profile).canAccessGAMonthlyEvaluationHistory).toBe(expected)
+  })
+
+  it.each([
     ['GA', { type: 'gerente_area' }, true, true, false, true, false],
     ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, true, false, true, false, true],
     ['active Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, true, false, true, false, true],

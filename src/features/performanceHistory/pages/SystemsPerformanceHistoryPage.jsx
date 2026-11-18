@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Aviso, EstadoCarga, PageHeader } from '../../tuvet/components/TuvetUi'
+import { Aviso, EstadoCarga, Modal, PageHeader } from '../../tuvet/components/TuvetUi'
 import { getAreas } from '../../areas/services/areasService'
 import { getPerformanceHistory } from '../services/performanceHistoryService'
+import GAMonthlyEvaluationPanel from '../../gaMonthlyEvaluations/components/GAMonthlyEvaluationPanel'
 import '../../tuvet/tuvet.css'
 import './SystemsPerformanceHistoryPage.css'
 
@@ -62,7 +63,7 @@ function responsibilityLabel(responsibility) {
   return 'Gerente histórico no disponible'
 }
 
-function HistoryRow({ row, onSelectTarget }) {
+function HistoryRow({ row, onSelectTarget, onEvaluationHistory }) {
   const performance = row?.performance ?? {}
   const definitive = performance.kind === 'definitive'
   const responsibility = responsibilityLabel(row?.responsibility)
@@ -88,7 +89,7 @@ function HistoryRow({ row, onSelectTarget }) {
         <span>{formatDate(performance.as_of)}</span>
         <small>{definitive ? 'Cierre definitivo' : 'Proyección generada'}</small>
       </td>
-      {onSelectTarget && <td>{canCorrect && <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => onSelectTarget(safeTarget)}>Corregir rendimiento</button>}</td>}
+      {onSelectTarget && <td>{canCorrect && <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => onSelectTarget(safeTarget)}>Corregir rendimiento</button>}{row?.responsibility?.manager?.id ? <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => onEvaluationHistory(row)}>Ver historial de evaluación</button> : null}</td>}
     </tr>
   )
 }
@@ -109,6 +110,7 @@ export default function SystemsPerformanceHistoryPage({ selectionMode = false, o
   const [rangeError, setRangeError] = useState('')
   const [areasAttempt, setAreasAttempt] = useState(0)
   const [areasLoadError, setAreasLoadError] = useState(false)
+  const [evaluationTarget, setEvaluationTarget] = useState(null)
   const searchButtonRef = useRef(null)
 
   useEffect(() => {
@@ -178,6 +180,11 @@ export default function SystemsPerformanceHistoryPage({ selectionMode = false, o
     request()
   }
 
+  function openEvaluationHistory(row) {
+    if (!row?.responsibility?.manager?.id || !row?.period) return
+    setEvaluationTarget(row)
+  }
+
   return (
     <main className="tema-analiza tuvet-page systems-performance-history" data-responsive-breakpoints="375 768 1024 1440">
       <PageHeader title={selectionMode ? 'Seleccionar rendimiento definitivo' : 'Historial de rendimiento mensual'} description={selectionMode ? 'Selecciona un cierre definitivo con evidencia para continuar.' : 'Consulta de solo lectura para Sistemas. El servidor conserva la autorización de los datos.'} />
@@ -201,11 +208,14 @@ export default function SystemsPerformanceHistoryPage({ selectionMode = false, o
         <div className="sph-table-wrap" tabIndex="0" aria-label="Resultados del historial de rendimiento mensual">
           <table className="sph-table">
             <thead><tr><th>Área</th><th>Responsabilidad</th><th>Mes</th><th>Estado</th><th>Versión</th><th>Peso esperado</th><th>Peso acreditado</th><th>Porcentaje</th><th>Actualizado</th>{(selectionMode || !selectionMode) && <th>{selectionMode ? 'Seleccionar' : 'Corrección'}</th>}</tr></thead>
-            <tbody>{rows.map((row, index) => <HistoryRow key={`${row?.period ?? 'period'}-${index}`} row={row} onSelectTarget={selectionMode ? onSelectTarget : (target) => navigate('/correcciones-rendimiento-mensual', { state: { target } })} />)}</tbody>
+            <tbody>{rows.map((row, index) => <HistoryRow key={`${row?.period ?? 'period'}-${index}`} row={row} onSelectTarget={selectionMode ? onSelectTarget : (target) => navigate('/correcciones-rendimiento-mensual', { state: { target } })} onEvaluationHistory={openEvaluationHistory} />)}</tbody>
           </table>
         </div>
         {nextCursor && <button type="button" className="tuvet-btn tuvet-btn-secondary sph-load-more" onClick={() => request({ cursor: nextCursor, append: true })} disabled={loadingMore}>{loadingMore ? 'Cargando más…' : 'Cargar más'}</button>}
       </EstadoCarga>
+      {evaluationTarget && <Modal title="Historial de evaluación mensual" subtitle="Consulta de solo lectura versionada para Sistemas." icon="archivo" wide onClose={() => setEvaluationTarget(null)} footer={<button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => setEvaluationTarget(null)}>Cerrar</button>}>
+        <GAMonthlyEvaluationPanel gaId={evaluationTarget.responsibility.manager.id} month={evaluationTarget.period} mode="systems" />
+      </Modal>}
     </main>
   )
 }

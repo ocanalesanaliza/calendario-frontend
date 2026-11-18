@@ -8,6 +8,7 @@ import {
 } from '../services/rendimientoService'
 import { getUsuarios } from '../../usuarios/services/usuariosService'
 import { useAuth } from '../../auth/context/AuthContext'
+import GAMonthlyEvaluationPanel from '../../gaMonthlyEvaluations/components/GAMonthlyEvaluationPanel'
 import './RendimientoPage.css'
 
 const hoy = () => new Date().toISOString().slice(0, 10)
@@ -102,7 +103,7 @@ export default function RendimientoPage() {
 
       {tab === 'diario'
         ? <VistaDiaria  esGerente={esGerente} idUsuario={idUsuario || undefined} />
-        : <VistaMensual esGerente={esGerente} idUsuario={idUsuario || undefined} />
+        : <VistaMensual esGerente={esGerente} idUsuario={idUsuario || undefined} showOwnEvaluation={perfil?.type === 'gerente_area' && !idUsuario} />
       }
     </div>
   )
@@ -281,7 +282,7 @@ function VistaDiaria({ esGerente, idUsuario }) {
 }
 
 /* ── Mensual ── */
-function VistaMensual({ idUsuario }) {
+function VistaMensual({ idUsuario, showOwnEvaluation }) {
   const init = mesActual()
   const [anio, setAnio] = useState(init.anio)
   const [mes, setMes]   = useState(init.mes)
@@ -345,6 +346,7 @@ function VistaMensual({ idUsuario }) {
               )}
             </div>
           </div>
+          {showOwnEvaluation && <GAMonthlyEvaluationPanel month={`${anio}-${String(mes).padStart(2, '0')}`} mode="ga" />}
 
           {data.dias?.length > 0 && (
             <div className="dias-grid">

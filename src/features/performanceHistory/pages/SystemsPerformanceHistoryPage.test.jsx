@@ -4,8 +4,10 @@ import { MemoryRouter } from 'react-router-dom'
 import SystemsPerformanceHistoryPage from './SystemsPerformanceHistoryPage'
 
 const service = vi.hoisted(() => ({ getPerformanceHistory: vi.fn(), getAreas: vi.fn() }))
+const evaluations = vi.hoisted(() => ({ getGAMonthlyEvaluations: vi.fn(), getGAMonthlyEvaluationHistory: vi.fn(), createGAMonthlyEvaluation: vi.fn(), correctGAMonthlyEvaluation: vi.fn() }))
 vi.mock('../services/performanceHistoryService', () => ({ getPerformanceHistory: service.getPerformanceHistory }))
 vi.mock('../../areas/services/areasService', () => ({ getAreas: service.getAreas }))
+vi.mock('../../gaMonthlyEvaluations/services/gaMonthlyEvaluationsService', () => evaluations)
 
 const areas = [{ id_area: 7, codigo: 'NORTE', nombre: 'Área Norte', activo: true }, { id_area: 8, codigo: 'SUR', nombre: 'Área Sur', activo: false }]
 const result = (kind = 'definitive', state = 'closed') => ({
@@ -18,8 +20,11 @@ function renderPage(props = {}) { return render(<MemoryRouter><SystemsPerformanc
 describe('SystemsPerformanceHistoryPage', () => {
   beforeEach(() => {
     service.getAreas.mockReset(); service.getPerformanceHistory.mockReset()
+    Object.values(evaluations).forEach((mock) => mock.mockReset())
     service.getAreas.mockResolvedValue(areas)
     service.getPerformanceHistory.mockResolvedValue({ results: [result()], next_cursor: null })
+    evaluations.getGAMonthlyEvaluations.mockResolvedValue({ evaluations: [{ id: 81, score: '87.50', comment: 'Seguimiento', issuer_go: { name: 'GO Ana' } }] })
+    evaluations.getGAMonthlyEvaluationHistory.mockResolvedValue({ history: [{ id: 80, version: 1, score: '80.00', comment: '', reason: '' }, { id: 81, version: 2, score: '87.50', comment: 'Seguimiento', reason: 'Revisión operativa' }] })
   })
 
   it('shows inactive areas, searches a matching one-month range, and never exposes snapshot ids', async () => {
@@ -100,5 +105,33 @@ describe('SystemsPerformanceHistoryPage', () => {
     expect(await screen.findByText('Nombre del GA')).toBeInTheDocument()
     expect(screen.getByText('Gerente histórico no disponible')).toBeInTheDocument()
     expect(screen.getByText('Responsable histórico')).toBeInTheDocument()
+  })
+
+  it('loads the complete versioned evaluation history for the selected Systems row without evaluation mutation controls', async () => {
+    service.getPerformanceHistory.mockResolvedValue({ results: [{ ...result(), responsibility: { id: 1, manager: { id: 27, display_name: 'Nombre del GA' } } }], next_cursor: null })
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver historial de evaluación' }))
+    expect(await screen.findByRole('dialog', { name: /Historial de evaluación mensual/i })).toBeInTheDocument()
+    expect(evaluations.getGAMonthlyEvaluations).toHaveBeenCalledWith({ gaId: 27, month: '2026-10' })
+    fireEvent.click(screen.getByRole('button', { name: 'Ver historial completo' }))
+    expect(await screen.findByText('Versión 2')).toBeInTheDocument()
+    expect(screen.getByText('Revisión operativa')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /emitir|corregir evaluación|guardar evaluación/i })).not.toBeInTheDocument()
+    expect(evaluations.createGAMonthlyEvaluation).not.toHaveBeenCalled()
+    expect(evaluations.correctGAMonthlyEvaluation).not.toHaveBeenCalled()
+  })
+
+  it('keeps evaluation history states isolated for an empty or denied API response', async () => {
+    service.getPerformanceHistory.mockResolvedValue({ results: [{ ...result(), responsibility: { id: 1, manager: { id: 27, display_name: 'Nombre del GA' } } }], next_cursor: null })
+    evaluations.getGAMonthlyEvaluations.mockResolvedValueOnce({ evaluations: [] }).mockRejectedValueOnce(Object.assign(new Error('denied'), { status: 403 }))
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver historial de evaluación' }))
+    expect(await screen.findByText('No hay evaluación mensual vigente.')).toBeInTheDocument()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Cerrar' }).at(-1))
+    fireEvent.click(screen.getByRole('button', { name: 'Ver historial de evaluación' }))
+    expect(await screen.findByText(/El servidor mantiene la autorización/)).toBeInTheDocument()
+    expect(screen.getByText('Nombre del GA')).toBeInTheDocument()
   })
 })
