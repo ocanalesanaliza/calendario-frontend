@@ -574,6 +574,22 @@ describe('CalendarioAreaPage', () => {
     expect(screen.queryByRole('dialog', { name: 'Registrar inventario' })).not.toBeInTheDocument()
   })
 
+  it('navigates a manual inventory-area entry to its dedicated workspace instead of opening a modal', async () => {
+    const manualInventory = {
+      id: 123,
+      effective_date: '2026-09-03',
+      execution_kind: 'inventory_area',
+      task: { id: 21, name: 'Inventario manual de área', mode: 'simple' },
+    }
+    getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [], manual_catalog_entries: [manualInventory] })
+
+    render(<CalendarioAreaPage />)
+    fireEvent.click(await screen.findByRole('button', { name: /Inventario manual de área/ }))
+
+    expect(navigate).toHaveBeenCalledWith('/calendario-area/inventario/manual/123?fecha=2026-09-03')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
   it('does not offer sin_registro_revisado for a pending case', async () => {
     const depositOccurrence = { ...occurrence, id: 'occurrence-signed-opaque', occurrence_id: undefined, task: { id: 123, name: 'Deposit review', mode: 'deposit_review' } }
     getMonthlyAreaOccurrences.mockResolvedValue({ occurrences: [depositOccurrence] })

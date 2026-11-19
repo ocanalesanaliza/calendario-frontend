@@ -31,8 +31,11 @@ export function previewInventory(file) {
   return request('/api/inventarios/preview/', { method: 'POST', body: formData({ file }) }, 'No se pudo previsualizar el inventario.')
 }
 
-export function discoverAreaBranches(areaOccurrenceId) {
-  return request(`/api/inventarios/ga/ocurrencias/${areaOccurrenceId}/sucursales/`, undefined, 'No se pudieron cargar las sucursales autorizadas.')
+export function discoverAreaBranches(source) {
+  const path = typeof source === 'object' && source?.manualEntryId !== undefined
+    ? `/api/inventarios/ga/manuales/${source.manualEntryId}/sucursales/`
+    : `/api/inventarios/ga/ocurrencias/${source}/sucursales/`
+  return request(path, undefined, 'No se pudieron cargar las sucursales autorizadas.')
 }
 
 export function submitInventoryBranch({ assignmentId, file, rows, comment, idempotencyKey }) {
@@ -42,10 +45,13 @@ export function submitInventoryBranch({ assignmentId, file, rows, comment, idemp
   }, 'No se pudo registrar el inventario.')
 }
 
-export function submitInventoryArea({ areaOccurrenceId, branchId, file, rows, comment, idempotencyKey }) {
+export function submitInventoryArea({ areaOccurrenceId, manualEntryId, branchId, file, rows, comment, idempotencyKey }) {
+  const origin = manualEntryId !== undefined
+    ? { manual_entry_id: String(manualEntryId) }
+    : { area_occurrence_id: String(areaOccurrenceId) }
   return request('/api/inventarios/ga/enviar/', {
     method: 'POST',
-    body: formData({ area_occurrence_id: String(areaOccurrenceId), branch_id: String(branchId), file, rows: JSON.stringify(rows), comment, idempotency_key: idempotencyKey }),
+    body: formData({ ...origin, branch_id: String(branchId), file, rows: JSON.stringify(rows), comment, idempotency_key: idempotencyKey }),
   }, 'No se pudo registrar el inventario.')
 }
 

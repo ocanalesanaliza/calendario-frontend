@@ -56,6 +56,24 @@ describe('inventoryService', () => {
     expect(apiRequest).toHaveBeenCalledWith('/api/inventarios/ga/ocurrencias/42/sucursales/')
   })
 
+  it('discovers authorized branches for a manual GA inventory through its explicit URL', async () => {
+    apiRequest.mockResolvedValueOnce(response({ manual_entry_id: 123, branches: [{ id: 7, code: 'INV-001', name: 'Sucursal Centro' }] }))
+
+    await expect(discoverAreaBranches({ manualEntryId: 123 })).resolves.toEqual({ manual_entry_id: 123, branches: [{ id: 7, code: 'INV-001', name: 'Sucursal Centro' }] })
+    expect(apiRequest).toHaveBeenCalledWith('/api/inventarios/ga/manuales/123/sucursales/')
+  })
+
+  it.each([
+    ['scheduled', { areaOccurrenceId: 42 }, 'area_occurrence_id', '42'],
+    ['manual', { manualEntryId: 123 }, 'manual_entry_id', '123'],
+  ])('sends only the %s GA inventory origin identity', async (_flow, identity, expectedKey, expectedValue) => {
+    await submitInventoryArea({ ...identity, branchId: 7, file, rows, comment: 'Hallazgo', idempotencyKey: 'stable-ga' })
+
+    const [, options] = apiRequest.mock.calls[0]
+    expect(options.body.get(expectedKey)).toBe(expectedValue)
+    expect(options.body.get(expectedKey === 'manual_entry_id' ? 'area_occurrence_id' : 'manual_entry_id')).toBeNull()
+  })
+
   it('sends only the recognized history scope query parameter', async () => {
     await listHistory({ branchId: 7 })
     expect(apiRequest).toHaveBeenLastCalledWith('/api/inventarios/historial/?branch_id=7')

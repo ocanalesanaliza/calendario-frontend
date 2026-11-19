@@ -37,6 +37,7 @@ function renderPage(entry = '/calendario-area/inventario/117?fecha=2026-09-03') 
   return render(<MemoryRouter initialEntries={[entry]}><RouteState /><Routes>
     <Route path="/calendario-area" element={<p>Calendario del área</p>} />
     <Route path="/calendario-area/inventario/:idOcurrencia" element={<InventoryAreaExecutionPage />} />
+    <Route path="/calendario-area/inventario/manual/:manualEntryId" element={<InventoryAreaExecutionPage />} />
   </Routes></MemoryRouter>)
 }
 
@@ -148,5 +149,24 @@ describe('InventoryAreaExecutionPage', () => {
       ],
     })))
     await waitFor(() => expect(screen.getByTestId('route-state')).toHaveTextContent('/calendario-area?fecha=2026-09-03'))
+  })
+
+  it('reloads and submits a manual area inventory with only its manual entry identity', async () => {
+    getMonthlyAreaOccurrences.mockResolvedValue({
+      occurrences: [],
+      manual_catalog_entries: [{ id: 123, effective_date: '2026-09-03', execution_kind: 'inventory_area', task: { name: 'Inventario manual de área', mode: 'simple' } }],
+    })
+    renderPage('/calendario-area/inventario/manual/123?fecha=2026-09-03')
+    const file = await selectBranchAndPreview()
+    fireEvent.click(document.querySelector('.MuiDataGrid-row[data-id="A-1"] [data-field="physical_stock"]'))
+    fireEvent.change(await screen.findByLabelText('Existencia física para Arroz'), { target: { value: '5' } })
+    fireEvent.keyDown(screen.getByLabelText('Existencia física para Arroz'), { key: 'Enter' })
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar inventario' }))
+
+    await waitFor(() => expect(discoverAreaBranches).toHaveBeenCalledWith({ manualEntryId: '123' }))
+    await waitFor(() => expect(submitInventoryArea).toHaveBeenCalled())
+    const [payload] = submitInventoryArea.mock.calls[0]
+    expect(payload).toMatchObject({ manualEntryId: '123', branchId: '8', file })
+    expect(payload).not.toHaveProperty('areaOccurrenceId')
   })
 })

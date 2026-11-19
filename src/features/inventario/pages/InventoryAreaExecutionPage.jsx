@@ -64,7 +64,7 @@ function GridEditCell({ id, field, value, api, onValueChange, row, disabled }) {
 }
 
 export default function InventoryAreaExecutionPage() {
-  const { idOcurrencia } = useParams()
+  const { idOcurrencia, manualEntryId } = useParams()
   const { search: locationSearch } = useLocation()
   const navigate = useNavigate()
   const fecha = new URLSearchParams(locationSearch).get('fecha') ?? ''
@@ -93,11 +93,14 @@ export default function InventoryAreaExecutionPage() {
       if (!isValidCalendarDate(fecha)) { if (active) { setOccurrence(undefined); setLoading(false) }; return }
       try {
         const data = await getMonthlyAreaOccurrences(fecha.slice(0, 7))
-        const next = data.occurrences?.find((item) => String(item.occurrence_id ?? item.id) === String(idOcurrencia))
-        if (!next || next.task?.mode !== 'inventory_area') { if (active) setOccurrence(undefined); return }
+        const isManual = manualEntryId !== undefined
+        const next = isManual
+          ? data.manual_catalog_entries?.find((item) => String(item.id) === String(manualEntryId) && item.execution_kind === 'inventory_area')
+          : data.occurrences?.find((item) => String(item.occurrence_id ?? item.id) === String(idOcurrencia) && item.task?.mode === 'inventory_area')
+        if (!next) { if (active) setOccurrence(undefined); return }
         if (!active) return
         setOccurrence(next)
-        const branchData = await discoverAreaBranches(next.occurrence_id ?? next.id)
+        const branchData = await discoverAreaBranches(isManual ? { manualEntryId } : next.occurrence_id ?? next.id)
         if (active) setBranches(branchData.branches ?? [])
       } catch (requestError) {
         if (active) setError(requestError.message || 'No se pudo recargar el inventario de área.')
@@ -105,7 +108,7 @@ export default function InventoryAreaExecutionPage() {
     }
     void load()
     return () => { active = false }
-  }, [fecha, idOcurrencia])
+  }, [fecha, idOcurrencia, manualEntryId])
 
   const gridRows = useMemo(() => rows.map(toBranchInventoryGridRow), [rows])
   const filteredRows = useMemo(() => filterBranchInventoryGridRows(gridRows, search, statusFilter), [gridRows, search, statusFilter])
@@ -171,7 +174,7 @@ export default function InventoryAreaExecutionPage() {
         delete serialized.__id
         return serialized
       })
-      await submitInventoryArea({ areaOccurrenceId: occurrence.occurrence_id ?? occurrence.id, branchId, file, rows: serializedRows, comment, idempotencyKey: idempotencyKey.current })
+      await submitInventoryArea({ ...(manualEntryId !== undefined ? { manualEntryId } : { areaOccurrenceId: occurrence.occurrence_id ?? occurrence.id }), branchId, file, rows: serializedRows, comment, idempotencyKey: idempotencyKey.current })
       navigate({ pathname: '/calendario-area', search: fecha ? `?fecha=${fecha}` : '' }, { replace: true })
     } catch (requestError) { setError(requestError.message || 'No se pudo registrar el inventario.'); setSending(false) }
   }
