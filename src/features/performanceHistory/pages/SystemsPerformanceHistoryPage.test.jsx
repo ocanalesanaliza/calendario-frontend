@@ -114,7 +114,7 @@ describe('SystemsPerformanceHistoryPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Ver historial de evaluación' }))
     expect(await screen.findByRole('dialog', { name: /Historial de evaluación mensual/i })).toBeInTheDocument()
     expect(evaluations.getGAMonthlyEvaluations).toHaveBeenCalledWith({ gaId: 27, month: '2026-10' })
-    fireEvent.click(screen.getByRole('button', { name: 'Ver historial completo' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Mostrar historial de versiones' }))
     expect(await screen.findByText('Versión 2')).toBeInTheDocument()
     expect(screen.getByText('Revisión operativa')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /emitir|corregir evaluación|guardar evaluación/i })).not.toBeInTheDocument()

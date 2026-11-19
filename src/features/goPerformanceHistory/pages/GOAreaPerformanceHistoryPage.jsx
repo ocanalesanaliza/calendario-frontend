@@ -9,10 +9,17 @@ const PAGE_SIZE = 25
 const ALL_AREAS_VALUE = '__all_areas__'
 const OCCURRENCE_STATUS = {
   pendiente: { label: 'Pendiente', tone: 'pending' },
+  pending: { label: 'Pendiente', tone: 'pending' },
   completada: { label: 'Completada', tone: 'completed' },
+  completed: { label: 'Completada', tone: 'completed' },
+  aprobada: { label: 'Completada', tone: 'completed' },
+  approved: { label: 'Completada', tone: 'completed' },
   vencida: { label: 'Vencida', tone: 'overdue' },
+  overdue: { label: 'Vencida', tone: 'overdue' },
   justificada: { label: 'Justificada', tone: 'justified' },
+  justified: { label: 'Justificada', tone: 'justified' },
   diferida: { label: 'Diferida', tone: 'deferred' },
+  deferred: { label: 'Diferida', tone: 'deferred' },
 }
 
 function currentMonth() {
@@ -63,6 +70,25 @@ function isNotApplicable(performance) {
   return performance?.state === 'not_applicable'
 }
 
+function formatCompactDate(value) {
+  if (!value) return '—'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(date)
+}
+
+function performanceStatus(performance) {
+  if (isNotApplicable(performance)) return { label: 'No aplica', tone: 'neutral' }
+  if (performance?.kind === 'definitive') return { label: 'Definitivo', tone: 'definitive' }
+  if (performance?.kind === 'provisional') return { label: 'Provisional', tone: 'provisional' }
+  return { label: 'Estado no disponible', tone: 'neutral' }
+}
+
+function evaluationActionLabel(row) {
+  if (row?.monthly_evaluation === null) return 'Evaluar GA'
+  if (row?.monthly_evaluation) return 'Gestionar evaluación'
+  return 'Gestionar evaluación mensual'
+}
+
 function displayValue(value, suffix = '') {
   return value === null || value === undefined || value === '' ? '—' : `${value}${suffix}`
 }
@@ -96,6 +122,13 @@ function occurrenceStatus(status) {
   return OCCURRENCE_STATUS[status] ?? { label: 'Estado no disponible', tone: 'neutral' }
 }
 
+function revisionHistory(detail) {
+  const history = Array.isArray(detail?.revision_history) ? detail.revision_history : []
+  const latest = detail?.latest_revision
+  if (!latest?.effective_at) return history
+  return history.some((revision) => revision?.effective_at === latest.effective_at) ? history : [...history, latest]
+}
+
 function uniqueOccurrences(items, existing = []) {
   const knownIds = new Set(existing.map(occurrenceId).filter(Boolean))
   return [...existing, ...items.filter((item) => {
@@ -106,24 +139,32 @@ function uniqueOccurrences(items, existing = []) {
   })]
 }
 
-function HistoryRow({ row, onOccurrences, onEvaluation, showArea }) {
+function HistoryRow({ row, onOccurrences, onEvaluation }) {
   const performance = row?.performance ?? {}
-  const definitive = performance.kind === 'definitive'
   const notApplicable = isNotApplicable(performance)
-  const state = notApplicable ? 'No aplica' : (performance.state ?? '—')
+  const status = performanceStatus(performance)
   const updated = formatDateParts(performance.as_of)
 
   return (
     <tr>
-      {showArea && <td className="go-performance-area">{areaLabel(row?.area)}</td>}
-      <td className="go-performance-manager">{managerLabel(row?.responsibility)}</td>
-      <td className="go-performance-period">{formatMonth(row?.period)}</td>
-      <td><span className={`go-performance-state go-performance-state-${definitive ? 'definitive' : 'provisional'}`} aria-label={`${definitive ? 'Definitivo' : 'Provisional'} · ${state}`}><strong>{definitive ? 'Definitivo' : 'Provisional'}</strong><span aria-hidden="true"> · </span><span>{state}</span></span></td>
-      <td className="go-performance-number">{notApplicable ? 'No aplica' : displayValue(performance.percentage, '%')}</td>
-      <td className="go-performance-updated">{updated ? <><span>{updated.date}</span><span>{updated.time}</span></> : '—'}</td>
-      <td><button type="button" className="tuvet-btn tuvet-btn-secondary go-performance-row-action" onClick={() => onOccurrences(row)}>Ver evidencia de ocurrencias</button>{row?.responsibility?.manager?.id ? <button type="button" className="tuvet-btn tuvet-btn-secondary go-performance-row-action" onClick={() => onEvaluation(row)}>Gestionar evaluación mensual</button> : null}</td>
+      <td className="go-performance-area" data-label="Área"><strong>{areaLabel(row?.area)}</strong><span>{managerLabel(row?.responsibility)}</span></td>
+      <td className="go-performance-number" data-label="Rendimiento">{notApplicable ? 'No aplica' : displayValue(performance.percentage, '%')}</td>
+      <td data-label="Estado"><span className={`go-performance-state go-performance-state-${status.tone}`}>{status.label}</span></td>
+      <td className="go-performance-updated" data-label="Actualizado">{updated ? <><span>{updated.date}</span><span>{updated.time}</span></> : '—'}</td>
+      <td className="go-performance-actions-cell" data-label="Acciones"><div className="go-performance-row-actions">{row?.responsibility?.manager?.id ? <button type="button" className="tuvet-btn go-performance-row-action" onClick={() => onEvaluation(row)}>{evaluationActionLabel(row)}</button> : null}<button type="button" className="tuvet-btn tuvet-btn-link go-performance-evidence-action" onClick={() => onOccurrences(row)}>Ver evidencia de ocurrencias</button></div></td>
     </tr>
   )
+}
+
+function performanceSummary(rows) {
+  return rows.reduce((summary, row) => {
+    const status = performanceStatus(row?.performance)
+    summary.total += 1
+    if (status.tone === 'definitive') summary.definitive += 1
+    else if (status.tone === 'provisional') summary.provisional += 1
+    else if (status.tone === 'neutral' && isNotApplicable(row?.performance)) summary.notApplicable += 1
+    return summary
+  }, { total: 0, definitive: 0, provisional: 0, notApplicable: 0 })
 }
 
 export default function GOAreaPerformanceHistoryPage() {
@@ -160,6 +201,7 @@ export default function GOAreaPerformanceHistoryPage() {
   const latestOccurrencesRequest = useRef(0)
 
   const allAreasSelected = areaId === ALL_AREAS_VALUE
+  const summary = performanceSummary(rows)
 
   function resetRangePresentation() {
     latestOccurrencesRequest.current += 1
@@ -372,32 +414,36 @@ export default function GOAreaPerformanceHistoryPage() {
 
       <EstadoCarga loading={loading} error={error} onRetry={retry} empty={!loading && !error && areas.length === 0} emptyText="No hay áreas autorizadas para el rango seleccionado.">
         {areas.length > 0 && rows.length === 0 && !loading ? <div className="go-performance-empty">{allAreasSelected ? 'No hay Áreas autorizadas para el rango seleccionado.' : 'No hay resultados para el Área y período seleccionados.'}</div> : (
-          <div className="go-performance-table-wrap" tabIndex="0" aria-label="Resultados del historial de rendimiento de áreas">
-            <table className="go-performance-table">
-              <thead><tr>{allAreasSelected && <th className="go-performance-area">Área</th>}<th className="go-performance-manager">Gerente de Área</th><th className="go-performance-period">Período</th><th>Estado</th><th>Porcentaje</th><th className="go-performance-updated">Actualizado</th><th className="go-performance-evidence">Evidencia</th></tr></thead>
-              <tbody>{rows.map((row, index) => <HistoryRow key={`${row?.area?.id ?? 'area'}-${row?.responsibility?.id ?? index}-${row?.period ?? 'period'}`} row={row} onOccurrences={openOccurrences} onEvaluation={openEvaluation} showArea={allAreasSelected} />)}</tbody>
-            </table>
-          </div>
+          <>
+            <section className="go-performance-summary" aria-label="Resumen de resultados"><span><strong>{summary.total}</strong> Áreas</span><span><strong>{summary.definitive}</strong> definitivos</span><span><strong>{summary.provisional}</strong> provisionales</span><span><strong>{summary.notApplicable}</strong> no aplica</span></section>
+            <div className="go-performance-table-wrap" tabIndex="0" aria-label="Resultados del historial de rendimiento de áreas">
+              <table className="go-performance-table">
+                <thead><tr><th className="go-performance-area">Área y Gerente de Área</th><th>Rendimiento</th><th>Estado</th><th className="go-performance-updated">Actualizado</th><th>Acciones</th></tr></thead>
+                <tbody>{rows.map((row, index) => <HistoryRow key={`${row?.area?.id ?? 'area'}-${row?.responsibility?.id ?? index}-${row?.period ?? 'period'}`} row={row} onOccurrences={openOccurrences} onEvaluation={openEvaluation} />)}</tbody>
+              </table>
+            </div>
+          </>
         )}
         {nextCursor && <button type="button" className="tuvet-btn tuvet-btn-secondary go-performance-load-more" onClick={() => loadRange({ cursor: nextCursor, append: true })} disabled={loadingMore}>{loadingMore ? 'Cargando más…' : 'Cargar más'}</button>}
       </EstadoCarga>
       {occurrenceModal && <Modal title="Evidencia de ocurrencias" subtitle="Consulta de solo lectura autorizada para el segmento seleccionado." icon="archivo" wide onClose={closeOccurrences} footer={<button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={closeOccurrences}>Cerrar</button>}>
-        {occurrenceDetail ? <div className="go-evidence-detail">
-          <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => { setOccurrenceDetail(null); setDetailError('') }}>Volver a la lista</button>
-          <header className="go-evidence-detail-header"><h3>{occurrenceDetail?.task?.title ?? 'Tarea sin título disponible'}</h3></header>
-          <section className="go-evidence-detail-section" aria-labelledby="go-evidence-detail-metadata-title">
-            <h4 id="go-evidence-detail-metadata-title">Información de la ocurrencia</h4>
-            <dl className="go-evidence-detail-metadata"><dt>Fecha de origen</dt><dd>{formatDate(occurrenceDetail?.origin_date_local)}</dd><dt>Mes de atribución</dt><dd>{formatMonth(occurrenceDetail?.attribution_month)}</dd><dt>Peso congelado</dt><dd>{displayValue(occurrenceDetail?.frozen_weight)}</dd></dl>
-          </section>
-          <section className="go-evidence-detail-section" aria-labelledby="go-evidence-detail-latest-title">
-            <h4 id="go-evidence-detail-latest-title">Última revisión</h4>
-            <dl className="go-evidence-detail-latest"><dt>Estado</dt><dd>{occurrenceDetail?.latest_revision?.status ?? '—'}</dd></dl>
-          </section>
-          <section className="go-evidence-detail-section" aria-labelledby="go-evidence-detail-history-title">
-            <h4 id="go-evidence-detail-history-title">Historial de revisiones</h4>
-            <ul className="go-evidence-revision-list">{(occurrenceDetail?.revision_history ?? []).map((revision, index) => <li key={`${revision?.effective_at ?? 'revision'}-${index}`}><span>{revision?.status ?? 'Revisión registrada'}</span><span>{formatDate(revision?.effective_at)}</span></li>)}</ul>
-          </section>
-        </div> : <EstadoCarga loading={occurrencesLoading || detailLoading} error={occurrencesError || detailError} onRetry={() => { if (detailError) setOccurrenceDetail(null); else openOccurrences(occurrenceModal) }} empty={!occurrencesLoading && !occurrencesError && occurrences.length === 0 && manualOccurrences.length === 0} emptyText="No hay ocurrencias autorizadas para este segmento.">
+        {occurrenceDetail ? (() => {
+          const currentStatus = occurrenceStatus(occurrenceDetail?.latest_revision?.status)
+          const revisions = revisionHistory(occurrenceDetail)
+          const currentRevision = occurrenceDetail?.latest_revision?.effective_at
+          return <div className="go-evidence-detail">
+            <button type="button" className="tuvet-btn tuvet-btn-link go-evidence-back" onClick={() => { setOccurrenceDetail(null); setDetailError('') }}>Volver a la lista</button>
+            <header className="go-evidence-detail-header"><div><h3>{occurrenceDetail?.task?.title ?? 'Tarea sin título disponible'}</h3><p>Actualizada {formatCompactDate(currentRevision)}</p></div><span className={`go-evidence-detail-status go-evidence-record-status-${currentStatus.tone}`}>{currentStatus.label}</span></header>
+            <section className="go-evidence-detail-section" aria-labelledby="go-evidence-detail-metadata-title">
+              <h4 id="go-evidence-detail-metadata-title">Detalles de la ocurrencia</h4>
+              <dl className="go-evidence-detail-metadata"><div><dt>Fecha de origen</dt><dd>{formatDate(occurrenceDetail?.origin_date_local)}</dd></div><div><dt>Mes de atribución</dt><dd>{formatMonth(occurrenceDetail?.attribution_month)}</dd></div><div><dt>Peso congelado</dt><dd>{displayValue(occurrenceDetail?.frozen_weight)}</dd></div></dl>
+            </section>
+            <section className="go-evidence-detail-timeline" aria-labelledby="go-evidence-detail-history-title">
+              <h4 id="go-evidence-detail-history-title">Historial de revisiones</h4>
+              <ol className="go-evidence-revision-list" aria-label="Historial de revisiones">{revisions.map((revision, index) => { const status = occurrenceStatus(revision?.status); const isCurrent = revision?.effective_at === currentRevision; return <li key={`${revision?.effective_at ?? 'revision'}-${index}`} className={isCurrent ? 'is-current' : ''}><span className={`go-evidence-revision-marker go-evidence-record-status-${status.tone}`} aria-hidden="true" /><div><strong>{status.label}</strong><time dateTime={revision?.effective_at ?? undefined}>{formatCompactDate(revision?.effective_at)}</time></div>{isCurrent ? <span className="go-evidence-current-label">Estado actual</span> : null}</li> })}</ol>
+            </section>
+          </div>
+        })() : <EstadoCarga loading={occurrencesLoading || detailLoading} error={occurrencesError || detailError} onRetry={() => { if (detailError) setOccurrenceDetail(null); else openOccurrences(occurrenceModal) }} empty={!occurrencesLoading && !occurrencesError && occurrences.length === 0 && manualOccurrences.length === 0} emptyText="No hay ocurrencias autorizadas para este segmento.">
           <ul className="go-evidence-list">{occurrences.map((occurrence) => {
             const status = occurrenceStatus(occurrence?.latest_status)
             return <li key={occurrenceId(occurrence)}><button type="button" className="tuvet-btn tuvet-btn-secondary go-evidence-record" onClick={() => void openOccurrenceDetail(occurrence)}><span className="go-evidence-record-title">{occurrence?.task?.title ?? 'Ocurrencia autorizada'}</span><span className="go-evidence-record-meta"><span className="go-evidence-record-date-meta"><span>Fecha de origen</span><time className="go-evidence-record-date" dateTime={occurrence?.origin_date_local ?? undefined}>{formatDate(occurrence?.origin_date_local)}</time></span><span className={`go-evidence-record-status go-evidence-record-status-${status.tone}`} aria-label={`Estado: ${status.label}`}>{status.label}</span></span></button></li>

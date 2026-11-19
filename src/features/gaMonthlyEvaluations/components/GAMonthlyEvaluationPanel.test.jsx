@@ -41,7 +41,13 @@ describe('GAMonthlyEvaluationPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Guardar corrección' }))
     await waitFor(() => expect(service.correctGAMonthlyEvaluation).toHaveBeenCalledWith(8, expect.objectContaining({ score: '90', reason: 'Follow-up', idempotency_key: 'stable-command-key' })))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Ver historial completo' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('La corrección fue registrada.')
+    expect(screen.getByRole('status')).toHaveClass('tuvet-aviso-success')
+
+    const historyToggle = screen.getByRole('button', { name: 'Mostrar historial de versiones' })
+    expect(historyToggle).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(historyToggle)
+    expect(historyToggle).toHaveAttribute('aria-expanded', 'true')
     expect(await screen.findByText('Versión 2')).toBeInTheDocument()
     expect(screen.getByText('Follow-up')).toBeInTheDocument()
   })
@@ -54,5 +60,16 @@ describe('GAMonthlyEvaluationPanel', () => {
     expect(screen.getByText('Initial')).toBeInTheDocument()
     expect(screen.getByText('GO Ana')).toBeInTheDocument()
     expect(screen.queryByText(/Versión|Hidden|historial/i)).not.toBeInTheDocument()
+  })
+
+  it('renders the current evaluation as a scannable summary card', async () => {
+    service.getGAMonthlyEvaluations.mockResolvedValue({ evaluations: [{ id: 8, score: '87.50', comment: 'Initial', issuer_go: { name: 'GO Ana' }, status: 'Vigente' }] })
+    render(<GAMonthlyEvaluationPanel gaId={7} month="2026-02" mode="go" />)
+
+    expect(await screen.findByLabelText('Evaluación vigente')).toBeInTheDocument()
+    expect(screen.getByText('Nota')).toBeInTheDocument()
+    expect(screen.getByText('Comentario')).toBeInTheDocument()
+    expect(screen.getByText('Emitida por')).toBeInTheDocument()
+    expect(screen.getByText('Vigente')).toBeInTheDocument()
   })
 })

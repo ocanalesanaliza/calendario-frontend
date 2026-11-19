@@ -1181,6 +1181,78 @@
   background: var(--tv-surface);
 }
 
+/* ── Evaluación mensual ── */
+.ga-monthly-evaluation { display: grid; gap: 1rem; }
+
+.ga-monthly-evaluation-summary {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(7rem, .72fr) minmax(0, 1.7fr) auto;
+  gap: 1.25rem;
+  align-items: stretch;
+  padding: 1.1rem;
+  border: 1px solid var(--tv-border);
+  border-radius: var(--tv-radius);
+  background: var(--tv-surface);
+  box-shadow: var(--tv-shadow-sm);
+}
+
+.ga-monthly-evaluation-score {
+  display: grid;
+  align-content: center;
+  gap: .15rem;
+  padding-right: 1.25rem;
+  border-right: 1px solid var(--tv-border);
+}
+
+.ga-monthly-evaluation-score span,
+.ga-monthly-evaluation-details dt,
+.ga-monthly-evaluation-history p span {
+  color: var(--tv-subtle);
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.ga-monthly-evaluation-score strong {
+  color: var(--tv-fg);
+  font-size: clamp(2rem, 6vw, 2.75rem);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.ga-monthly-evaluation-details { display: grid; align-content: center; gap: .75rem; margin: 0; }
+.ga-monthly-evaluation-details div { display: grid; gap: .15rem; }
+.ga-monthly-evaluation-details dt { margin: 0; }
+.ga-monthly-evaluation-details dd { margin: 0; color: var(--tv-fg); overflow-wrap: anywhere; }
+
+.ga-monthly-evaluation-status {
+  align-self: start;
+  padding: .25rem .55rem;
+  border-radius: 999px;
+  background: var(--tv-primary-soft);
+  color: var(--tv-primary-text);
+  font-size: .8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ga-monthly-evaluation-actions { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
+.ga-monthly-evaluation-history { padding-top: .25rem; border-top: 1px solid var(--tv-border); }
+.ga-monthly-evaluation-history ol { display: grid; gap: .75rem; margin: 0; padding: 0; list-style: none; }
+.ga-monthly-evaluation-history li { position: relative; display: grid; gap: .45rem; padding: .85rem .95rem .85rem 1.15rem; border-left: 2px solid var(--tv-primary-border); background: var(--tv-surface); }
+.ga-monthly-evaluation-history-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; color: var(--tv-fg); }
+.ga-monthly-evaluation-history-heading span { color: var(--tv-muted); font-variant-numeric: tabular-nums; }
+.ga-monthly-evaluation-history p { display: grid; gap: .15rem; margin: 0; color: var(--tv-text); }
+.ga-monthly-evaluation-history small { color: var(--tv-subtle); font-size: .8rem; }
+
+@media (max-width: 640px) {
+  .ga-monthly-evaluation-summary { grid-template-columns: 1fr; gap: 1rem; }
+  .ga-monthly-evaluation-score { padding: 0 0 1rem; border-right: 0; border-bottom: 1px solid var(--tv-border); }
+  .ga-monthly-evaluation-status { position: absolute; top: 1rem; right: 1rem; }
+}
+
 /* ── Responsive (375 / 768 / 1024 / 1440) ── */
 @media (max-width: 900px) {
   .tuvet-resumen { grid-template-columns: repeat(2, minmax(0, 1fr)); }

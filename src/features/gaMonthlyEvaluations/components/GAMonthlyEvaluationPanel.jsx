@@ -35,8 +35,10 @@ export default function GAMonthlyEvaluationPanel({ gaId, month, mode = 'go' }) {
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState('')
+  const [noticeType, setNoticeType] = useState('info')
   const [history, setHistory] = useState(null)
   const [historyError, setHistoryError] = useState('')
+  const [historyExpanded, setHistoryExpanded] = useState(false)
   const commandKey = useRef(null)
   const canEdit = mode === 'go'
   const canViewHistory = mode === 'go' || mode === 'systems'
@@ -75,7 +77,9 @@ export default function GAMonthlyEvaluationPanel({ gaId, month, mode = 'go' }) {
         ? await correctGAMonthlyEvaluation(evaluation.id, { ...payload, reason: reason.trim() })
         : await createGAMonthlyEvaluation({ ...payload, ga_id: gaId, month })
       setEvaluation(result?.evaluation ?? evaluation)
-      setFormMode(null); setNotice(formMode === 'correct' ? 'La corrección fue registrada.' : 'La evaluación fue registrada.')
+      setFormMode(null)
+      setNotice(formMode === 'correct' ? 'La corrección fue registrada.' : 'La evaluación fue registrada.')
+      setNoticeType('success')
       commandKey.current = null
     } catch (error) {
       if (error?.status === 422) {
@@ -83,13 +87,16 @@ export default function GAMonthlyEvaluationPanel({ gaId, month, mode = 'go' }) {
         setErrors({ score: fields.score ? 'Revisa la nota indicada.' : '', comment: fields.comment ? 'El comentario debe tener como máximo 500 caracteres.' : '', reason: fields.reason ? 'Revisa el motivo indicado.' : '' })
       }
       if (error?.status === 409) commandKey.current = null
-      setNotice(messageFor(error))
+      setNotice(messageFor(error)); setNoticeType('error')
     } finally {
       setSaving(false)
     }
   }
 
-  async function openHistory() {
+  async function toggleHistory() {
+    const nextExpanded = !historyExpanded
+    setHistoryExpanded(nextExpanded)
+    if (!nextExpanded || history !== null) return
     setHistoryError('')
     try {
       const data = await getGAMonthlyEvaluationHistory(evaluation.id)
@@ -100,12 +107,18 @@ export default function GAMonthlyEvaluationPanel({ gaId, month, mode = 'go' }) {
   }
 
   return <section className="ga-monthly-evaluation" aria-label="Evaluación mensual GO a GA">
-    <h2>Evaluación mensual</h2>
     <EstadoCarga loading={loading} error={loadError} onRetry={load} empty={!loading && !loadError && !evaluation} emptyText="No hay evaluación mensual vigente.">
-      {evaluation && <dl><div><dt>Nota</dt><dd>{evaluation.score}</dd></div>{evaluation.comment ? <div><dt>Comentario</dt><dd>{evaluation.comment}</dd></div> : null}<div><dt>Emitida por</dt><dd>{issuerName(evaluation)}</dd></div></dl>}
+      {evaluation && <section className="ga-monthly-evaluation-summary" aria-label="Evaluación vigente">
+        <div className="ga-monthly-evaluation-score"><span>Nota</span><strong>{evaluation.score}</strong></div>
+        <dl className="ga-monthly-evaluation-details">
+          {evaluation.comment ? <div><dt>Comentario</dt><dd>{evaluation.comment}</dd></div> : null}
+          <div><dt>Emitida por</dt><dd>{issuerName(evaluation)}</dd></div>
+        </dl>
+        {evaluation.status ? <span className="ga-monthly-evaluation-status">{evaluation.status}</span> : null}
+      </section>}
     </EstadoCarga>
-    {notice && <Aviso tipo="error">{notice}</Aviso>}
-    {canViewHistory && !loading && !loadError && !formMode && evaluation && <div className="ga-monthly-evaluation-actions">{canEdit && <button type="button" className="tuvet-btn" onClick={() => openForm('correct')}>Corregir evaluación</button>}<button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => void openHistory()}>Ver historial completo</button></div>}
+    {notice && <Aviso tipo={noticeType}>{notice}</Aviso>}
+    {canViewHistory && !loading && !loadError && !formMode && evaluation && <div className="ga-monthly-evaluation-actions">{canEdit && <button type="button" className="tuvet-btn" onClick={() => openForm('correct')}>Corregir evaluación</button>}<button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={() => void toggleHistory()} aria-expanded={historyExpanded} aria-controls="ga-monthly-evaluation-history">{historyExpanded ? 'Ocultar historial de versiones' : 'Mostrar historial de versiones'}</button></div>}
     {canEdit && !loading && !loadError && !formMode && !evaluation && <div className="ga-monthly-evaluation-actions"><button type="button" className="tuvet-btn" onClick={() => openForm('create')}>Emitir evaluación</button></div>}
     {formMode && <form className="tuvet-form" onSubmit={submit} noValidate>
       <FormSection title={formMode === 'correct' ? 'Corregir evaluación' : 'Emitir evaluación'} description="La autorización y el cierre definitivo se verifican en el servidor.">
@@ -117,6 +130,6 @@ export default function GAMonthlyEvaluationPanel({ gaId, month, mode = 'go' }) {
       <button type="submit" className="tuvet-btn" disabled={saving}>{saving ? 'Guardando…' : formMode === 'correct' ? 'Guardar corrección' : 'Guardar evaluación'}</button>
     </form>}
     {canViewHistory && historyError && <Aviso tipo="error">{historyError}</Aviso>}
-    {canViewHistory && history && <section aria-label="Historial completo de evaluación"><h3>Historial completo</h3><ol>{history.map((item, index) => <li key={item?.id ?? index}><strong>Versión {item?.version ?? '—'}</strong><span> · Nota: {item?.score ?? '—'}</span>{item?.comment ? <p>{item.comment}</p> : null}{item?.reason ? <p>{item.reason}</p> : null}</li>)}</ol></section>}
+    {canViewHistory && historyExpanded && history && <section id="ga-monthly-evaluation-history" className="ga-monthly-evaluation-history" aria-label="Historial de versiones de la evaluación"><ol>{history.map((item, index) => <li key={item?.id ?? index}><div className="ga-monthly-evaluation-history-heading"><strong>Versión {item?.version ?? '—'}</strong><span>Nota {item?.score ?? '—'}</span></div>{item?.comment ? <p><span>Comentario</span>{item.comment}</p> : null}{item?.reason ? <p><span>Motivo</span>{item.reason}</p> : null}{(item?.updated_at || item?.created_at || item?.issuer_go?.name) ? <small>{item?.updated_at || item?.created_at ? <time dateTime={item.updated_at ?? item.created_at}>{item.updated_at ?? item.created_at}</time> : null}{item?.issuer_go?.name ? <>{(item?.updated_at || item?.created_at) ? ' · ' : ''}{item.issuer_go.name}</> : null}</small> : null}</li>)}</ol></section>}
   </section>
 }
