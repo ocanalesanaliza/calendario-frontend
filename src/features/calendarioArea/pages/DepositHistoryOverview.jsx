@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { Icono } from '../../tuvet/components/TuvetUi'
 import DepositHistoryCompliance from './DepositHistoryCompliance'
-import { amount, branchName, money, percent } from './depositHistoryPresentation'
+import { amount, branchName, money, normalizeHistoryBranch, percent } from './depositHistoryPresentation'
 
 function Status({ item }) {
   const outstanding = amount(item.outstanding_amount)
-  const label = item.reconciliation_status === 'pending_reconciliation' || (outstanding !== null && outstanding > 0)
+  const label = item.reconciliation_status === 'pending_reconciliation' || amount(item.closures_pending_reconciliation) > 0 || (outstanding !== null && outstanding > 0)
     ? 'Pendiente' : item.reconciliation_status === 'reconciled' || outstanding === 0 ? 'Conciliado' : null
   return label ? <span className={`deposit-history-status deposit-history-status--${label === 'Pendiente' ? 'pending_reconciliation' : 'reconciled'}`}><Icono nombre={label === 'Pendiente' ? 'reloj' : 'check'} />{label}</span> : <span className="deposit-history-muted">Sin estado</span>
 }
@@ -15,10 +15,11 @@ export default function DepositHistoryOverview({ history, branches, period, onOp
   const [pendingOnly, setPendingOnly] = useState(false)
   const [sort, setSort] = useState({ key: 'outstanding_amount', descending: true })
   const data = history.summary ?? history.resumen ?? {}
+  const branchRows = branches.map(normalizeHistoryBranch)
   const applied = percent(data.deposited_amount, data.cash_sales)
   const cashShare = percent(data.cash_sales, data.total_sales)
-  const pendingBranches = branches.filter((item) => amount(item.outstanding_amount) > 0 || item.reconciliation_status === 'pending_reconciliation')
-  const visible = branches.filter((item) => branchName(item).toLocaleLowerCase('es').includes(query.trim().toLocaleLowerCase('es')) && (!pendingOnly || pendingBranches.includes(item))).sort((a, b) => {
+  const pendingBranches = branchRows.filter((item) => amount(item.outstanding_amount) > 0 || amount(item.closures_pending_reconciliation) > 0 || item.reconciliation_status === 'pending_reconciliation')
+  const visible = branchRows.filter((item) => branchName(item).toLocaleLowerCase('es').includes(query.trim().toLocaleLowerCase('es')) && (!pendingOnly || pendingBranches.includes(item))).sort((a, b) => {
     const first = amount(a[sort.key])
     const second = amount(b[sort.key])
     if (first === null) return second === null ? branchName(a).localeCompare(branchName(b), 'es') : 1
@@ -26,7 +27,7 @@ export default function DepositHistoryOverview({ history, branches, period, onOp
     return (sort.descending ? second - first : first - second) || branchName(a).localeCompare(branchName(b), 'es')
   })
   const metrics = [
-    { label: 'Pendiente por aplicar', value: data.outstanding_amount, icon: 'reloj', accent: amount(data.outstanding_amount) > 0, detail: pendingBranches.length ? `${pendingBranches.length} ${pendingBranches.length === 1 ? 'sucursal con pendientes' : 'sucursales con pendientes'}` : 'Saldo del rango consultado' },
+    { label: 'Pendiente por aplicar', value: data.outstanding_amount, icon: 'reloj', accent: amount(data.outstanding_amount) > 0, detail: pendingBranches.length ? `${data.closures_pending_reconciliation != null ? `${data.closures_pending_reconciliation} cierres pendientes · ` : ''}${pendingBranches.length} ${pendingBranches.length === 1 ? 'sucursal con pendientes' : 'sucursales con pendientes'}` : 'Saldo del rango consultado' },
     { label: 'Monto ya aplicado', value: data.deposited_amount, icon: 'check', detail: applied === null ? 'Efectivo conciliado' : `${applied.toFixed(1)} % del efectivo` },
     { label: 'Efectivo del cierre', value: data.cash_sales, icon: 'archivo', detail: cashShare === null ? 'Efectivo registrado en los cierres' : `${cashShare.toFixed(1)} % de las ventas` },
     { label: 'Ventas totales', value: data.total_sales, icon: 'edificio', detail: <><span>Ventas con tarjeta</span>: <strong>{money(data.card_sales)}</strong></> },

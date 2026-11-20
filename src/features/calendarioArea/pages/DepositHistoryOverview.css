@@ -2,6 +2,7 @@
   --dh-expected: #647b9b;
   --dh-sent: var(--tv-primary);
   --dh-missing: #d97706;
+  --dh-applied: #16a34a;
   width: min(100%, 1600px);
   margin-inline: auto;
   color: var(--tv-text);
@@ -40,10 +41,10 @@
 .deposit-history-progress h2 { flex: 0 0 auto; font-size: .95rem; }
 .deposit-history-progress-content { flex: 1; min-width: 0; }
 .deposit-history-progress-track { height: .65rem; border-radius: 99px; overflow: hidden; background: var(--dh-missing); }
-.deposit-history-progress-track > span { display: block; height: 100%; border-radius: inherit; background: var(--tv-chart-high); }
+.deposit-history-progress-track > span { display: block; height: 100%; border-radius: inherit; background: var(--dh-applied); }
 .deposit-history-progress-labels { display: flex; flex-wrap: wrap; gap: .35rem 1.5rem; margin-top: .5rem; color: var(--tv-muted); font-size: .8rem; }
 .deposit-history-progress-labels > span { display: inline-flex; align-items: center; gap: .35rem; }
-.deposit-history-progress-labels i { width: .5rem; height: .5rem; border-radius: 50%; background: var(--tv-chart-high); }
+.deposit-history-progress-labels i { width: .5rem; height: .5rem; border-radius: 50%; background: var(--dh-applied); }
 .deposit-history-search { display: flex; align-items: center; gap: .5rem; width: min(100%, 22rem); min-height: 2.75rem; padding: 0 .75rem; border: 1px solid var(--tv-border-strong); border-radius: var(--tv-radius-sm); background: var(--tv-surface); }
 .deposit-history-search .tuvet-icon { width: 1.1rem; height: 1.1rem; flex-shrink: 0; color: var(--tv-subtle); }
 .deposit-history-search input { min-width: 0; width: 100%; min-height: 2.65rem; padding: .4rem 0; border: 0; background: transparent; color: var(--tv-fg); font: inherit; font-size: .85rem; }

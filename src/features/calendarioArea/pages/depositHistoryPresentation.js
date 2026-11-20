@@ -13,6 +13,22 @@ export function branchName(branch) {
   return [branch?.code ?? branch?.codigo, branch?.name ?? branch?.nombre].filter(Boolean).join(' · ') || 'Sucursal'
 }
 
+// GET /api/depositos/ga/historial/ returns branch identity beside a nested
+// summary. Keep its signed identity intact and project only financial fields.
+export function normalizeHistoryBranch(branch) {
+  const summary = branch?.summary ?? branch?.resumen
+  if (!summary || typeof summary !== 'object') return branch
+  const fields = [
+    'total_sales', 'cash_sales', 'card_sales', 'deposited_amount', 'outstanding_amount',
+    'closures_total', 'closures_reconciled', 'closures_pending_reconciliation',
+    'closures_no_deposit_declared', 'closures_with_discrepancy',
+  ]
+  return {
+    ...branch,
+    ...Object.fromEntries(fields.filter((key) => Object.hasOwn(summary, key)).map((key) => [key, summary[key]])),
+  }
+}
+
 export function percent(value, total) {
   const numerator = amount(value)
   const denominator = amount(total)

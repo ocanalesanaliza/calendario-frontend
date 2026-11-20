@@ -19,6 +19,34 @@ function setup(extraHistory = {}, extraBranches = branches) {
 }
 
 describe('DepositHistoryOverview', () => {
+  it('reads the actual backend branch.summary contract for amounts, sorting and pending states', () => {
+    const backendBranches = branches.map(({ id, code, name, ...summary }) => ({
+      id, code, name,
+      summary: { ...summary, closures_total: 3, closures_pending_reconciliation: id === 'north' ? 1 : 0 },
+    }))
+    const open = setup({}, backendBranches)
+    const financial = screen.getByRole('table', { name: /Comparativa financiera/ })
+    const north = within(financial).getByRole('row', { name: /NTE/ })
+    expect(within(north).getByText('L 1,000.00')).toBeInTheDocument()
+    expect(within(north).getByText('L 400.00')).toBeInTheDocument()
+    expect(within(north).getByText('L 100.00')).toBeInTheDocument()
+    expect(within(north).getByText('Pendiente')).toBeInTheDocument()
+    expect(within(financial).getByRole('row', { name: /SUR/ })).toHaveTextContent('Conciliado')
+    expect(within(financial).queryByText('—')).not.toBeInTheDocument()
+    fireEvent.click(within(financial).getByRole('button', { name: 'Ventas' }))
+    expect(within(financial).getAllByRole('row')[1]).toHaveTextContent('SUR')
+    fireEvent.click(screen.getByRole('button', { name: 'Con pendientes · 1' }))
+    expect(within(financial).queryByText('Sucursal Sur')).not.toBeInTheDocument()
+    fireEvent.click(within(north).getByRole('button', { name: 'Ver cierres de NTE Sucursal Norte' }))
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ id: 'north', summary: backendBranches[0].summary }))
+  })
+
+  it('preserves signed branch IDs even when a summary contains unexpected identity fields', () => {
+    const open = setup({}, [{ id: 'signed-north', code: 'NTE', name: 'Sucursal Norte', summary: { id: 'wrong-id', name: 'wrong-name', total_sales: '1000.00', outstanding_amount: '0.00' } }])
+    fireEvent.click(screen.getByRole('button', { name: 'Ver cierres de NTE Sucursal Norte' }))
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ id: 'signed-north', name: 'Sucursal Norte' }))
+  })
+
   it('keeps the financial table and the separate three-series compliance chart together', () => {
     const open = setup({ submission_compliance: compliance })
     expect(screen.getByText('L 3,000.00')).toBeInTheDocument()

@@ -3,9 +3,44 @@
 La pantalla mantiene las consultas existentes y los identificadores opacos de sucursal y cierre.
 El resumen financiero y la tabla no dependen de la disponibilidad del calendario.
 
+## Contrato financiero existente
+
+`DepositGAHistoryView` devuelve los importes de cada sucursal dentro de
+`branches[].summary`, separados de `id`, `code` y `name`:
+
+```json
+{
+  "branches": [{
+    "id": "identificador-opaco-firmado",
+    "code": "CMG-001",
+    "name": "Comayagua",
+    "summary": {
+      "total_sales": "210000.00",
+      "cash_sales": "74300.00",
+      "card_sales": "135700.00",
+      "deposited_amount": "64300.00",
+      "outstanding_amount": "10000.00",
+      "closures_total": 18,
+      "closures_pending_reconciliation": 2
+    }
+  }]
+}
+```
+
+Los valores del ejemplo son ilustrativos; la estructura se contrastó con
+`tareas/views/api_depositos.py` y `tareas/serializers/deposito_serializer.py`
+en la referencia local `origin/dev` del backend, commit `a0ebfc6`.
+`normalizeHistoryBranch` proyecta únicamente los campos financieros y conserva
+los identificadores firmados. No se necesitan consultas adicionales por sucursal.
+
+El contador `closures_total` corresponde a cierres de reportes enviados dentro
+del rango autorizado; no es un denominador de cierres esperados. La conciliación
+financiera tampoco determina si se envió un cierre.
+
 ## Integración pendiente del servidor
 
 El contrato actual utilizado por el frontend no proporciona envíos esperados y faltantes.
+No se encontró `submission_compliance` en la referencia de backend inspeccionada.
 Se propone agregar este bloque **opcional** a la respuesta existente de
 `GET /api/depositos/ga/historial/?from=YYYY-MM-DD&to=YYYY-MM-DD`:
 
