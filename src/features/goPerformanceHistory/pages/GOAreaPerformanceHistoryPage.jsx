@@ -21,6 +21,10 @@ const OCCURRENCE_STATUS = {
   diferida: { label: 'Diferida', tone: 'deferred' },
   deferred: { label: 'Diferida', tone: 'deferred' },
 }
+const MANUAL_CLASSIFICATION_LABELS = {
+  qualitative: 'Cualitativa',
+  quantitative: 'Cuantitativa',
+}
 
 function currentMonth() {
   const date = new Date()
@@ -122,6 +126,10 @@ function occurrenceStatus(status) {
   return OCCURRENCE_STATUS[status] ?? { label: 'Estado no disponible', tone: 'neutral' }
 }
 
+function manualClassificationLabel(classification) {
+  return MANUAL_CLASSIFICATION_LABELS[classification] ?? displayValue(classification)
+}
+
 function revisionHistory(detail) {
   const history = Array.isArray(detail?.revision_history) ? detail.revision_history : []
   const latest = detail?.latest_revision
@@ -183,6 +191,8 @@ export default function GOAreaPerformanceHistoryPage() {
   const [occurrences, setOccurrences] = useState([])
   const [occurrenceCursor, setOccurrenceCursor] = useState(null)
   const [manualOccurrences, setManualOccurrences] = useState([])
+  const [evidenceTab, setEvidenceTab] = useState('scheduled')
+  const [expandedManualOccurrenceId, setExpandedManualOccurrenceId] = useState(null)
   const [occurrencesLoading, setOccurrencesLoading] = useState(false)
   const [occurrencesLoadingMore, setOccurrencesLoadingMore] = useState(false)
   const [occurrencesError, setOccurrencesError] = useState('')
@@ -202,6 +212,7 @@ export default function GOAreaPerformanceHistoryPage() {
 
   const allAreasSelected = areaId === ALL_AREAS_VALUE
   const summary = performanceSummary(rows)
+  const hasManualOccurrences = manualOccurrences.length > 0
 
   function resetRangePresentation() {
     latestOccurrencesRequest.current += 1
@@ -293,6 +304,8 @@ export default function GOAreaPerformanceHistoryPage() {
     setOccurrences([])
     setOccurrenceCursor(null)
     setManualOccurrences([])
+    setEvidenceTab('scheduled')
+    setExpandedManualOccurrenceId(null)
     setOccurrenceDetail(null)
     setOccurrencesError('')
     setOccurrencesLoadMoreError('')
@@ -444,26 +457,36 @@ export default function GOAreaPerformanceHistoryPage() {
             </section>
           </div>
         })() : <EstadoCarga loading={occurrencesLoading || detailLoading} error={occurrencesError || detailError} onRetry={() => { if (detailError) setOccurrenceDetail(null); else openOccurrences(occurrenceModal) }} empty={!occurrencesLoading && !occurrencesError && occurrences.length === 0 && manualOccurrences.length === 0} emptyText="No hay ocurrencias autorizadas para este segmento.">
-          <ul className="go-evidence-list">{occurrences.map((occurrence) => {
-            const status = occurrenceStatus(occurrence?.latest_status)
-            return <li key={occurrenceId(occurrence)}><button type="button" className="tuvet-btn tuvet-btn-secondary go-evidence-record" onClick={() => void openOccurrenceDetail(occurrence)}><span className="go-evidence-record-title">{occurrence?.task?.title ?? 'Ocurrencia autorizada'}</span><span className="go-evidence-record-meta"><span className="go-evidence-record-date-meta"><span>Fecha de origen</span><time className="go-evidence-record-date" dateTime={occurrence?.origin_date_local ?? undefined}>{formatDate(occurrence?.origin_date_local)}</time></span><span className={`go-evidence-record-status go-evidence-record-status-${status.tone}`} aria-label={`Estado: ${status.label}`}>{status.label}</span></span></button></li>
-          })}{manualOccurrences.map((occurrence, index) => {
-            const adHoc = occurrence?.provenance === 'ad_hoc'
-            const title = adHoc ? occurrence?.name : occurrence?.task?.title
-            const status = occurrenceStatus(occurrence?.latest_status)
-            return (
-              <li key={`manual-${occurrence?.provenance ?? 'unknown'}-${occurrence?.id ?? index}`} className="go-evidence-record go-evidence-record--manual">
+          <div className="go-evidence-tabs" role="tablist" aria-label="Tipo de evidencia">
+            <button id="go-evidence-scheduled-tab" type="button" role="tab" aria-selected={evidenceTab === 'scheduled'} aria-controls="go-evidence-scheduled-panel" onClick={() => setEvidenceTab('scheduled')}>Tareas programadas <span>{occurrences.length}</span></button>
+            {hasManualOccurrences && <button id="go-evidence-manual-tab" type="button" role="tab" aria-selected={evidenceTab === 'manual'} aria-controls="go-evidence-manual-panel" onClick={() => setEvidenceTab('manual')}>Tareas registradas de forma manual <span>{manualOccurrences.length}</span></button>}
+          </div>
+          {evidenceTab === 'scheduled' && <section id="go-evidence-scheduled-panel" role="tabpanel" aria-labelledby="go-evidence-scheduled-tab">
+            <ul className="go-evidence-list">{occurrences.map((occurrence) => {
+              const status = occurrenceStatus(occurrence?.latest_status)
+              return <li key={occurrenceId(occurrence)}><button type="button" className="tuvet-btn tuvet-btn-secondary go-evidence-record" onClick={() => void openOccurrenceDetail(occurrence)}><span className="go-evidence-record-title">{occurrence?.task?.title ?? 'Ocurrencia autorizada'}</span><span className="go-evidence-record-meta"><span className="go-evidence-record-date-meta"><span>Fecha de origen</span><time className="go-evidence-record-date" dateTime={occurrence?.origin_date_local ?? undefined}>{formatDate(occurrence?.origin_date_local)}</time></span><span className={`go-evidence-record-status go-evidence-record-status-${status.tone}`} aria-label={`Estado: ${status.label}`}>{status.label}</span></span></button></li>
+            })}</ul>
+          </section>}
+          {hasManualOccurrences && evidenceTab === 'manual' && <section id="go-evidence-manual-panel" role="tabpanel" aria-labelledby="go-evidence-manual-tab">
+            <ul className="go-evidence-list">{manualOccurrences.map((occurrence, index) => {
+              const adHoc = occurrence?.provenance === 'ad_hoc'
+              const title = adHoc ? occurrence?.name : occurrence?.task?.title
+              const status = occurrenceStatus(occurrence?.latest_status)
+              const itemId = `manual-${occurrence?.provenance ?? 'unknown'}-${occurrence?.id ?? index}`
+              const expanded = expandedManualOccurrenceId === itemId
+              return <li key={itemId} className="go-evidence-record go-evidence-record--manual">
                 <span className="go-evidence-record-title">{title ?? 'Entrada manual'}</span>
-                <span className="go-evidence-record-meta"><span>Origen: {adHoc ? 'Actividad ad hoc' : 'Tarea manual de catálogo'}</span><span>Fecha de origen: {formatDate(occurrence?.origin_date_local)}</span><span className={`go-evidence-record-status go-evidence-record-status-${status.tone}`} aria-label={`Estado: ${status.label}`}>{status.label}</span></span>
-                <dl className="go-evidence-manual-details">
-                  {!adHoc && <><dt>Clasificación</dt><dd>{occurrence?.classification ?? '—'}</dd><dt>Peso congelado</dt><dd>{displayValue(occurrence?.frozen_weight)}</dd>{occurrence?.planning_note ? <><dt>Nota de planificación</dt><dd>{occurrence.planning_note}</dd></> : null}</>}
-                  {adHoc && occurrence?.description ? <><dt>Descripción</dt><dd>{occurrence.description}</dd></> : null}
-                  <dt>Creada el</dt><dd>{formatDate(occurrence?.created_at)}</dd>
-                  {occurrence?.cancelled_at ? <><dt>Cancelada el</dt><dd>{formatDate(occurrence.cancelled_at)}</dd></> : null}
-                </dl>
+                <span className="go-evidence-record-meta"><span>Fecha: {formatDate(occurrence?.origin_date_local)}</span><span className={`go-evidence-record-status go-evidence-record-status-${status.tone}`} aria-label={`Estado: ${status.label}`}>{status.label}</span></span>
+                <button type="button" className="tuvet-btn tuvet-btn-link go-evidence-manual-detail-toggle" aria-expanded={expanded} aria-controls={`${itemId}-details`} onClick={() => setExpandedManualOccurrenceId(expanded ? null : itemId)} aria-label={`Ver información de ${title ?? 'entrada manual'}`}>Ver información</button>
+                {expanded && <dl id={`${itemId}-details`} className="go-evidence-manual-details">
+                  {!adHoc && <><div><dt>Clasificación</dt><dd>{manualClassificationLabel(occurrence?.classification)}</dd></div><div><dt>Peso congelado</dt><dd>{displayValue(occurrence?.frozen_weight)}</dd></div>{occurrence?.planning_note ? <div className="go-evidence-manual-details-wide"><dt>Nota de planificación</dt><dd>{occurrence.planning_note}</dd></div> : null}</>}
+                  {adHoc && occurrence?.description ? <div className="go-evidence-manual-details-wide"><dt>Descripción</dt><dd>{occurrence.description}</dd></div> : null}
+                  <div><dt>Creada el</dt><dd>{formatDate(occurrence?.created_at)}</dd></div>
+                  {occurrence?.cancelled_at ? <div><dt>Cancelada el</dt><dd>{formatDate(occurrence.cancelled_at)}</dd></div> : null}
+                </dl>}
               </li>
-            )
-          })}</ul>
+            })}</ul>
+          </section>}
           {occurrenceCursor && <div className="go-evidence-pagination">
             {occurrencesLoadMoreError && <Aviso tipo="warning">{occurrencesLoadMoreError}</Aviso>}
             <button type="button" className="tuvet-btn tuvet-btn-secondary go-performance-load-more" onClick={retryMoreOccurrences} disabled={occurrencesLoadingMore}>{occurrencesLoadingMore ? 'Cargando más…' : (occurrencesLoadMoreError ? 'Reintentar cargar más ocurrencias' : 'Cargar más ocurrencias')}</button>
