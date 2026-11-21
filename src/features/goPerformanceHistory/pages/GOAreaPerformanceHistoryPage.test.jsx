@@ -300,6 +300,51 @@ describe('GOAreaPerformanceHistoryPage', () => {
     expect(timeline.querySelector('.is-current')).toHaveTextContent('Completada')
   })
 
+  it('preserves list-issued structured evidence, renders only allowlisted actions, and keeps the modal open', async () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    const diagnostic = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const opaqueReference = 'signed-opaque-inventory-reference'
+    service.getGOOccurrences.mockResolvedValueOnce({
+      results: [{ id: 'opaque-occurrence-id', task: { title: 'Inventario mensual' }, origin_date_local: '2026-10-04', structured_evidence: [
+        { type: 'inventory_area', reference: opaqueReference },
+        { type: 'deposit_review', reference: 'opaque deposit reference' },
+        { type: 'unknown', reference: 'opaque unknown reference' },
+        { type: 'inventory_area', reference: '   ' },
+        { type: 'deposit_review', reference: 'https://untrusted.example/' },
+      ] }],
+    })
+    service.getGOOccurrenceDetail.mockResolvedValueOnce({
+      task: { title: 'Inventario y depósitos' }, origin_date_local: '2026-11-04', attribution_month: '2026-11', frozen_weight: '0.50',
+      latest_revision: { status: 'completed', effective_at: '2026-11-05T16:01:00Z' }, revision_history: [],
+    })
+    render(<GOAreaPerformanceHistoryPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver evidencia de ocurrencias' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Inventario mensual/ }))
+    const dialog = await screen.findByRole('dialog', { name: /Evidencia de ocurrencias/i })
+    const inventory = within(dialog).getByRole('button', { name: /Ver inventario de área/i })
+    const deposits = within(dialog).getByRole('button', { name: /Ver revisión de depósitos/i })
+
+    fireEvent.click(inventory)
+    fireEvent.click(deposits)
+    expect(open).toHaveBeenNthCalledWith(1, `/evidencia-go/inventario/${opaqueReference}`, '_blank', 'noopener,noreferrer')
+    expect(open).toHaveBeenNthCalledWith(2, '/evidencia-go/depositos/opaque%20deposit%20reference', '_blank', 'noopener,noreferrer')
+    expect(screen.getByRole('dialog', { name: /Evidencia de ocurrencias/i })).toBeInTheDocument()
+    expect(dialog).not.toHaveTextContent('untrusted.example')
+    expect(diagnostic).toHaveBeenCalledWith('[GO evidence diagnostic]', 'eligible actions', expect.objectContaining({ actions: [
+      expect.objectContaining({ type: 'inventory_area', reference_present: true, reference_length: opaqueReference.length }),
+      expect.objectContaining({ type: 'deposit_review', reference_present: true }),
+    ] }))
+    expect(diagnostic).toHaveBeenCalledWith('[GO evidence diagnostic]', 'rejected actions', expect.objectContaining({ actions: [
+      expect.objectContaining({ type: 'unknown', rejection_reason: 'unknown_type' }),
+      expect.objectContaining({ type: 'inventory_area', rejection_reason: 'missing_reference' }),
+      expect.objectContaining({ type: 'deposit_review', rejection_reason: 'url_like_reference' }),
+    ] }))
+    expect(diagnostic.mock.calls.flat().join(' ')).not.toContain(opaqueReference)
+    open.mockRestore()
+    diagnostic.mockRestore()
+  })
+
   it('renders safe detail fallbacks for legitimate null or missing optional values', async () => {
     service.getGOOccurrenceDetail.mockResolvedValueOnce({
       task: { title: null },
@@ -334,6 +379,7 @@ describe('GOAreaPerformanceHistoryPage', () => {
     expect(await screen.findByText('Historial de revisiones')).toBeInTheDocument()
     expect(document.querySelector('.go-evidence-detail-metadata')).toBeInTheDocument()
     expect(document.querySelector('.go-evidence-detail-section')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Ver inventario de área|Ver revisión de depósitos/i })).not.toBeInTheDocument()
   })
 
   it.each([

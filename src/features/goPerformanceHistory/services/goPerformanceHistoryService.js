@@ -33,6 +33,7 @@ function normalizeGOOccurrenceDetail(response) {
     frozen_weight: occurrence?.frozen_weight,
     latest_revision: response?.latest_revision ?? null,
     revision_history: Array.isArray(response?.revision_history) ? response.revision_history : [],
+    evidence_actions: Array.isArray(response?.evidence_actions) ? response.evidence_actions : [],
   }
 }
 

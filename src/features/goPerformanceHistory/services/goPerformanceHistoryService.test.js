@@ -74,6 +74,7 @@ describe('goPerformanceHistoryService', () => {
       frozen_weight: '2.50',
       latest_revision: payload.latest_revision,
       revision_history: [],
+      evidence_actions: [],
     })
     expect(apiRequest).toHaveBeenCalledWith('/api/calendar/performance/occurrences/opaque-listed-occurrence/', { method: 'GET' })
   })
@@ -88,7 +89,15 @@ describe('goPerformanceHistoryService', () => {
       frozen_weight: undefined,
       latest_revision: null,
       revision_history: [],
+      evidence_actions: [],
     })
+  })
+
+  it('keeps typed occurrence evidence actions while safely omitting malformed action collections', async () => {
+    const payload = { occurrence: { task_snapshot: { title: 'Tarea' } }, evidence_actions: [{ type: 'inventory_area', reference: 'opaque-reference' }] }
+    apiRequest.mockResolvedValueOnce(response(payload))
+
+    await expect(getGOOccurrenceDetail('opaque-listed-occurrence')).resolves.toMatchObject({ evidence_actions: payload.evidence_actions })
   })
 
   it('requests responsibility gaps with documented Area/range parameters and preserves an opaque cursor', async () => {

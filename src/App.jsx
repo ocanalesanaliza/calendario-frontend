@@ -53,6 +53,8 @@ import OperationalAlertsPage from './features/operationalAlerts/pages/Operationa
 import SystemsPerformanceHistoryPage from './features/performanceHistory/pages/SystemsPerformanceHistoryPage'
 import MonthlyPerformanceCorrectionsPage from './features/monthlyPerformanceCorrections/pages/MonthlyPerformanceCorrectionsPage'
 import GOAreaPerformanceHistoryPage from './features/goPerformanceHistory/pages/GOAreaPerformanceHistoryPage'
+import GOInventoryEvidencePage from './features/goStructuredEvidence/pages/GOInventoryEvidencePage'
+import GODepositEvidencePage from './features/goStructuredEvidence/pages/GODepositEvidencePage'
 import DepositHistoryPage from './features/calendarioArea/pages/DepositHistoryPage'
 
 export function RendimientoRoute({ children }) {
@@ -269,6 +271,8 @@ function App() {
             <Route path="/historial-rendimiento-mensual" element={<PerformanceHistoryRoute><SystemsPerformanceHistoryPage /></PerformanceHistoryRoute>} />
           <Route path="/correcciones-rendimiento-mensual" element={<MonthlyPerformanceCorrectionsRoute><MonthlyPerformanceCorrectionsPage /></MonthlyPerformanceCorrectionsRoute>} />
           <Route path="/historial-rendimiento-go" element={<GOAreaPerformanceHistoryRoute><GOAreaPerformanceHistoryPage /></GOAreaPerformanceHistoryRoute>} />
+          <Route path="/evidencia-go/inventario/:reference" element={<GOAreaPerformanceHistoryRoute><GOInventoryEvidencePage /></GOAreaPerformanceHistoryRoute>} />
+          <Route path="/evidencia-go/depositos/:reference" element={<GOAreaPerformanceHistoryRoute><GODepositEvidencePage /></GOAreaPerformanceHistoryRoute>} />
           <Route path="/areas" element={<AreaManagerAssignmentRoute><AreasPage /></AreaManagerAssignmentRoute>} />
           <Route path="/organizacion" element={<OrganizacionRoute><OrganizacionPage /></OrganizacionRoute>} />
           <Route path="/mis-tareas" element={<MisTareasRoute><MisTareasPage /></MisTareasRoute>} />

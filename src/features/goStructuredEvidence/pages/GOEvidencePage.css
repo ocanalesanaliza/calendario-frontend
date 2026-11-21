@@ -1,0 +1,7 @@
+.go-structured-evidence__content { max-width: 72rem; }
+.go-structured-evidence__fields { display: grid; gap: var(--tv-space-3, 0.75rem); margin: 0; }
+.go-structured-evidence__fields > div { display: grid; gap: 0.25rem; padding: var(--tv-space-3, 0.75rem); border: 1px solid var(--tv-border, #d8dce2); border-radius: var(--tv-radius, 0.5rem); }
+.go-structured-evidence__fields dt { font-weight: 700; }
+.go-structured-evidence__fields dd { margin: 0; overflow-wrap: anywhere; }
+.go-structured-evidence__list { display: grid; gap: var(--tv-space-3, 0.75rem); padding-left: 1.25rem; }
+@media (prefers-reduced-motion: reduce) { .go-structured-evidence * { transition: none !important; animation: none !important; } }

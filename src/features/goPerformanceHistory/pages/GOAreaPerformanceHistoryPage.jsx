@@ -25,6 +25,57 @@ const MANUAL_CLASSIFICATION_LABELS = {
   qualitative: 'Cualitativa',
   quantitative: 'Cuantitativa',
 }
+const EVIDENCE_ACTION_ROUTES = {
+  inventory_area: { path: '/evidencia-go/inventario', label: 'Ver inventario de área' },
+  deposit_review: { path: '/evidencia-go/depositos', label: 'Ver revisión de depósitos' },
+}
+
+function evidenceActionRejection(action) {
+  const route = EVIDENCE_ACTION_ROUTES[action?.type]
+  const reference = typeof action?.reference === 'string' ? action.reference.trim() : ''
+  if (!route) return 'unknown_type'
+  if (!reference) return 'missing_reference'
+  if (/^(?:[a-z][a-z\d+.-]*:|[/\\]{1,2})/i.test(reference)) return 'url_like_reference'
+  return null
+}
+
+function safeEvidenceAction(action) {
+  if (evidenceActionRejection(action)) return null
+  const route = EVIDENCE_ACTION_ROUTES[action.type]
+  const reference = action.reference.trim()
+  return { ...route, type: action.type, reference }
+}
+
+function diagnosticActions(actions) {
+  return Array.isArray(actions) ? actions.map((action) => {
+    const reference = typeof action?.reference === 'string' ? action.reference.trim() : ''
+    return {
+      type: typeof action?.type === 'string' ? action.type : null,
+      reference_present: Boolean(reference),
+      reference_length: reference.length,
+    }
+  }) : []
+}
+
+function diagnosticRejectedActions(actions) {
+  return Array.isArray(actions) ? actions.map((action) => {
+    const rejectionReason = evidenceActionRejection(action)
+    return rejectionReason ? { ...diagnosticActions([action])[0], rejection_reason: rejectionReason } : null
+  }).filter(Boolean) : []
+}
+
+function logEvidenceDiagnostic(event, data) {
+  if (import.meta.env.DEV || import.meta.env.VITE_GO_EVIDENCE_DIAGNOSTICS === 'true') {
+    console.info('[GO evidence diagnostic]', event, data)
+  }
+}
+
+function diagnosticDetail(detail) {
+  return {
+    ...detail,
+    evidence_actions: diagnosticActions(detail?.evidence_actions),
+  }
+}
 
 function currentMonth() {
   const date = new Date()
@@ -95,6 +146,10 @@ function evaluationActionLabel(row) {
 
 function displayValue(value, suffix = '') {
   return value === null || value === undefined || value === '' ? '—' : `${value}${suffix}`
+}
+
+function openEvidenceAction(action) {
+  window.open(`${action.path}/${encodeURIComponent(action.reference)}`, '_blank', 'noopener,noreferrer')
 }
 
 function normalizeError(error, fallback) {
@@ -358,10 +413,22 @@ export default function GOAreaPerformanceHistoryPage() {
   async function openOccurrenceDetail(occurrence) {
     const id = String(occurrence?.id ?? '')
     if (!issuedOccurrenceIds.has(id)) return
+    const evidenceActions = Array.isArray(occurrence?.structured_evidence) ? occurrence.structured_evidence : []
+    logEvidenceDiagnostic('occurrence selected', { occurrence_id: id, structured_evidence: diagnosticActions(evidenceActions) })
     setDetailLoading(true)
     setDetailError('')
     try {
-      setOccurrenceDetail(await getGOOccurrenceDetail(id))
+      const detail = await getGOOccurrenceDetail(id)
+      logEvidenceDiagnostic('fetched detail', diagnosticDetail(detail))
+      const detailWithEvidence = {
+        ...detail,
+        evidence_actions: evidenceActions,
+      }
+      const eligibleActions = evidenceActions.map(safeEvidenceAction).filter(Boolean)
+      logEvidenceDiagnostic('state evidence actions', { evidence_actions: diagnosticActions(detailWithEvidence.evidence_actions) })
+      logEvidenceDiagnostic('eligible actions', { actions: diagnosticActions(eligibleActions) })
+      logEvidenceDiagnostic('rejected actions', { actions: diagnosticRejectedActions(evidenceActions) })
+      setOccurrenceDetail(detailWithEvidence)
     } catch (error) {
       setDetailError(normalizeError(error, 'No fue posible cargar el detalle de la ocurrencia autorizada.'))
     } finally {
@@ -455,6 +522,7 @@ export default function GOAreaPerformanceHistoryPage() {
               <h4 id="go-evidence-detail-history-title">Historial de revisiones</h4>
               <ol className="go-evidence-revision-list" aria-label="Historial de revisiones">{revisions.map((revision, index) => { const status = occurrenceStatus(revision?.status); const isCurrent = revision?.effective_at === currentRevision; return <li key={`${revision?.effective_at ?? 'revision'}-${index}`} className={isCurrent ? 'is-current' : ''}><span className={`go-evidence-revision-marker go-evidence-record-status-${status.tone}`} aria-hidden="true" /><div><strong>{status.label}</strong><time dateTime={revision?.effective_at ?? undefined}>{formatCompactDate(revision?.effective_at)}</time></div>{isCurrent ? <span className="go-evidence-current-label">Estado actual</span> : null}</li> })}</ol>
             </section>
+            {(occurrenceDetail.evidence_actions ?? []).map(safeEvidenceAction).filter(Boolean).map((action) => <button key={`${action.path}-${action.reference}`} type="button" className="tuvet-btn tuvet-btn-secondary go-evidence-action" onClick={() => openEvidenceAction(action)}>{action.label}</button>)}
           </div>
         })() : <EstadoCarga loading={occurrencesLoading || detailLoading} error={occurrencesError || detailError} onRetry={() => { if (detailError) setOccurrenceDetail(null); else openOccurrences(occurrenceModal) }} empty={!occurrencesLoading && !occurrencesError && occurrences.length === 0 && manualOccurrences.length === 0} emptyText="No hay ocurrencias autorizadas para este segmento.">
           <div className="go-evidence-tabs" role="tablist" aria-label="Tipo de evidencia">
