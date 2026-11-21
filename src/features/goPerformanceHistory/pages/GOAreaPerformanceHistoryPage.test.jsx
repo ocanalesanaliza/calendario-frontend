@@ -251,6 +251,52 @@ describe('GOAreaPerformanceHistoryPage', () => {
     expect(service.getGOOccurrenceDetail).not.toHaveBeenCalled()
   })
 
+  it('opens eligible manual inventory evidence in a new tab and keeps the manual dialog open', async () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null)
+    const reference = 'goe1_signed-opaque-token'
+    service.getGOOccurrences.mockResolvedValueOnce({
+      results: [],
+      manual_results: [{ id: 42, provenance: 'manual_catalog', task: { title: 'Inventario manual' }, origin_date_local: '2026-10-04', created_at: '2026-10-04T09:00:00Z', classification: 'quantitative', frozen_weight: '2.50', latest_status: 'completed', structured_evidence: [{ type: 'manual_inventory_area', reference }] }],
+    })
+    render(<GOAreaPerformanceHistoryPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver evidencia de ocurrencias' }))
+    fireEvent.click(await screen.findByRole('tab', { name: /Tareas registradas de forma manual.*1/ }))
+    const dialog = screen.getByRole('dialog', { name: /Evidencia de ocurrencias/i })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Ver inventario de área' }))
+
+    expect(open).toHaveBeenCalledWith(`/evidencia-go/inventario/${encodeURIComponent(reference)}`, '_blank', 'noopener,noreferrer')
+    expect(screen.getByRole('dialog', { name: /Evidencia de ocurrencias/i })).toBeInTheDocument()
+    const information = within(dialog).getByRole('button', { name: 'Ver información de Inventario manual' })
+    fireEvent.click(information)
+    expect(information).toHaveAttribute('aria-expanded', 'true')
+    expect(within(dialog).getByText('Cuantitativa')).toBeInTheDocument()
+    expect(service.getGOOccurrenceDetail).not.toHaveBeenCalled()
+    open.mockRestore()
+  })
+
+  it('does not render manual inventory evidence actions for excluded rows', async () => {
+    service.getGOOccurrences.mockResolvedValueOnce({
+      results: [],
+      manual_results: [
+        { id: 1, provenance: 'ad_hoc', name: 'Ad-hoc', latest_status: 'completed', structured_evidence: [{ type: 'manual_inventory_area', reference: 'goe1_ad-hoc' }] },
+        { id: 2, provenance: 'manual_catalog', task: { title: 'Pendiente' }, latest_status: 'pending', structured_evidence: [{ type: 'manual_inventory_area', reference: 'goe1_pending' }] },
+        { id: 3, provenance: 'manual_catalog', task: { title: 'Cancelada' }, latest_status: 'cancelled', structured_evidence: [{ type: 'manual_inventory_area', reference: 'goe1_cancelled' }] },
+        { id: 4, provenance: 'manual_catalog', task: { title: 'Sin evidencia' }, latest_status: 'completed' },
+        { id: 5, provenance: 'manual_catalog', task: { title: 'Tipo desconocido' }, latest_status: 'completed', structured_evidence: [{ type: 'unknown', reference: 'goe1_unknown' }] },
+        { id: 6, provenance: 'manual_catalog', task: { title: 'Referencia vacía' }, latest_status: 'completed', structured_evidence: [{ type: 'manual_inventory_area', reference: '   ' }] },
+        { id: 7, provenance: 'manual_catalog', task: { title: 'Referencia URL' }, latest_status: 'completed', structured_evidence: [{ type: 'manual_inventory_area', reference: 'https://untrusted.example/' }] },
+      ],
+    })
+    render(<GOAreaPerformanceHistoryPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver evidencia de ocurrencias' }))
+    fireEvent.click(await screen.findByRole('tab', { name: /Tareas registradas de forma manual.*7/ }))
+
+    expect(screen.queryByRole('button', { name: 'Ver inventario de área' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ver información de Pendiente' })).toBeInTheDocument()
+  })
+
   it('renders the normalized canonical occurrence detail without exposing opaque identifiers', async () => {
     service.getGOOccurrenceDetail.mockResolvedValueOnce({
       task: { title: 'Occurrence detail task' },

@@ -27,6 +27,7 @@ const MANUAL_CLASSIFICATION_LABELS = {
 }
 const EVIDENCE_ACTION_ROUTES = {
   inventory_area: { path: '/evidencia-go/inventario', label: 'Ver inventario de área' },
+  manual_inventory_area: { path: '/evidencia-go/inventario', label: 'Ver inventario de área' },
   deposit_review: { path: '/evidencia-go/depositos', label: 'Ver revisión de depósitos' },
 }
 
@@ -44,6 +45,12 @@ function safeEvidenceAction(action) {
   const route = EVIDENCE_ACTION_ROUTES[action.type]
   const reference = action.reference.trim()
   return { ...route, type: action.type, reference }
+}
+
+function manualEvidenceAction(occurrence) {
+  if (occurrence?.provenance !== 'manual_catalog' || occurrence?.latest_status !== 'completed') return null
+  const actions = Array.isArray(occurrence?.structured_evidence) ? occurrence.structured_evidence : []
+  return actions.map(safeEvidenceAction).find((action) => action?.type === 'manual_inventory_area') ?? null
 }
 
 function diagnosticActions(actions) {
@@ -540,11 +547,13 @@ export default function GOAreaPerformanceHistoryPage() {
               const adHoc = occurrence?.provenance === 'ad_hoc'
               const title = adHoc ? occurrence?.name : occurrence?.task?.title
               const status = occurrenceStatus(occurrence?.latest_status)
+              const evidenceAction = manualEvidenceAction(occurrence)
               const itemId = `manual-${occurrence?.provenance ?? 'unknown'}-${occurrence?.id ?? index}`
               const expanded = expandedManualOccurrenceId === itemId
               return <li key={itemId} className="go-evidence-record go-evidence-record--manual">
                 <span className="go-evidence-record-title">{title ?? 'Entrada manual'}</span>
                 <span className="go-evidence-record-meta"><span>Fecha: {formatDate(occurrence?.origin_date_local)}</span><span className={`go-evidence-record-status go-evidence-record-status-${status.tone}`} aria-label={`Estado: ${status.label}`}>{status.label}</span></span>
+                {evidenceAction && <button type="button" className="tuvet-btn tuvet-btn-secondary go-evidence-action" onClick={() => openEvidenceAction(evidenceAction)}>{evidenceAction.label}</button>}
                 <button type="button" className="tuvet-btn tuvet-btn-link go-evidence-manual-detail-toggle" aria-expanded={expanded} aria-controls={`${itemId}-details`} onClick={() => setExpandedManualOccurrenceId(expanded ? null : itemId)} aria-label={`Ver información de ${title ?? 'entrada manual'}`}>Ver información</button>
                 {expanded && <dl id={`${itemId}-details`} className="go-evidence-manual-details">
                   {!adHoc && <><div><dt>Clasificación</dt><dd>{manualClassificationLabel(occurrence?.classification)}</dd></div><div><dt>Peso congelado</dt><dd>{displayValue(occurrence?.frozen_weight)}</dd></div>{occurrence?.planning_note ? <div className="go-evidence-manual-details-wide"><dt>Nota de planificación</dt><dd>{occurrence.planning_note}</dd></div> : null}</>}
