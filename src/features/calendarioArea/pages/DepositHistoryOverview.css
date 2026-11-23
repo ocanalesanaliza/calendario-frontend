@@ -1,0 +1,115 @@
+.deposit-history-page {
+  --dh-expected: #647b9b;
+  --dh-sent: var(--tv-primary);
+  --dh-missing: #d97706;
+  --dh-applied: #16a34a;
+  width: min(100%, 1600px);
+  margin-inline: auto;
+  color: var(--tv-text);
+  font-family: var(--tv-font);
+  gap: 1.5rem;
+}
+.deposit-history-page .tuvet-page-header h1 { font-size: clamp(1.5rem, 2.4vw, 2rem); letter-spacing: -.035em; }
+.deposit-history-page .tuvet-page-header p { margin-top: .4rem; font-size: .95rem; }
+.deposit-history-page .deposit-history-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem; margin: 0; padding: 1rem 1.25rem; border: 1px solid var(--tv-border); border-radius: var(--tv-radius); background: var(--tv-surface); }
+.deposit-history-presets { display: flex; flex-wrap: wrap; gap: .5rem; border: 0; padding: 0; margin: 0 auto 0 0; }
+.deposit-history-chip { min-height: 2.75rem; padding: .5rem .9rem; border: 1px solid var(--tv-border-strong); border-radius: var(--tv-radius-sm); background: var(--tv-surface); color: var(--tv-text); font: inherit; font-size: .82rem; font-weight: 600; cursor: pointer; }
+.deposit-history-chip:hover { background: var(--tv-surface-muted); border-color: var(--tv-primary); }
+.deposit-history-chip.is-active { background: var(--tv-primary); border-color: var(--tv-primary); color: white; }
+.deposit-history-page .deposit-history-filters label { display: grid; gap: .35rem; color: var(--tv-text); font-size: .8rem; font-weight: 600; }
+.deposit-history-page .deposit-history-filters input { width: 10.5rem; min-height: 2.75rem; padding: .5rem .65rem; border: 1px solid var(--tv-border-strong); border-radius: var(--tv-radius-sm); background: var(--tv-surface); color: var(--tv-fg); font: inherit; color-scheme: light; }
+.deposit-history-page .deposit-history-filters .tuvet-btn { min-height: 2.75rem; }
+.deposit-history-page .deposit-history-period { display: flex; align-items: center; flex-basis: 100%; gap: .5rem; margin: 0; color: var(--tv-muted); font-size: .8rem; }
+.deposit-history-period .tuvet-icon { width: 1rem; height: 1rem; }
+.deposit-history-overview { display: grid; gap: 1.25rem; min-width: 0; }
+.deposit-history-overview-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+.deposit-history-overview-kpi { display: flex; flex-direction: column; gap: .7rem; padding: 1.25rem; border: 1px solid var(--tv-border); border-radius: var(--tv-radius); background: var(--tv-surface); }
+.deposit-history-overview-kpi--attention { border-color: #f5d7a3; border-left: 3px solid var(--dh-missing); background: #fffbf2; }
+.deposit-history-overview-kpi > div { display: flex; justify-content: space-between; align-items: center; gap: .5rem; color: var(--tv-text); font-size: .85rem; font-weight: 600; }
+.deposit-history-overview-kpi .tuvet-icon { flex-shrink: 0; width: 1.35rem; height: 1.35rem; color: var(--tv-subtle); }
+.deposit-history-overview-kpi--attention .tuvet-icon { color: var(--tv-accent-text); }
+.deposit-history-overview-value { font-size: clamp(1.25rem, 1.9vw, 1.9rem); font-variant-numeric: tabular-nums; line-height: 1.25; color: var(--tv-fg); letter-spacing: -.04em; overflow-wrap: anywhere; }
+.deposit-history-overview-kpi p { margin: auto 0 0; color: var(--tv-muted); font-size: .77rem; line-height: 1.6; }
+.deposit-history-overview-kpi p strong { font-weight: 500; font-variant-numeric: tabular-nums; }
+.deposit-history-panel { min-width: 0; padding: 1.25rem; border: 1px solid var(--tv-border); border-radius: var(--tv-radius); background: var(--tv-surface); box-shadow: var(--tv-shadow-sm); }
+.deposit-history-panel h2 { margin: 0; color: var(--tv-fg); font-size: 1.1rem; font-weight: 700; letter-spacing: -.02em; }
+.deposit-history-panel-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.deposit-history-panel-header p { margin: .3rem 0 0; color: var(--tv-muted); font-size: .8rem; }
+.deposit-history-panel-title { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: baseline; }
+.deposit-history-panel-title p { margin: 0; }
+.deposit-history-progress { display: flex; align-items: center; gap: 1.5rem; }
+.deposit-history-progress h2 { flex: 0 0 auto; font-size: .95rem; }
+.deposit-history-progress-content { flex: 1; min-width: 0; }
+.deposit-history-progress-track { height: .65rem; border-radius: 99px; overflow: hidden; background: var(--dh-missing); }
+.deposit-history-progress-track > span { display: block; height: 100%; border-radius: inherit; background: var(--dh-applied); }
+.deposit-history-progress-labels { display: flex; flex-wrap: wrap; gap: .35rem 1.5rem; margin-top: .5rem; color: var(--tv-muted); font-size: .8rem; }
+.deposit-history-progress-labels > span { display: inline-flex; align-items: center; gap: .35rem; }
+.deposit-history-progress-labels i { width: .5rem; height: .5rem; border-radius: 50%; background: var(--dh-applied); }
+.deposit-history-search { display: flex; align-items: center; gap: .5rem; width: min(100%, 22rem); min-height: 2.75rem; padding: 0 .75rem; border: 1px solid var(--tv-border-strong); border-radius: var(--tv-radius-sm); background: var(--tv-surface); }
+.deposit-history-search .tuvet-icon { width: 1.1rem; height: 1.1rem; flex-shrink: 0; color: var(--tv-subtle); }
+.deposit-history-search input { min-width: 0; width: 100%; min-height: 2.65rem; padding: .4rem 0; border: 0; background: transparent; color: var(--tv-fg); font: inherit; font-size: .85rem; }
+.deposit-history-search:focus-within { outline: 2px solid var(--tv-primary); outline-offset: 2px; }
+.deposit-history-search input:focus-visible { outline: none; }
+.deposit-history-table-tools { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; margin-bottom: 1rem; }
+.deposit-history-table-tools > span { color: var(--tv-muted); font-size: .78rem; margin-left: .5rem; }
+.deposit-history-table-scroll { overflow-x: auto; border-radius: var(--tv-radius-sm); }
+.deposit-history-table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+.deposit-history-table th, .deposit-history-table td { padding: .85rem .8rem; border-bottom: 1px solid var(--tv-border); text-align: left; vertical-align: middle; }
+.deposit-history-table thead th { background: var(--tv-surface-sunken); color: var(--tv-text); font-size: .77rem; font-weight: 600; white-space: nowrap; }
+.deposit-history-table th.deposit-history-num, .deposit-history-table td.deposit-history-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.deposit-history-table thead button { min-height: 2.1rem; border: 0; padding: 0; background: none; color: inherit; font: inherit; font-weight: inherit; cursor: pointer; }
+.deposit-history-table thead th { padding-block: .2rem; }
+.deposit-history-table tbody tr:hover { background: var(--tv-surface-muted); }
+.deposit-history-table tbody .deposit-history-row--attention { background: #fffbf2; }
+.deposit-history-row--attention > th { border-left: 3px solid var(--dh-missing); }
+.deposit-history-branch-name { display: grid; gap: .15rem; min-width: 10rem; max-width: 22rem; font-weight: 400; }
+.deposit-history-branch-name strong { color: var(--tv-fg); font-weight: 700; }
+.deposit-history-branch-name > span { color: var(--tv-muted); font-size: .78rem; }
+.deposit-history-page .deposit-history-status { display: inline-flex; gap: .35rem; align-items: center; margin: 0; padding: .25rem .55rem; font-size: .73rem; white-space: nowrap; }
+.deposit-history-status .tuvet-icon { width: .9rem; height: .9rem; }
+.deposit-history-page .deposit-history-status--pending_reconciliation { color: var(--tv-accent-text); background: var(--tv-accent-soft); }
+.deposit-history-page .deposit-history-status--reconciled { color: var(--tv-success-text); background: var(--tv-success-soft); }
+.deposit-history-status--neutral { color: var(--tv-primary-text); background: var(--tv-primary-softer); }
+.deposit-history-pending-amount { color: var(--tv-accent-text); font-weight: 700; }
+.deposit-history-muted { color: var(--tv-subtle); font-size: .82rem; }
+.deposit-history-text-button { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; min-height: 2.75rem; border: 0; border-radius: .25rem; padding: .35rem; background: none; color: var(--tv-primary-text); font: inherit; font-size: .8rem; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.deposit-history-text-button:hover { color: var(--tv-primary-hover); text-decoration: underline; }
+.deposit-history-no-results { text-align: center !important; color: var(--tv-muted); padding: 2rem !important; }
+.deposit-history-page :is(button, input, summary, [tabindex]):focus-visible { outline: 2px solid var(--tv-primary); outline-offset: 3px; }
+.deposit-history-page button:disabled, .deposit-history-page fieldset:disabled { opacity: .65; cursor: wait; }
+.deposit-history-compliance-summary { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .75rem; margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--tv-border); }
+.deposit-history-compliance-summary p { margin: 0; color: var(--tv-muted); font-size: .9rem; }
+.deposit-history-compliance-summary p > span { padding-inline: .5rem; }
+.deposit-history-compliance-summary strong { color: var(--tv-fg); font-variant-numeric: tabular-nums; }
+.deposit-history-compliance-empty { display: flex; gap: 1rem; align-items: center; padding: 1.5rem; border: 1px dashed var(--tv-border-strong); border-radius: var(--tv-radius-sm); background: var(--tv-surface-muted); }
+.deposit-history-compliance-empty > .tuvet-icon { width: 2rem; height: 2rem; flex-shrink: 0; color: var(--tv-subtle); }
+.deposit-history-compliance-empty h3 { margin: 0 0 .35rem; color: var(--tv-text); font-size: .95rem; }
+.deposit-history-compliance-empty p { margin: 0; max-width: 75ch; font-size: .85rem; color: var(--tv-muted); }
+.deposit-history-chart-scroll { overflow-x: auto; padding: 1rem .5rem .5rem; }
+.deposit-history-chart { min-width: var(--chart-width); }
+.deposit-history-chart-plot { height: 230px; margin: 1rem .5rem 0 2.5rem; position: relative; border-bottom: 1px solid var(--tv-border-strong); }
+.deposit-history-chart-axis { position: absolute; left: -2.5rem; width: 2rem; top: 0; bottom: 0; font-variant-numeric: tabular-nums; color: var(--tv-muted); font-size: .75rem; }
+.deposit-history-chart-axis > span { position: absolute; right: 0; transform: translateY(50%); }
+.deposit-history-chart-grid { position: absolute; inset: 0; }
+.deposit-history-chart-grid > span { position: absolute; left: 0; right: 0; border-top: 1px solid var(--tv-border); }
+.deposit-history-chart-groups { display: flex; gap: 1.5rem; position: relative; height: 100%; padding-inline: 1rem; }
+.deposit-history-chart-group { flex: 1 0 0; display: flex; align-items: end; justify-content: center; gap: .35rem; min-width: 0; height: 100%; }
+.deposit-history-chart-bar { position: relative; flex: 1; max-width: 2.75rem; border-radius: .2rem .2rem 0 0; }
+.deposit-history-chart-bar > strong { position: absolute; top: -1.55rem; left: 50%; transform: translateX(-50%); color: var(--tv-fg); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.deposit-history-chart-bar--expected { background: var(--dh-expected); }
+.deposit-history-chart-bar--submitted { background: var(--dh-sent); }
+.deposit-history-chart-bar--missing { background: var(--dh-missing); }
+.deposit-history-chart-labels { display: flex; gap: 1.5rem; margin: .75rem .5rem 0 2.5rem; padding-inline: 1rem; }
+.deposit-history-chart-labels > div { flex: 1 0 0; min-width: 0; text-align: center; display: flex; align-items: center; flex-direction: column; gap: .2rem; }
+.deposit-history-chart-labels strong { color: var(--tv-fg); font-size: .8rem; }
+.deposit-history-chart-labels > div > span { max-width: 20ch; font-size: .7rem; line-height: 1.4; color: var(--tv-muted); overflow-wrap: anywhere; }
+.deposit-history-chart-legend { display: flex; justify-content: center; flex-wrap: wrap; gap: .75rem 1.5rem; list-style: none; padding: 0; margin: 1rem 0; font-size: .8rem; }
+.deposit-history-chart-legend li { display: inline-flex; gap: .5rem; align-items: center; }
+.deposit-history-chart-legend i { width: 1.25rem; height: .65rem; border-radius: .15rem; }
+.deposit-history-chart-note { margin: .75rem 0 0; font-size: .77rem; color: var(--tv-muted); }
+.deposit-history-chart-data { border-top: 1px solid var(--tv-border); padding-top: .5rem; font-size: .8rem; }
+.deposit-history-chart-data summary { cursor: pointer; padding: .65rem 0; color: var(--tv-primary-text); font-weight: 600; }
+@media (min-width: 1440px) { .deposit-history-chart-plot { height: 270px; } }
+@media (max-width: 1100px) { .deposit-history-overview-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .deposit-history-page .deposit-history-filters { align-items: end; } .deposit-history-presets { flex-basis: 100%; } }
+@media (max-width: 768px) { .deposit-history-page { width: 100%; } .deposit-history-overview { gap: 1rem; } .deposit-history-progress { align-items: stretch; flex-direction: column; gap: .75rem; } .deposit-history-panel-header { align-items: stretch; } .deposit-history-search { width: 100%; } .deposit-history-overview-value { font-size: 1.4rem; } .deposit-history-page .deposit-history-filters label { flex: 1; min-width: 8rem; } .deposit-history-page .deposit-history-filters input { width: 100%; } }
+@media (max-width: 480px) { .deposit-history-panel, .deposit-history-page .deposit-history-filters { padding: 1rem; } .deposit-history-overview-kpis { grid-template-columns: 1fr; gap: .65rem; } .deposit-history-overview-kpi { padding: 1rem; gap: .5rem; } .deposit-history-page .deposit-history-filters > .tuvet-btn { width: 100%; } .deposit-history-page .deposit-history-presets { flex-basis: 100%; } .deposit-history-presets .deposit-history-chip { flex: 1; padding-inline: .45rem; font-size: .75rem; } .deposit-history-compliance-empty { align-items: start; padding: 1rem; } .deposit-history-panel-title { display: block; } .deposit-history-panel-title p { margin-top: .35rem; } }

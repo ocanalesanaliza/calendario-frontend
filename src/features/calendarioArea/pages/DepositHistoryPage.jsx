@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Aviso, EstadoCarga, PageHeader } from '../../tuvet/components/TuvetUi'
+import { Aviso, EstadoCarga, Icono, PageHeader } from '../../tuvet/components/TuvetUi'
+import DepositHistoryOverview from './DepositHistoryOverview'
 import { getDepositHistory, getDepositHistoryBranch, getDepositHistoryClosure } from '../../calendarArea/services/depositHistoryService'
 import '../../tuvet/tuvet.css'
 import './DepositHistoryPage.css'
+import './DepositHistoryOverview.css'
 
 function localMonthRange(now = new Date()) {
   const year = now.getFullYear()
@@ -49,10 +51,6 @@ function reconciliationLabel(status) {
   return ({ reconciled: 'Conciliado', pending_reconciliation: 'Pendiente de conciliación' })[status] ?? null
 }
 
-function hasFinancialData(data) {
-  return ['total_sales', 'cash_sales', 'card_sales', 'deposited_amount', 'outstanding_amount'].some((key) => data?.[key] !== null && data?.[key] !== undefined && data?.[key] !== '')
-}
-
 function FinancialSummary({ data, compact = false, separated = false }) {
   const values = data ?? {}
   const pending = values.reconciliation_status === 'pending_reconciliation'
@@ -88,6 +86,8 @@ function NavigationContext({ items, onBack, label }) {
 
 export default function DepositHistoryPage() {
   const [range, setRange] = useState(localMonthRange)
+  const [draftRange, setDraftRange] = useState(localMonthRange)
+  const [preset, setPreset] = useState('month')
   const [history, setHistory] = useState(null)
   const [branch, setBranch] = useState(null)
   const [selectedBranch, setSelectedBranch] = useState(null)
@@ -97,6 +97,7 @@ export default function DepositHistoryPage() {
   const [error, setError] = useState('')
 
   async function loadHistory(nextRange = range) {
+    setRange(nextRange)
     setLoading(true)
     setError('')
     setBranch(null)
@@ -111,6 +112,20 @@ export default function DepositHistoryPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  function choosePreset(value) {
+    const now = new Date()
+    let nextRange
+    if (value === 'previous') nextRange = localMonthRange(new Date(now.getFullYear(), now.getMonth() - 1, 1))
+    else if (value === 'week') {
+      const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6)
+      const date = (day) => `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
+      nextRange = { from: date(from), to: date(now) }
+    } else nextRange = localMonthRange(now)
+    setPreset(value)
+    setDraftRange(nextRange)
+    void loadHistory(nextRange)
   }
 
   useEffect(() => {
@@ -170,24 +185,18 @@ export default function DepositHistoryPage() {
   const closureDate = closureData?.closure_date ?? closureData?.fecha_cierre ?? selectedClosure?.closure_date ?? selectedClosure?.fecha_cierre
 
   return <main className="tema-analiza tuvet-page deposit-history-page" data-testid="deposit-history-layout" data-responsive-breakpoints="375 768 1024 1440">
-    <PageHeader title="Historial de depósitos" description="Consulta los cierres y su conciliación histórica por sucursal." />
-    <form className="deposit-history-filters" onSubmit={(event) => { event.preventDefault(); void loadHistory(range) }} aria-label="Rango del historial de depósitos">
-      <p className="deposit-history-period">Período consultado: <strong>{formatRange(range)}</strong></p>
-      <label htmlFor="deposit-history-from">Desde<input id="deposit-history-from" type="date" value={range.from} onChange={(event) => setRange((current) => ({ ...current, from: event.target.value }))} /></label>
-      <label htmlFor="deposit-history-to">Hasta<input id="deposit-history-to" type="date" value={range.to} onChange={(event) => setRange((current) => ({ ...current, to: event.target.value }))} /></label>
+    <PageHeader title="Historial de depósitos" description="Consulta y compara los cierres y su conciliación por sucursal." />
+    <form className="deposit-history-filters" onSubmit={(event) => { event.preventDefault(); setPreset(''); void loadHistory(draftRange) }} aria-label="Rango del historial de depósitos">
+      <fieldset className="deposit-history-presets" disabled={loading}><legend className="tuvet-visually-hidden">Rangos rápidos</legend>{[['week', 'Últimos 7 días'], ['month', 'Este mes'], ['previous', 'Mes anterior']].map(([value, label]) => <button key={value} type="button" className={`deposit-history-chip${preset === value ? ' is-active' : ''}`} aria-pressed={preset === value} onClick={() => choosePreset(value)}>{label}</button>)}</fieldset>
+      <label htmlFor="deposit-history-from">Desde<input id="deposit-history-from" type="date" required max={draftRange.to || undefined} disabled={loading} value={draftRange.from} onChange={(event) => { setPreset(''); setDraftRange((current) => ({ ...current, from: event.target.value })) }} /></label>
+      <label htmlFor="deposit-history-to">Hasta<input id="deposit-history-to" type="date" required min={draftRange.from || undefined} disabled={loading} value={draftRange.to} onChange={(event) => { setPreset(''); setDraftRange((current) => ({ ...current, to: event.target.value })) }} /></label>
       <button type="submit" className="tuvet-btn" disabled={loading}>{loading ? 'Cargando…' : 'Consultar historial'}</button>
+      <p className="deposit-history-period"><Icono nombre="calendario" /> <span>Período consultado: <strong>{formatRange(range)}</strong></span></p>
     </form>
 
     {error && <Aviso tipo={error.startsWith('No hay') ? 'info' : 'error'} role="alert">{error}</Aviso>}
     <EstadoCarga loading={loading} error="" onRetry={() => void loadHistory()} empty={!loading && !error && history && branches.length === 0} emptyText="No hay historial disponible para el rango seleccionado.">
-      {history && !branch && <section aria-labelledby="deposit-history-summary-title">
-        <h2 id="deposit-history-summary-title">Resumen del rango</h2>
-        <FinancialSummary data={history.summary ?? history.resumen} />
-        <h2 className="deposit-history-section-title">Sucursales</h2>
-        <div className="deposit-history-branch-list">{branches.map((item) => <button type="button" key={item.id} className="deposit-history-branch-row" onClick={() => void openBranch(item)} aria-label={`Ver cierres de ${[item.code ?? item.codigo, item.name ?? item.nombre].filter(Boolean).join(' ') || 'sucursal'}`}>
-          <span><strong>{item.code ?? item.codigo ?? 'Sin código'}</strong><span>{item.name ?? item.nombre ?? 'Sucursal'}</span>{hasFinancialData(item) && <FinancialSummary data={item} compact />}</span><span className="deposit-history-row-action">Ver cierres <span aria-hidden="true">→</span></span>
-        </button>)}</div>
-      </section>}
+      {history && !branch && <DepositHistoryOverview history={history} branches={branches} period={formatRange(range)} onOpenBranch={openBranch} />}
       {branch && !closure && <section aria-labelledby="deposit-history-branch-title">
         <NavigationContext items={['Historial de depósitos', currentBranchLabel]} label="← Volver a sucursales" onBack={() => { setBranch(null); setSelectedBranch(null); setError('') }} />
         <h2 id="deposit-history-branch-title">Cierres de {currentBranchLabel}</h2>
