@@ -4,8 +4,11 @@ import {
   allocateDepositReceipt,
   captureDepositClosure,
   declareNoDepositado,
+  getDepositCompliance,
   getDepositReport,
+  getOverdueDepositObligation,
   openDepositReport,
+  openOverdueDepositReport,
   submitDepositReport,
 } from './depositService'
 
@@ -52,5 +55,55 @@ describe('depositService', () => {
     api.apiRequest.mockResolvedValue(response({ detail: 'deposit_api_disabled' }, false, 409))
 
     await expect(openDepositReport({ sucursal_tarea_id: 44 })).rejects.toMatchObject({ status: 409, detail: 'deposit_api_disabled' })
+  })
+
+  it('uses the overdue-obligation T4/T5 endpoints without changing opaque IDs or payloads', async () => {
+    const obligationId = 'obligation:opaque/GS-001'
+    const bridgePayload = {
+      report: { id: 'report:opaque/001', occurrence_id: 'occurrence:opaque/001', receipt_ids: ['receipt:opaque/001'] },
+      access: { can_read: true, can_prepare: true, can_submit: false },
+    }
+    api.apiRequest
+      .mockResolvedValueOnce(response({ results: [{ id: obligationId }] }))
+      .mockResolvedValueOnce(response({ id: obligationId, historical_closure_id: 'closure:opaque/001' }))
+      .mockResolvedValueOnce(response(bridgePayload, true, 201))
+
+    await expect(getDepositCompliance()).resolves.toEqual({ results: [{ id: obligationId }] })
+    await expect(getOverdueDepositObligation(obligationId)).resolves.toEqual({ id: obligationId, historical_closure_id: 'closure:opaque/001' })
+    await expect(openOverdueDepositReport(obligationId)).resolves.toEqual(bridgePayload)
+
+    expect(api.apiRequest.mock.calls).toEqual([
+      ['/api/depositos/cumplimiento/', { method: 'GET' }],
+      [`/api/depositos/obligaciones/${obligationId}/`, { method: 'GET' }],
+      [`/api/depositos/obligaciones/${obligationId}/reporte/`, { method: 'POST' }],
+    ])
+  })
+
+  it('preserves overdue-obligation API error status and detail for a recoverable UI', async () => {
+    api.apiRequest.mockResolvedValue(response({ detail: 'overdue_obligation_forbidden' }, false, 403))
+
+    await expect(getOverdueDepositObligation('opaque-obligation-id')).rejects.toMatchObject({
+      status: 403,
+      detail: 'overdue_obligation_forbidden',
+    })
+  })
+
+  it('forwards punctuation-bearing opaque IDs and preserves bridge errors', async () => {
+    const obligationId = 'obligation:segment/GS-001?raw=%26+space'
+    api.apiRequest
+      .mockResolvedValueOnce(response({ id: obligationId }))
+      .mockResolvedValueOnce(response({ detail: 'already_submitted' }, false, 409))
+
+    await expect(getOverdueDepositObligation(obligationId)).resolves.toEqual({ id: obligationId })
+    await expect(openOverdueDepositReport(obligationId)).rejects.toMatchObject({
+      message: 'already_submitted',
+      status: 409,
+      detail: 'already_submitted',
+    })
+
+    expect(api.apiRequest.mock.calls).toEqual([
+      [`/api/depositos/obligaciones/${obligationId}/`, { method: 'GET' }],
+      [`/api/depositos/obligaciones/${obligationId}/reporte/`, { method: 'POST' }],
+    ])
   })
 })

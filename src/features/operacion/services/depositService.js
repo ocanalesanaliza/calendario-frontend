@@ -52,3 +52,15 @@ export function declareNoDepositado(reportId, entryId, body) {
 export function submitDepositReport(reportId, body) {
   return post(`${BASE}reportes/${reportId}/enviar/`, body, 'No fue posible enviar el reporte de depósito.')
 }
+
+export function getDepositCompliance() {
+  return request('/api/depositos/cumplimiento/', { method: 'GET' }, 'No fue posible cargar el cumplimiento de depósitos.')
+}
+
+export function getOverdueDepositObligation(obligationId) {
+  return request(`/api/depositos/obligaciones/${obligationId}/`, { method: 'GET' }, 'No fue posible cargar la obligación vencida.')
+}
+
+export function openOverdueDepositReport(obligationId) {
+  return request(`/api/depositos/obligaciones/${obligationId}/reporte/`, { method: 'POST' }, 'No fue posible preparar el reporte vencido.')
+}
