@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Aviso, EstadoCarga, Icono, PageHeader } from '../../tuvet/components/TuvetUi'
+import { Aviso, EstadoCarga, Icono, Modal, PageHeader } from '../../tuvet/components/TuvetUi'
 import DepositHistoryOverview from './DepositHistoryOverview'
-import { getDepositHistory, getDepositHistoryBranch, getDepositHistoryClosure } from '../../calendarArea/services/depositHistoryService'
+import { getDepositHistory, getDepositHistoryBranch, getDepositHistoryClosure, getDepositHistoryCompliance, openSubmittedOverdueDepositReport } from '../../calendarArea/services/depositHistoryService'
 import '../../tuvet/tuvet.css'
 import './DepositHistoryPage.css'
 import './DepositHistoryOverview.css'
@@ -84,15 +84,28 @@ function NavigationContext({ items, onBack, label }) {
   return <div className="deposit-history-navigation"><Breadcrumbs items={items} /><button type="button" className="deposit-history-back" onClick={onBack}>{label}</button></div>
 }
 
+function SubmittedOverdueReportDetail({ report, onClose }) {
+  return <Modal title="Detalle de depósito vencido" subtitle="Reporte enviado" icon="archivo" wide className="tema-analiza" onClose={onClose} footer={<button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={onClose}>Cerrar</button>}>
+    <div className="deposit-history-detail">
+      <Aviso tipo="success">El reporte vencido ya fue enviado y es de solo lectura.</Aviso>
+      <section aria-labelledby="submitted-overdue-closures"><h2 id="submitted-overdue-closures">Cierres</h2><div className="deposit-history-closure-list">{(report.closures ?? []).map((item) => <article key={item.id} className="deposit-history-closure-row"><div className="deposit-history-closure-content"><h3>Cierre del {formatDate(item.closure_date)}</h3><FinancialSummary data={item} separated />{item.no_depositado_reason && <p>No depositado: {item.no_depositado_reason}</p>}</div></article>)}</div></section>
+      <section className="deposit-history-receipts" aria-labelledby="submitted-overdue-receipts"><h2 id="submitted-overdue-receipts">Comprobantes y asignaciones</h2>{(report.receipts ?? []).length === 0 ? <p className="deposit-history-empty">No hay comprobantes para este reporte.</p> : <div className="deposit-history-receipts-table"><table><thead><tr><th>Referencia</th><th>Fecha de depósito</th><th>Depositado</th><th>Asignado</th></tr></thead><tbody>{report.receipts.map((receipt) => <tr key={receipt.id}><td>{receipt.reference ?? 'Sin referencia'}</td><td>{formatDate(receipt.deposited_on)}</td><td>{formatAmount(receipt.deposited_amount)}</td><td>{formatAmount(receipt.allocated_amount)}</td></tr>)}</tbody></table></div>}{(report.receipts ?? []).flatMap((receipt) => receipt.allocations ?? []).length > 0 && <ul aria-label="Asignaciones de comprobantes">{report.receipts.flatMap((receipt) => (receipt.allocations ?? []).map((allocation) => <li key={allocation.id}>Comprobante {receipt.reference ?? 'sin referencia'}: {formatAmount(allocation.allocated_amount)}</li>))}</ul>}</section>
+    </div>
+  </Modal>
+}
+
 export default function DepositHistoryPage() {
   const [range, setRange] = useState(localMonthRange)
   const [draftRange, setDraftRange] = useState(localMonthRange)
   const [preset, setPreset] = useState('month')
   const [history, setHistory] = useState(null)
+  const [overdueCompliance, setOverdueCompliance] = useState(null)
   const [branch, setBranch] = useState(null)
   const [selectedBranch, setSelectedBranch] = useState(null)
   const [closure, setClosure] = useState(null)
   const [selectedClosure, setSelectedClosure] = useState(null)
+  const [openingOverdueId, setOpeningOverdueId] = useState(null)
+  const [submittedOverdueReport, setSubmittedOverdueReport] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -105,7 +118,9 @@ export default function DepositHistoryPage() {
     setClosure(null)
     setSelectedClosure(null)
     try {
-      setHistory(await getDepositHistory(nextRange))
+      const [nextHistory, nextOverdueCompliance] = await Promise.all([getDepositHistory(nextRange), getDepositHistoryCompliance().catch(() => null)])
+      setHistory(nextHistory)
+      setOverdueCompliance(nextOverdueCompliance)
     } catch (requestError) {
       setHistory(null)
       setError(safeError(requestError))
@@ -132,8 +147,11 @@ export default function DepositHistoryPage() {
     let active = true
     void Promise.resolve().then(async () => {
       try {
-        const data = await getDepositHistory(range)
-        if (active) setHistory(data)
+        const [data, nextOverdueCompliance] = await Promise.all([getDepositHistory(range), getDepositHistoryCompliance().catch(() => null)])
+        if (active) {
+          setHistory(data)
+          setOverdueCompliance(nextOverdueCompliance)
+        }
       } catch (requestError) {
         if (active) setError(safeError(requestError))
       } finally {
@@ -175,6 +193,25 @@ export default function DepositHistoryPage() {
     }
   }
 
+  async function openSubmittedOverdueReport(obligationId) {
+    setOpeningOverdueId(obligationId)
+    setError('')
+    try {
+      const bridge = await openSubmittedOverdueDepositReport(obligationId)
+      if (bridge?.report?.state !== 'submitted') {
+        setSubmittedOverdueReport(null)
+        setError('El reporte vencido aún no está disponible para consulta.')
+        return
+      }
+      setSubmittedOverdueReport(bridge.report)
+    } catch {
+      setSubmittedOverdueReport(null)
+      setError('No fue posible cargar el reporte vencido enviado.')
+    } finally {
+      setOpeningOverdueId(null)
+    }
+  }
+
   const branches = history?.branches ?? history?.sucursales ?? history?.results ?? []
   const closures = branch?.closures ?? branch?.cierres ?? branch?.results ?? []
   const closureData = closure?.closure ?? closure
@@ -196,7 +233,7 @@ export default function DepositHistoryPage() {
 
     {error && <Aviso tipo={error.startsWith('No hay') ? 'info' : 'error'} role="alert">{error}</Aviso>}
     <EstadoCarga loading={loading} error="" onRetry={() => void loadHistory()} empty={!loading && !error && history && branches.length === 0} emptyText="No hay historial disponible para el rango seleccionado.">
-      {history && !branch && <DepositHistoryOverview history={history} branches={branches} period={formatRange(range)} onOpenBranch={openBranch} />}
+      {history && !branch && <DepositHistoryOverview history={history} branches={branches} period={formatRange(range)} onOpenBranch={openBranch} overdueCompliance={overdueCompliance} openingOverdueId={openingOverdueId} onOpenSubmittedOverdueReport={openSubmittedOverdueReport} />}
       {branch && !closure && <section aria-labelledby="deposit-history-branch-title">
         <NavigationContext items={['Historial de depósitos', currentBranchLabel]} label="← Volver a sucursales" onBack={() => { setBranch(null); setSelectedBranch(null); setError('') }} />
         <h2 id="deposit-history-branch-title">Cierres de {currentBranchLabel}</h2>
@@ -212,5 +249,6 @@ export default function DepositHistoryPage() {
         </section>
       </section>}
     </EstadoCarga>
+    {submittedOverdueReport && <SubmittedOverdueReportDetail report={submittedOverdueReport} onClose={() => setSubmittedOverdueReport(null)} />}
   </main>
 }

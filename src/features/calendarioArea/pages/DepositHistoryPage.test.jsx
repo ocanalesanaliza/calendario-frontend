@@ -2,11 +2,64 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import DepositHistoryPage from './DepositHistoryPage'
 
-const api = vi.hoisted(() => ({ getDepositHistory: vi.fn(), getDepositHistoryBranch: vi.fn(), getDepositHistoryClosure: vi.fn() }))
+const api = vi.hoisted(() => ({ getDepositHistory: vi.fn(), getDepositHistoryBranch: vi.fn(), getDepositHistoryClosure: vi.fn(), getDepositHistoryCompliance: vi.fn(), openSubmittedOverdueDepositReport: vi.fn() }))
 vi.mock('../../calendarArea/services/depositHistoryService', () => api)
 
 describe('DepositHistoryPage', () => {
-  beforeEach(() => Object.values(api).forEach((mock) => mock.mockReset()))
+  beforeEach(() => {
+    Object.values(api).forEach((mock) => mock.mockReset())
+    api.getDepositHistoryCompliance.mockResolvedValue({ branches: [] })
+  })
+
+  it('opens complete submitted overdue financial detail with the backend-issued opaque obligation ID only', async () => {
+    api.getDepositHistory.mockResolvedValue({ summary: {}, branches: [{ id: 'opaque-branch-id', code: 'NTE', name: 'Sucursal Norte' }] })
+    api.getDepositHistoryCompliance.mockResolvedValue({ branches: [{ id: 'opaque-branch-id', code: 'NTE', name: 'Sucursal Norte', state: 'resolved', obligations: ['opaque-obligation-id'] }] })
+    api.openSubmittedOverdueDepositReport.mockResolvedValue({
+      report: {
+        id: 'opaque-report-id', state: 'submitted', closures: [{ id: 'opaque-closure-entry', closure_date: '2026-11-02', total_sales: '100.00', cash_sales: '100.00', card_sales: '0.00', no_depositado_reason: 'Bank closure' }],
+        receipts: [{ id: 'opaque-receipt-id', reference: 'DEP-001', deposited_on: '2026-11-03', deposited_amount: '100.00', allocated_amount: '100.00', allocations: [{ id: 'opaque-allocation-id', closure_entry_id: 'opaque-closure-entry', allocated_amount: '100.00' }] }],
+      },
+    })
+    render(<DepositHistoryPage />)
+
+    await screen.findByText('Sucursal Norte')
+    expect(api.getDepositHistoryCompliance).toHaveBeenCalled()
+    const open = await screen.findByRole('button', { name: 'Ver reporte vencido enviado de NTE · Sucursal Norte' })
+    fireEvent.click(open)
+
+    expect(api.openSubmittedOverdueDepositReport).toHaveBeenCalledWith('opaque-obligation-id')
+    expect(await screen.findByText('DEP-001')).toBeInTheDocument()
+    expect(screen.getByText(/Bank closure/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Capturar ventas' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Agregar comprobante' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Revisar y enviar reporte/ })).not.toBeInTheDocument()
+  })
+
+  it('does not offer a draft overdue report or any preparation action', async () => {
+    api.getDepositHistory.mockResolvedValue({ summary: {}, branches: [{ id: 'opaque-branch-id', code: 'NTE', name: 'Sucursal Norte' }] })
+    api.getDepositHistoryCompliance.mockResolvedValue({ branches: [{ id: 'opaque-branch-id', code: 'NTE', name: 'Sucursal Norte', state: 'pending', obligations: ['opaque-draft-obligation-id'] }] })
+    render(<DepositHistoryPage />)
+
+    await screen.findByText('Sucursal Norte')
+    expect(screen.queryByRole('button', { name: /Ver reporte vencido enviado/ })).not.toBeInTheDocument()
+    expect(api.openSubmittedOverdueDepositReport).not.toHaveBeenCalled()
+    expect(screen.queryByText(/Capturar ventas|Agregar comprobante|Declarar no depositado|Revisar y enviar reporte/)).not.toBeInTheDocument()
+  })
+
+  it('does not disclose overdue financial detail when the bridge report is not submitted', async () => {
+    api.getDepositHistory.mockResolvedValue({ summary: {}, branches: [{ id: 'opaque-branch-id', code: 'NTE', name: 'Sucursal Norte' }] })
+    api.getDepositHistoryCompliance.mockResolvedValue({ branches: [{ id: 'opaque-branch-id', code: 'NTE', name: 'Sucursal Norte', state: 'resolved', obligations: ['opaque-obligation-id'] }] })
+    api.openSubmittedOverdueDepositReport.mockResolvedValue({ report: { state: 'draft', closures: [{ no_depositado_reason: 'hidden' }], receipts: [{ reference: 'HIDDEN-001' }] } })
+    render(<DepositHistoryPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Ver reporte vencido enviado/ }))
+
+    expect(api.openSubmittedOverdueDepositReport).toHaveBeenCalledWith('opaque-obligation-id')
+    expect(await screen.findByText('El reporte vencido aún no está disponible para consulta.')).toBeInTheDocument()
+    expect(screen.queryByText('HIDDEN-001')).not.toBeInTheDocument()
+    expect(screen.queryByText(/hidden/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Capturar ventas|Agregar comprobante|Declarar no depositado|Revisar y enviar reporte/ })).not.toBeInTheDocument()
+  })
 
   it('renders formatted KPI, period context, compact branch rows, and opaque drill-downs', async () => {
     api.getDepositHistory.mockResolvedValue({ summary: { total_sales: '58000.00', cash_sales: '40000.00', card_sales: '18000.00', deposited_amount: '40000.00', outstanding_amount: '18000.00' }, branches: [{ id: 'opaque-branch-id', code: 'NTE', name: 'Sucursal Norte' }] })

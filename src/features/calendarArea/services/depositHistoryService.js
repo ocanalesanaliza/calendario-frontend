@@ -2,12 +2,12 @@ import { apiRequest } from '../../../services/apiClient'
 
 const BASE = '/api/depositos/ga/historial/'
 
-async function request(path) {
-  const response = await apiRequest(path, { method: 'GET' })
+async function request(path, options = { method: 'GET' }, fallback = 'No fue posible cargar el historial de depósitos.') {
+  const response = await apiRequest(path, options)
   const data = await response.json().catch(() => null)
   if (response.ok) return data
 
-  const error = new Error('No fue posible cargar el historial de depósitos.')
+  const error = new Error(fallback)
   error.status = response.status
   throw error
 }
@@ -30,4 +30,12 @@ export function getDepositHistoryBranch(branchId, range) {
 
 export function getDepositHistoryClosure(closureId) {
   return request(`${BASE}cierres/${closureId}/`)
+}
+
+export function getDepositHistoryCompliance() {
+  return request('/api/depositos/cumplimiento/')
+}
+
+export function openSubmittedOverdueDepositReport(obligationId) {
+  return request(`/api/depositos/obligaciones/${obligationId}/reporte/`, { method: 'POST' }, 'No fue posible cargar el reporte vencido enviado.')
 }

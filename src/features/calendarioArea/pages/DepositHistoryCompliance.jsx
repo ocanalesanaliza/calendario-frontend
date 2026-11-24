@@ -8,7 +8,7 @@ const SERIES = [
   { key: 'missing', label: 'No enviados' },
 ]
 
-export default function DepositHistoryCompliance({ compliance, branches, period, onOpenBranch }) {
+export default function DepositHistoryCompliance({ compliance, branches, period, onOpenBranch, overdueCompliance, openingOverdueId, onOpenSubmittedOverdueReport }) {
   const [query, setQuery] = useState('')
   const rows = complianceRows(compliance, branches)
   const visible = rows.filter(({ branch }) => branchName(branch).toLocaleLowerCase('es').includes(query.trim().toLocaleLowerCase('es')))
@@ -18,6 +18,7 @@ export default function DepositHistoryCompliance({ compliance, branches, period,
   const ceiling = step * Math.ceil(maxValue / step)
   const ticks = Array.from({ length: ceiling / step + 1 }, (_, index) => index * step)
   const missingCalendars = branches.length - rows.length
+  const submittedOverdueReports = (overdueCompliance?.branches ?? []).flatMap((item) => item?.state === 'resolved' && Array.isArray(item.obligations) ? item.obligations.map((obligationId) => ({ obligationId, branch: item })) : [])
 
   return <section className="deposit-history-panel deposit-history-compliance" aria-labelledby="deposit-history-compliance-title">
     <div className="deposit-history-panel-header">
@@ -46,5 +47,6 @@ export default function DepositHistoryCompliance({ compliance, branches, period,
       </>}
       <p className="deposit-history-chart-note">Esperados según el calendario de cada sucursal. Los días que aún no vencen no se cuentan como no enviados.</p>
     </>}
+    {submittedOverdueReports.length > 0 && <section aria-labelledby="submitted-overdue-reports-title"><h3 id="submitted-overdue-reports-title">Reportes vencidos enviados</h3><p>Los detalles financieros están disponibles solo después del envío confirmado por el servidor.</p><div className="deposit-history-closure-list">{submittedOverdueReports.map(({ obligationId, branch }) => <article className="deposit-history-closure-row" key={obligationId}><div className="deposit-history-closure-content"><h4>{branchName(branch)}</h4><button type="button" className="tuvet-btn tuvet-btn-secondary" disabled={openingOverdueId === obligationId} onClick={() => onOpenSubmittedOverdueReport?.(obligationId)} aria-label={`Ver reporte vencido enviado de ${branchName(branch)}`}>{openingOverdueId === obligationId ? 'Cargando reporte…' : 'Ver reporte enviado'}</button></div></article>)}</div></section>}
   </section>
 }
