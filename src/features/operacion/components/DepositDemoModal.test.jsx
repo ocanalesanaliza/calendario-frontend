@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DepositDemoModal } from './DepositDemoModal'
 
 const api = vi.hoisted(() => ({
-  openDepositReport: vi.fn(), getDepositReport: vi.fn(), captureDepositClosure: vi.fn(), addDepositReceipt: vi.fn(), allocateDepositReceipt: vi.fn(), declareNoDepositado: vi.fn(), submitDepositReport: vi.fn(),
+  openDepositReport: vi.fn(), getDepositReport: vi.fn(), openOverdueDepositReport: vi.fn(), captureDepositClosure: vi.fn(), addDepositReceipt: vi.fn(), allocateDepositReceipt: vi.fn(), declareNoDepositado: vi.fn(), submitDepositReport: vi.fn(),
 }))
 
 vi.mock('../services/depositService', () => api)
@@ -41,6 +41,30 @@ describe('DepositDemoModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar captura' }))
     await waitFor(() => expect(api.captureDepositClosure).toHaveBeenCalledWith('opaque-report-id', 71, expect.objectContaining({ total_sales: '100.00', cash_sales: '70.00', card_sales: '30.00', expected_version: 1 })))
     expect(await screen.findByText(/Ventas capturadas: L/)).toBeInTheDocument()
+  })
+
+  it('uses the bridge report and preserves its opaque closure identity during an overdue capture', async () => {
+    const overdueReport = report({ id: 'opaque-overdue-report', closures: [{ ...report().closures[0], id: 'opaque-closure-entry' }] })
+    api.captureDepositClosure.mockResolvedValue({ report: { ...overdueReport, optimistic_version: 2, closures: [capturedClosure({ id: 'opaque-closure-entry' })] } })
+    render(<DepositDemoModal tarea={task} fecha="2026-11-02" overdue={{ obligationId: 'opaque-obligation', report: overdueReport, access: { can_read_draft: true, can_prepare_draft: true, can_submit: true } }} onClose={vi.fn()} />)
+
+    await screen.findByText('Cierre del 2026-11-01')
+    expect(api.openDepositReport).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText('Ventas totales *'), { target: { value: '100.00' } })
+    fireEvent.change(screen.getByLabelText('Ventas en efectivo *'), { target: { value: '70.00' } })
+    fireEvent.change(screen.getByLabelText('Ventas con tarjeta *'), { target: { value: '30.00' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Capturar ventas' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirmar captura' }))
+
+    await waitFor(() => expect(api.captureDepositClosure).toHaveBeenCalledWith('opaque-overdue-report', 'opaque-closure-entry', expect.objectContaining({ expected_version: 1 })))
+  })
+
+  it('renders a submitted overdue report as read-only and gates draft actions by access', async () => {
+    render(<DepositDemoModal tarea={task} fecha="2026-11-02" overdue={{ obligationId: 'opaque-obligation', report: report({ state: 'submitted', closures: [capturedClosure()] }), access: { can_read_draft: false, can_prepare_draft: false, can_submit: false } }} onClose={vi.fn()} />)
+
+    expect(await screen.findByText('El reporte vencido ya fue enviado y es de solo lectura.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Revisar y enviar reporte' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Declarar no depositado' })).not.toBeInTheDocument()
   })
 
   it('captures balanced sales without requiring a discrepancy explanation', async () => {

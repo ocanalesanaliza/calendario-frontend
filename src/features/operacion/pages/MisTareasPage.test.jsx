@@ -5,14 +5,14 @@ import MisTareasPage from './MisTareasPage'
 import MisTareasV2Page from './MisTareasV2Page'
 import { MisTareasRoute } from '../../../App'
 
-const { getMisTareas, registrarTarea, registrarTareasLote, getTrabajosCampo, aceptarTrabajoCampo, rechazarTrabajoCampo, getRevisionGuardia, guardarRevisionGuardia, openDepositReport } = vi.hoisted(() => ({ getMisTareas: vi.fn(), registrarTarea: vi.fn(), registrarTareasLote: vi.fn(), getTrabajosCampo: vi.fn(), aceptarTrabajoCampo: vi.fn(), rechazarTrabajoCampo: vi.fn(), getRevisionGuardia: vi.fn(), guardarRevisionGuardia: vi.fn(), openDepositReport: vi.fn() }))
+const { getMisTareas, registrarTarea, registrarTareasLote, getTrabajosCampo, aceptarTrabajoCampo, rechazarTrabajoCampo, getRevisionGuardia, guardarRevisionGuardia, openDepositReport, getDepositCompliance, openOverdueDepositReport } = vi.hoisted(() => ({ getMisTareas: vi.fn(), registrarTarea: vi.fn(), registrarTareasLote: vi.fn(), getTrabajosCampo: vi.fn(), aceptarTrabajoCampo: vi.fn(), rechazarTrabajoCampo: vi.fn(), getRevisionGuardia: vi.fn(), guardarRevisionGuardia: vi.fn(), openDepositReport: vi.fn(), getDepositCompliance: vi.fn(), openOverdueDepositReport: vi.fn() }))
 let perfil = { type: 'gerente_sucursal', sucursal: { nombre: 'Sucursal Norte' } }
 const revokeMyTasksAccess = vi.fn()
 
 vi.mock('../services/operacionService', () => ({ getMisTareas, registrarTarea, registrarTareasLote }))
 vi.mock('../../trabajosCampo/services/trabajosCampoService', () => ({ getTrabajosCampo, aceptarTrabajoCampo, rechazarTrabajoCampo }))
 vi.mock('../services/revisionesGuardiaService', () => ({ getRevisionGuardia, guardarRevisionGuardia }))
-vi.mock('../services/depositService', () => ({ openDepositReport }))
+vi.mock('../services/depositService', () => ({ openDepositReport, getDepositCompliance, openOverdueDepositReport }))
 vi.mock('../../auth/context/AuthContext', () => ({ useAuth: () => ({ perfil, revokeMyTasksAccess }) }))
 
 const taskResponse = { meta: { fecha_consultada: '2026-09-05', fecha_servidor: '2026-09-05', hora_servidor: '10:00', jornada_servidor: 'manana' }, resumen: { total: 1, disponibles: 1, registradas: 0, cerradas: 0, bloqueadas: 0, manana: { total: 1 }, tarde: { total: 0 } }, results: [{ id_sucursal_tarea: 44, jornada: 'manana', hora: '09:00', hora_fin_registro: '18:00', disponible_para_registro: true, estado_ui: 'disponible', estado_ui_label: 'Disponible', tarea: { id_tarea: 18, nombre: 'Envio de deposito de Sucursal.' } }] }
@@ -42,7 +42,18 @@ function renderProtectedMisTareasRoutes(entries = ['/mis-tareas'], initialIndex)
 }
 
 describe('MisTareasPage deposit demonstrations', () => {
-  beforeEach(() => { perfil = { type: 'gerente_sucursal', can_access_my_tasks: true, sucursal: { nombre: 'Sucursal Norte' } }; getMisTareas.mockReset().mockResolvedValue(taskResponse); getTrabajosCampo.mockReset().mockResolvedValue({ results: [] }); registrarTarea.mockReset(); registrarTareasLote.mockReset(); aceptarTrabajoCampo.mockReset(); rechazarTrabajoCampo.mockReset(); getRevisionGuardia.mockReset(); guardarRevisionGuardia.mockReset(); openDepositReport.mockReset().mockResolvedValue({ report: { id: 'opaque-report-id', state: 'draft', optimistic_version: 1, occurrence: { execution_date: '2026-09-05', scheduled_shift: 'manana', branch_code: 'NORTE' }, closures: [], receipts: [], submission: null } }); revokeMyTasksAccess.mockReset() })
+  beforeEach(() => { perfil = { type: 'gerente_sucursal', can_access_my_tasks: true, sucursal: { nombre: 'Sucursal Norte' } }; getMisTareas.mockReset().mockResolvedValue(taskResponse); getTrabajosCampo.mockReset().mockResolvedValue({ results: [] }); registrarTarea.mockReset(); registrarTareasLote.mockReset(); aceptarTrabajoCampo.mockReset(); rechazarTrabajoCampo.mockReset(); getRevisionGuardia.mockReset(); guardarRevisionGuardia.mockReset(); openDepositReport.mockReset().mockResolvedValue({ report: { id: 'opaque-report-id', state: 'draft', optimistic_version: 1, occurrence: { execution_date: '2026-09-05', scheduled_shift: 'manana', branch_code: 'NORTE' }, closures: [], receipts: [], submission: null } }); getDepositCompliance.mockReset().mockResolvedValue({ branches: [] }); openOverdueDepositReport.mockReset(); revokeMyTasksAccess.mockReset() })
+
+  it('renders a visible GS overdue obligation and opens it through the opaque bridge', async () => {
+    getDepositCompliance.mockResolvedValue({ branches: [{ name: 'Sucursal Norte', obligations: ['opaque-overdue-obligation'] }] })
+    openOverdueDepositReport.mockResolvedValue({ report: { id: 'opaque-overdue-report', state: 'draft', optimistic_version: 1, closures: [], receipts: [] }, access: { can_read_draft: true, can_prepare_draft: true, can_submit: true } })
+
+    render(<MemoryRouter><MisTareasPage /></MemoryRouter>)
+    fireEvent.click(await screen.findByRole('button', { name: 'Regularizar depósito vencido de Sucursal Norte' }))
+
+    await waitFor(() => expect(openOverdueDepositReport).toHaveBeenCalledWith('opaque-overdue-obligation'))
+    expect(openDepositReport).not.toHaveBeenCalled()
+  })
 
   it('opens the real deposit report flow directly without rendering a selection checkbox or action bar', async () => {
     getMisTareas.mockResolvedValue({

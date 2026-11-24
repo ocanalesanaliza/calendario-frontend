@@ -4,6 +4,7 @@ import { getMisTareas, registrarTarea, registrarTareasLote } from '../services/o
 import { getTrabajosCampo, aceptarTrabajoCampo, rechazarTrabajoCampo } from '../../trabajosCampo/services/trabajosCampoService'
 import { useAuth } from '../../auth/context/AuthContext'
 import { DepositDemoModal } from '../components/DepositDemoModal'
+import { getDepositCompliance, openOverdueDepositReport } from '../services/depositService'
 import { RevisionGuardiaModal } from '../components/RevisionGuardiaModal'
 import './MisTareasPage.css'
 import './MisTareasV2Page.css'
@@ -99,6 +100,8 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
   const [registrandoLote, setRegistrandoLote] = useState(false)
   const [loteError, setLoteError] = useState('')
   const [depositTask, setDepositTask] = useState(null)
+  const [overdueDeposit, setOverdueDeposit] = useState(null)
+  const [overdueObligations, setOverdueObligations] = useState([])
   const [revisionGuardiaTask, setRevisionGuardiaTask] = useState(null)
   const [availableFilterActive, setAvailableFilterActive] = useState(false)
   const isMountedRef = useRef(true)
@@ -129,6 +132,31 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
     perfilRef.current = perfil
     fechaRef.current = fecha
   }, [fecha, perfil])
+
+  useEffect(() => {
+    let cancelled = false
+    void Promise.resolve().then(async () => {
+      try {
+        const response = await getDepositCompliance()
+        if (cancelled) return
+        setOverdueObligations((response?.branches ?? []).flatMap((branch) =>
+          (branch.obligations ?? []).map((obligationId) => ({ obligationId, branchName: branch.name ?? 'Sucursal asignada' })),
+        ))
+      } catch {
+        if (!cancelled) setOverdueObligations([])
+      }
+    })
+    return () => { cancelled = true }
+  }, [perfil])
+
+  async function openOverdueRegularization(item) {
+    try {
+      const bridge = await openOverdueDepositReport(item.obligationId)
+      setOverdueDeposit({ ...item, ...bridge })
+    } catch {
+      // The authorized obligation remains available for a later retry.
+    }
+  }
 
   function handleForbidden(error) {
     if (error?.status !== 403) return false
@@ -646,6 +674,23 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
         </div>
       )}
 
+      {overdueObligations.length > 0 && (
+        <section className="overdue-deposit-obligations" aria-labelledby="overdue-deposit-title">
+          <div>
+            <h2 id="overdue-deposit-title">Depósitos vencidos</h2>
+            <p>Regulariza los depósitos vencidos que siguen bajo tu responsabilidad.</p>
+          </div>
+          <div className="overdue-deposit-obligation-list">
+            {overdueObligations.map((item) => <article className="overdue-deposit-obligation" key={item.obligationId}>
+              <p>Depósito vencido de <strong>{item.branchName}</strong></p>
+              <button type="button" className="btn-mistareas-aceptar" onClick={() => openOverdueRegularization(item)} aria-label={`Regularizar depósito vencido de ${item.branchName}`}>
+                Regularizar depósito
+              </button>
+            </article>)}
+          </div>
+        </section>
+      )}
+
       <div className="mis-tareas-jornada-row">
         <div className="jornada-tabs" role="group" aria-label="Jornada de tareas">
           <button
@@ -773,6 +818,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
         </div>
       )}
       {depositTask && <DepositDemoModal tarea={depositTask} fecha={data?.meta?.fecha_consultada} sucursal={perfil?.sucursal?.nombre || 'Sucursal asignada'} onClose={() => setDepositTask(null)} />}
+      {overdueDeposit && <DepositDemoModal tarea={{ tarea: { nombre: `Depósito vencido de ${overdueDeposit.branchName}` } }} fecha={data?.meta?.fecha_consultada} overdue={{ obligationId: overdueDeposit.obligationId, report: overdueDeposit.report, access: overdueDeposit.access }} onClose={() => setOverdueDeposit(null)} />}
       {revisionGuardiaTask && (
         <RevisionGuardiaModal
           tarea={revisionGuardiaTask}
