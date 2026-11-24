@@ -158,7 +158,7 @@ export function DepositDemoModal({ tarea, fecha, overdue = null, onClose }) {
       }
     })
     return () => { cancelled = true }
-  }, [overdue, tarea.id_sucursal_tarea])
+  }, [overdue, tarea?.id_sucursal_tarea])
 
   async function mutate(action, operation) {
     if (!report) return
@@ -273,10 +273,10 @@ export function DepositDemoModal({ tarea, fecha, overdue = null, onClose }) {
 
   const footer = <><button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={onClose} disabled={Boolean(saving)}>Cerrar</button>{report?.state !== 'submitted' && <button type="button" className="tuvet-btn" onClick={(event) => { event.currentTarget.focus(); if (readyForReview && canSubmit) setConfirmation({ type: 'submit' }) }} disabled={!readyForReview || !canSubmit || Boolean(saving)} aria-describedby={!readyForReview ? 'deposit-submit-blockers' : undefined} aria-busy={saving === 'submit'}>{saving === 'submit' ? 'Enviando reporte…' : 'Revisar y enviar reporte'}</button>}</>
 
-  return <Modal title="Registrar depósito" subtitle={tarea.tarea?.nombre} icon="archivo" wide className="tema-analiza" onClose={onClose} footer={footer}>
+  return <Modal title={overdue ? 'Registrar depósito vencido' : 'Registrar depósito'} subtitle={overdue ? 'Preparación sustitutiva autorizada' : tarea?.tarea?.nombre} icon="archivo" wide className="tema-analiza" onClose={onClose} footer={footer}>
     <div className="deposit-flow">
       <div className="deposit-flow-context" aria-label="Datos de la tarea">
-        <span>Fecha: <strong>{fecha || 'No disponible'}</strong></span>
+        <span>Fecha: <strong>{fecha || report?.occurrence?.execution_date || 'No disponible'}</strong></span>
       </div>
       <EstadoCarga loading={loading} error={error && !report ? error : ''} onRetry={recoverReport} empty={!loading && !error && report && report.closures?.length === 0} emptyText="El reporte no contiene cierres proporcionados por el servidor.">
         {error && report && <Aviso tipo="error">{error} <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={recoverReport} disabled={Boolean(saving)}>Actualizar reporte</button></Aviso>}

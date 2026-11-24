@@ -16,6 +16,7 @@ import GerentesOperacionesPage from "./features/gerentes_operaciones/pages/Geren
 import AreasPage from "./features/areas/pages/AreasPage";
 import MisTareasPage from "./features/operacion/pages/MisTareasPage";
 import DepositosPendientesPage from "./features/operacion/pages/DepositosPendientesPage";
+import OverdueDepositsPage from './features/operacion/pages/OverdueDepositsPage'
 import SolicitudesPendientesPage from "./features/trabajosCampo/pages/SolicitudesPendientesPage";
 import AlmuerzosPage from "./features/almuerzos/pages/AlmuerzosPage";
 import CoberturasPage from "./features/coberturas/pages/CoberturasPage";
@@ -162,6 +163,12 @@ export function DepositosPendientesRoute({ children }) {
   return children
 }
 
+export function OverdueDepositsRoute({ children }) {
+  const { perfil } = useAuth()
+  if (!getProfileCapabilities(perfil).canAccessOverdueDeposits) return <Navigate to="/" replace />
+  return children
+}
+
 export function DepositHistoryRoute({ children }) {
   const { perfil } = useAuth()
   const { isAreaManager, isOperationsManager } = getProfileCapabilities(perfil)
@@ -278,7 +285,8 @@ function App() {
           <Route path="/mis-tareas" element={<MisTareasRoute><MisTareasPage /></MisTareasRoute>} />
           <Route path="/mis-tareas/inventario/:idSucursalTarea" element={<MisTareasRoute><InventoryBranchExecutionPage /></MisTareasRoute>} />
           <Route path="/mis-tareas-v2" element={<MisTareasRoute><MisTareasPage className="mis-tareas-page mis-tareas-v2-page" groupByStartTime selectionUxVariant scanabilityVariant availableFilterVariant priorityVariant /></MisTareasRoute>} />
-           <Route path="/depositospendientes" element={<DepositosPendientesRoute><DepositosPendientesPage /></DepositosPendientesRoute>} />
+            <Route path="/depositospendientes" element={<DepositosPendientesRoute><DepositosPendientesPage /></DepositosPendientesRoute>} />
+            <Route path="/depositos-vencidos" element={<OverdueDepositsRoute><OverdueDepositsPage /></OverdueDepositsRoute>} />
            <Route path="/analitica/historial-depositos" element={<DepositHistoryRoute><DepositHistoryPage /></DepositHistoryRoute>} />
           <Route path="/calendario-area" element={<CalendarioAreaRoute><CalendarioAreaPage /></CalendarioAreaRoute>} />
           <Route path="/calendario-area/inventario/manual/:manualEntryId" element={<CalendarioAreaRoute><InventoryAreaExecutionPage /></CalendarioAreaRoute>} />

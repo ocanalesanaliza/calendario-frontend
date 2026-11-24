@@ -67,6 +67,29 @@ describe('DepositDemoModal', () => {
     expect(screen.queryByRole('button', { name: 'Declarar no depositado' })).not.toBeInTheDocument()
   })
 
+  it('uses each overdue access capability as the sole action gate', async () => {
+    const draft = report({ closures: [report().closures[0]], readiness: { ready_to_submit: true, blockers: [] } })
+    const first = render(<DepositDemoModal overdue={{ obligationId: 'opaque-obligation', report: draft, access: { can_read_draft: true, can_prepare_draft: false, can_submit: true } }} onClose={vi.fn()} />)
+
+    expect(await screen.findByRole('button', { name: 'Capturar ventas' })).toBeDisabled()
+    first.unmount()
+    render(<DepositDemoModal overdue={{ obligationId: 'opaque-obligation', report: draft, access: { can_read_draft: true, can_prepare_draft: true, can_submit: false } }} onClose={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Revisar y enviar reporte' })).toBeDisabled()
+  })
+
+  it('supports an operational overdue context without a GS task and refreshes conflicts through its opaque obligation bridge', async () => {
+    const ready = report({ id: 'opaque-overdue-report', closures: [capturedClosure({ id: 'opaque-closure-entry', no_depositado_reason: 'Banco cerrado' })], readiness: { ready_to_submit: true, blockers: [] } })
+    api.submitDepositReport.mockRejectedValue(backendError({ status: 409, detail: 'stale_report' }))
+    api.openOverdueDepositReport.mockResolvedValue({ report: ready, access: { can_read_draft: true, can_prepare_draft: true, can_submit: true } })
+    render(<DepositDemoModal overdue={{ obligationId: 'opaque-obligation-id', report: ready, access: { can_read_draft: true, can_prepare_draft: true, can_submit: true } }} onClose={vi.fn()} />)
+
+    expect(await screen.findByRole('dialog', { name: 'Registrar depósito vencido' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar y enviar reporte' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Enviar reporte completo' }))
+
+    await waitFor(() => expect(api.openOverdueDepositReport).toHaveBeenCalledWith('opaque-obligation-id'))
+  })
+
   it('captures balanced sales without requiring a discrepancy explanation', async () => {
     api.captureDepositClosure.mockResolvedValue({ report: report({ optimistic_version: 2, closures: [capturedClosure()] }) })
     renderModal()

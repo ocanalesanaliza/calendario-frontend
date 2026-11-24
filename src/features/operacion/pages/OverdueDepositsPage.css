@@ -1,0 +1,39 @@
+.overdue-deposits-page {
+  display: grid;
+  gap: 1.5rem;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.overdue-deposits-page__header h1,
+.overdue-deposits-page__row h2 {
+  margin: 0;
+}
+
+.overdue-deposits-page__header p,
+.overdue-deposits-page__row p {
+  margin: .5rem 0 0;
+}
+
+.overdue-deposits-page__list {
+  display: grid;
+  gap: 1rem;
+}
+
+.overdue-deposits-page__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--tuvet-border, #d7dce5);
+  border-radius: .75rem;
+  background: var(--tuvet-surface, #fff);
+}
+
+@media (max-width: 640px) {
+  .overdue-deposits-page__row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

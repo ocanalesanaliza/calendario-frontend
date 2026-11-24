@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AdminMaestroRoute, AlmuerzosRoute, AusenciasAreaRoute, CalendarioAreaRoute, CapabilityRoute, DepositHistoryRoute, DepositosPendientesRoute, GOAreaPerformanceHistoryRoute, GerentesOperacionesRoute, MisTareasRoute, MonthlyPerformanceCorrectionsRoute, OperationalAlertsRoute, OrganizacionRoute, PendientesRoute, PerformanceHistoryRoute, PlantillasAreaRoute, RendimientoRoute, SystemsOnlyRoute } from './App'
+import { AdminMaestroRoute, AlmuerzosRoute, AusenciasAreaRoute, CalendarioAreaRoute, CapabilityRoute, DepositHistoryRoute, DepositosPendientesRoute, GOAreaPerformanceHistoryRoute, GerentesOperacionesRoute, MisTareasRoute, MonthlyPerformanceCorrectionsRoute, OperationalAlertsRoute, OrganizacionRoute, OverdueDepositsRoute, PendientesRoute, PerformanceHistoryRoute, PlantillasAreaRoute, RendimientoRoute, SystemsOnlyRoute } from './App'
 import Layout from './components/Layout/Layout'
 
 const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
@@ -296,6 +296,37 @@ describe('DepositosPendientesRoute', () => {
 
     expect(await screen.findByText('Inicio')).toBeInTheDocument()
     expect(screen.queryByText('Depósitos autorizados')).not.toBeInTheDocument()
+  })
+})
+
+describe('OverdueDepositsRoute and navigation', () => {
+  beforeEach(() => useAuth.mockReset())
+
+  it.each([
+    ['GA', { type: 'gerente_area' }, true],
+    ['Admin Master', { type: 'admin_master' }, true],
+    ['GS', { type: 'gerente_sucursal' }, false],
+    ['GO', { type: 'gerente_operaciones' }, false],
+  ])('admits only %s to the operational overdue route', async (_role, perfil, admitted) => {
+    useAuth.mockReturnValue({ perfil })
+    render(<MemoryRouter initialEntries={['/depositos-vencidos']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/depositos-vencidos" element={<OverdueDepositsRoute><p>Depósitos vencidos autorizados</p></OverdueDepositsRoute>} /></Routes></MemoryRouter>)
+
+    if (admitted) expect(screen.getByText('Depósitos vencidos autorizados')).toBeInTheDocument()
+    else expect(await screen.findByText('Inicio')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['GA', { type: 'gerente_area', nombre: 'GA' }, true],
+    ['Admin Master', { type: 'admin_master', nombre: 'AM' }, true],
+    ['GS', { type: 'gerente_sucursal', nombre: 'GS' }, false],
+    ['GO', { type: 'gerente_operaciones', nombre: 'GO' }, false],
+  ])('shows the dedicated navigation entry only to %s when admitted', (_role, perfil, visible) => {
+    useAuth.mockReturnValue({ perfil, logout: vi.fn() })
+    render(<MemoryRouter><Layout /></MemoryRouter>)
+
+    const entry = screen.queryByRole('link', { name: 'Depósitos vencidos' })
+    if (visible) expect(entry).toHaveAttribute('href', '/depositos-vencidos')
+    else expect(entry).not.toBeInTheDocument()
   })
 })
 

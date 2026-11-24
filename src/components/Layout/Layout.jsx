@@ -46,6 +46,7 @@ function Layout() {
     canManageMonthlyPerformanceCorrections,
     canAccessGOAreaPerformanceHistory,
     canAccessPendingRequests,
+    canAccessOverdueDeposits,
   } = getProfileCapabilities(perfil)
   const hideRestrictedNavigation = esGerenteArea
   const [operationalAlertsCount, setOperationalAlertsCount] = useState(0)
@@ -208,6 +209,17 @@ function Layout() {
               <rect x="2" y="6" width="20" height="12" rx="2" />
               <circle cx="12" cy="12" r="2" />
               <path d="M6 12h.01M18 12h.01" />
+            </svg>
+          ),
+        },
+        {
+          to: '/depositos-vencidos',
+          label: 'Depósitos vencidos',
+          visible: canAccessOverdueDeposits,
+          icon: (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="6" width="20" height="12" rx="2" />
+              <path d="M12 9v4M12 16h.01M6 12h.01M18 12h.01" />
             </svg>
           ),
         },

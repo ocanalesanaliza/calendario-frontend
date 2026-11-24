@@ -47,6 +47,7 @@ export function getProfileCapabilities(profile) {
     canManageGASpecialSituations: isOperationsManager || isAdminMaster || isMasterAdmin || isSystemsAccount,
     canManageAreaAbsences: isOperationsManager || isAdminMaster || isMasterAdmin || isSystemsAccount,
     canAccessPendingDeposits: isAreaManager,
+    canAccessOverdueDeposits: isAreaManager || isAdminMaster,
     canManageAreaManagers: isSystemsAccount || (isOperationsManager && isActiveProfile(profile)),
     canManageOperationsManagers: isSystemsAccount,
     canManageOrganization: isSystemsAccount,
