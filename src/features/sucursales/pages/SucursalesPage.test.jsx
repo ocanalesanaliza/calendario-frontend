@@ -15,7 +15,7 @@ function mockRequests({ sucursales = [], areas = [], createResponse = response({
     if (path === '/api/sucursales/15/' && options.method === 'PATCH') return patchResponse
     if (path === '/api/sucursales/15/desactivar/' && options.method === 'POST') return deactivateResponse
     if (path === '/api/sucursales/15/quitar-gs/' && options.method === 'POST') return gsRemovalResponse
-    if (path === '/api/sucursales/') return response({ results: sucursales })
+    if (path === '/api/sucursales/' || path === '/api/sucursales/?incluir_inactivas=true') return response({ results: sucursales })
     if (path === '/api/sucursales/areas-elegibles/') return response({ count: areas.length, results: areas })
     if (path === '/api/gerentes-area/') return response({ results: [{ id_gerente_area: 2, nombre: 'GA Centro', activo: true }] })
     if (path === '/api/plantillas/') return response({ results: templates })
@@ -35,6 +35,26 @@ describe('SucursalesPage: número de guardias', () => {
     apiRequest.mockReset()
     useAuth.mockReset()
     mockRequests({ areas: [{ id: 8, codigo: 'CENTRO', nombre: 'Centro', country: { id: 1, name: 'Honduras' }, gerente_area: { id_gerente_area: 2, nombre: 'GA Centro', email: 'ga@example.com' } }] })
+  })
+
+  it('carga las inactivas y permite filtrarlas en la pantalla de sucursales', async () => {
+    useAuth.mockReturnValue({ perfil: { es_admin_maestro: true } })
+    mockRequests({
+      sucursales: [
+        { id_sucursal: 1, nombre: 'Sucursal Activa', codigo: 'ACT-01', activa: true },
+        { id_sucursal: 2, nombre: 'Sucursal Inactiva', codigo: 'INA-01', activa: false },
+      ],
+    })
+
+    render(<SucursalesPage />)
+
+    expect(await screen.findByText('Sucursal Inactiva')).toBeInTheDocument()
+    expect(apiRequest).toHaveBeenCalledWith('/api/sucursales/?incluir_inactivas=true')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Inactivas (1)' }))
+
+    expect(screen.getByText('Sucursal Inactiva')).toBeInTheDocument()
+    expect(screen.queryByText('Sucursal Activa')).not.toBeInTheDocument()
   })
 
   it('permite al administrador maestro configurar de 0 a 4 guardias al crear', async () => {
@@ -156,7 +176,7 @@ describe('SucursalesPage: número de guardias', () => {
     const pendingAreas = new Promise((resolve) => { resolveAreas = resolve })
     mockRequests()
     apiRequest.mockImplementation(async (path, options = {}) => {
-      if (path === '/api/sucursales/') return response({ results: [] })
+      if (path === '/api/sucursales/?incluir_inactivas=true') return response({ results: [] })
       if (path === '/api/sucursales/areas-elegibles/') return pendingAreas
       throw new Error(`Unexpected request: ${options.method ?? 'GET'} ${path}`)
     })
@@ -288,7 +308,7 @@ describe('SucursalesPage: número de guardias', () => {
         tieneTitular = false
         return response({ detail: 'GS retirado de la sucursal correctamente.' })
       }
-      if (path === '/api/sucursales/') {
+      if (path === '/api/sucursales/?incluir_inactivas=true') {
         return response({ results: [{ ...sucursal, usuario_titular: tieneTitular ? sucursal.usuario_titular : null }] })
       }
       throw new Error(`Unexpected request: ${options.method ?? 'GET'} ${path}`)
@@ -326,7 +346,7 @@ describe('SucursalesPage: número de guardias', () => {
     expect(within(dialog).getByDisplayValue('Sucursal Centro')).toBeInTheDocument()
     expect(within(dialog).getByLabelText(/Área/)).toHaveValue('8')
     expect(screen.getByText('Sucursal Existente')).toBeInTheDocument()
-    expect(apiRequest.mock.calls.filter(([path, options]) => path === '/api/sucursales/' && !options?.method)).toHaveLength(1)
+    expect(apiRequest.mock.calls.filter(([path, options]) => path === '/api/sucursales/?incluir_inactivas=true' && !options?.method)).toHaveLength(1)
   })
 
   it('conserva el modal, los datos y la lista ante PATCH denegado', async () => {
@@ -343,7 +363,7 @@ describe('SucursalesPage: número de guardias', () => {
     expect(await within(dialog).findByText('No tienes permiso para editar esta sucursal.')).toBeInTheDocument()
     expect(within(dialog).getByDisplayValue('Sucursal Actualizada')).toBeInTheDocument()
     expect(screen.getByRole('cell', { name: 'Sucursal Centro' })).toBeInTheDocument()
-    expect(apiRequest.mock.calls.filter(([path, options]) => path === '/api/sucursales/' && !options?.method)).toHaveLength(1)
+    expect(apiRequest.mock.calls.filter(([path, options]) => path === '/api/sucursales/?incluir_inactivas=true' && !options?.method)).toHaveLength(1)
   })
 
   it('conserva el modal y la lista ante desactivación denegada', async () => {
@@ -358,7 +378,7 @@ describe('SucursalesPage: número de guardias', () => {
 
     expect(await within(dialog).findByText('No tienes permiso para desactivar esta sucursal.')).toBeInTheDocument()
     expect(screen.getByRole('cell', { name: 'Sucursal Centro' })).toBeInTheDocument()
-    expect(apiRequest.mock.calls.filter(([path, options]) => path === '/api/sucursales/' && !options?.method)).toHaveLength(1)
+    expect(apiRequest.mock.calls.filter(([path, options]) => path === '/api/sucursales/?incluir_inactivas=true' && !options?.method)).toHaveLength(1)
   })
 
   it('conserva el modal y la lista ante retiro de GS denegado', async () => {
@@ -373,7 +393,7 @@ describe('SucursalesPage: número de guardias', () => {
 
     expect(await within(dialog).findByText('No tienes permiso para quitar este GS.')).toBeInTheDocument()
     expect(screen.getByRole('cell', { name: /GS Ana/ })).toBeInTheDocument()
-    expect(apiRequest.mock.calls.filter(([path, options]) => path === '/api/sucursales/' && !options?.method)).toHaveLength(1)
+    expect(apiRequest.mock.calls.filter(([path, options]) => path === '/api/sucursales/?incluir_inactivas=true' && !options?.method)).toHaveLength(1)
   })
 
   it('recarga las áreas elegibles al reabrir el modal de creación', async () => {
@@ -383,7 +403,7 @@ describe('SucursalesPage: número de guardias', () => {
       response({ results: [{ id: 9, codigo: 'NORTE', nombre: 'Norte', country: { id: 2, name: 'Guatemala' } }] }),
     ]
     apiRequest.mockImplementation(async (path) => {
-      if (path === '/api/sucursales/') return response({ results: [] })
+      if (path === '/api/sucursales/?incluir_inactivas=true') return response({ results: [] })
       if (path === '/api/sucursales/areas-elegibles/') return areas.shift()
       throw new Error(`Unexpected request: ${path}`)
     })
@@ -402,7 +422,7 @@ describe('SucursalesPage: número de guardias', () => {
 
   it('normaliza los errores de lista y mutaciones con estado HTTP', async () => {
     apiRequest.mockImplementation(async (path) => {
-      if (path === '/api/sucursales/') return response({ detail: { nombre: ['Denegado.'] } }, 403)
+      if (path === '/api/sucursales/' || path === '/api/sucursales/?incluir_inactivas=true') return response({ detail: { nombre: ['Denegado.'] } }, 403)
       if (path === '/api/sucursales/15/') return response({ detail: 'PATCH denegado.' }, 403)
       if (path === '/api/sucursales/15/desactivar/') return response({ detail: 'Desactivación denegada.' }, 403)
       if (path === '/api/sucursales/15/quitar-gs/') return response({ detail: 'Retiro denegado.' }, 403)

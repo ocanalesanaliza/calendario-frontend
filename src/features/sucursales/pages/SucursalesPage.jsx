@@ -50,7 +50,7 @@ export default function SucursalesPage() {
     setLoading(true)
     setError('')
     try {
-      setSucursales(await getSucursales())
+      setSucursales(await getSucursales({ incluirInactivas: true }))
     } catch (requestError) {
       setError(requestError.message || 'No se pudieron cargar las sucursales.')
     } finally {

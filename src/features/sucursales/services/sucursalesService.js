@@ -18,8 +18,9 @@ function requestError(data, fallback, status) {
   return error
 }
 
-export async function getSucursales() {
-  const res = await apiRequest('/api/sucursales/')
+export async function getSucursales({ incluirInactivas = false } = {}) {
+  const path = incluirInactivas ? '/api/sucursales/?incluir_inactivas=true' : '/api/sucursales/'
+  const res = await apiRequest(path)
   const data = await res.json()
   if (!res.ok) throw requestError(data, 'Error al cargar sucursales', res.status)
   return data.results
