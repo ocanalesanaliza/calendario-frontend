@@ -13,7 +13,7 @@ describe('DepositHistoryPage', () => {
 
   it('opens complete submitted overdue financial detail with the backend-issued opaque obligation ID only', async () => {
     api.getDepositHistory.mockResolvedValue({ summary: {}, branches: [{ id: 'opaque-branch-id', code: 'NTE', name: 'Sucursal Norte' }] })
-    api.getDepositHistoryCompliance.mockResolvedValue({ branches: [{ id: 'opaque-branch-id', code: 'NTE', name: 'Sucursal Norte', state: 'resolved', obligations: ['opaque-obligation-id'] }] })
+    api.getDepositHistoryCompliance.mockResolvedValue({ branches: [{ id: 'opaque-branch-id', code: 'NTE', name: 'Sucursal Norte', state: 'resolved', obligations: [{ id: 'opaque-obligation-id', is_submitted: true }] }] })
     api.openSubmittedOverdueDepositReport.mockResolvedValue({
       report: {
         id: 'opaque-report-id', state: 'submitted', closures: [{ id: 'opaque-closure-entry', closure_date: '2026-11-02', total_sales: '100.00', cash_sales: '100.00', card_sales: '0.00', no_depositado_reason: 'Bank closure' }],
@@ -37,7 +37,7 @@ describe('DepositHistoryPage', () => {
 
   it('does not offer a draft overdue report or any preparation action', async () => {
     api.getDepositHistory.mockResolvedValue({ summary: {}, branches: [{ id: 'opaque-branch-id', code: 'NTE', name: 'Sucursal Norte' }] })
-    api.getDepositHistoryCompliance.mockResolvedValue({ branches: [{ id: 'opaque-branch-id', code: 'NTE', name: 'Sucursal Norte', state: 'pending', obligations: ['opaque-draft-obligation-id'] }] })
+    api.getDepositHistoryCompliance.mockResolvedValue({ branches: [{ id: 'opaque-branch-id', code: 'NTE', name: 'Sucursal Norte', state: 'pending', obligations: [{ id: 'opaque-draft-obligation-id', is_submitted: false }] }] })
     render(<DepositHistoryPage />)
 
     await screen.findByText('Sucursal Norte')
@@ -48,7 +48,7 @@ describe('DepositHistoryPage', () => {
 
   it('does not disclose overdue financial detail when the bridge report is not submitted', async () => {
     api.getDepositHistory.mockResolvedValue({ summary: {}, branches: [{ id: 'opaque-branch-id', code: 'NTE', name: 'Sucursal Norte' }] })
-    api.getDepositHistoryCompliance.mockResolvedValue({ branches: [{ id: 'opaque-branch-id', code: 'NTE', name: 'Sucursal Norte', state: 'resolved', obligations: ['opaque-obligation-id'] }] })
+    api.getDepositHistoryCompliance.mockResolvedValue({ branches: [{ id: 'opaque-branch-id', code: 'NTE', name: 'Sucursal Norte', state: 'resolved', obligations: [{ id: 'opaque-obligation-id', is_submitted: true }] }] })
     api.openSubmittedOverdueDepositReport.mockResolvedValue({ report: { state: 'draft', closures: [{ no_depositado_reason: 'hidden' }], receipts: [{ reference: 'HIDDEN-001' }] } })
     render(<DepositHistoryPage />)
 

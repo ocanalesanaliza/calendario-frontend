@@ -88,6 +88,8 @@ export function DepositDemoModal({ tarea, fecha, overdue = null, onClose }) {
   const [receipt, setReceipt] = useState(emptyReceipt)
   const [allocations, setAllocations] = useState({})
   const [reasons, setReasons] = useState({})
+  const [substituteReason, setSubstituteReason] = useState('')
+  const [substituteReasonTouched, setSubstituteReasonTouched] = useState(false)
   const [declarationsOpen, setDeclarationsOpen] = useState({})
   const [fieldErrors, setFieldErrors] = useState({})
   const [focusTarget, setFocusTarget] = useState('')
@@ -249,6 +251,23 @@ export function DepositDemoModal({ tarea, fecha, overdue = null, onClose }) {
   const canReadDraft = !overdue || access?.can_read_draft === true
   const canPrepareDraft = !overdue || access?.can_prepare_draft === true
   const canSubmit = !overdue || access?.can_submit === true
+  const requiresSubstituteReason = Boolean(overdue) && String(access?.submission_mode ?? '').startsWith('substitute')
+  const trimmedSubstituteReason = substituteReason.trim()
+  const substituteReasonReady = !requiresSubstituteReason || Boolean(trimmedSubstituteReason)
+
+  function updateSubstituteReason(value) {
+    setSubstituteReason(value)
+    if (value.trim()) clearFieldError('substitute-reason')
+  }
+
+  function validateSubstituteReason() {
+    if (!requiresSubstituteReason || trimmedSubstituteReason) return true
+    setSubstituteReasonTouched(true)
+    setFieldErrors((current) => ({ ...current, 'substitute-reason': 'Explica el motivo del envío sustituto.' }))
+    setFocusTarget('substitute-reason')
+    setFocusAttempt((current) => current + 1)
+    return false
+  }
 
   function confirmAction() {
     if (!confirmation) return
@@ -268,10 +287,12 @@ export function DepositDemoModal({ tarea, fecha, overdue = null, onClose }) {
       return
     }
     setConfirmation(null)
-    void mutate('submit', () => submitDepositReport(report.id, { expected_version: report.optimistic_version, idempotency_key: newIdempotencyKey() }))
+    const submission = { expected_version: report.optimistic_version, idempotency_key: newIdempotencyKey() }
+    if (requiresSubstituteReason) submission.substitute_reason = trimmedSubstituteReason
+    void mutate('submit', () => submitDepositReport(report.id, submission))
   }
 
-  const footer = <><button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={onClose} disabled={Boolean(saving)}>Cerrar</button>{report?.state !== 'submitted' && <button type="button" className="tuvet-btn" onClick={(event) => { event.currentTarget.focus(); if (readyForReview && canSubmit) setConfirmation({ type: 'submit' }) }} disabled={!readyForReview || !canSubmit || Boolean(saving)} aria-describedby={!readyForReview ? 'deposit-submit-blockers' : undefined} aria-busy={saving === 'submit'}>{saving === 'submit' ? 'Enviando reporte…' : 'Revisar y enviar reporte'}</button>}</>
+  const footer = <><button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={onClose} disabled={Boolean(saving)}>Cerrar</button>{report?.state !== 'submitted' && <button type="button" className="tuvet-btn" onClick={(event) => { event.currentTarget.focus(); if (readyForReview && canSubmit && validateSubstituteReason()) setConfirmation({ type: 'submit' }) }} disabled={!readyForReview || !canSubmit || !substituteReasonReady || Boolean(saving)} aria-describedby={!readyForReview ? 'deposit-submit-blockers' : undefined} aria-busy={saving === 'submit'}>{saving === 'submit' ? 'Enviando reporte…' : 'Revisar y enviar reporte'}</button>}</>
 
   return <Modal title={overdue ? 'Registrar depósito vencido' : 'Registrar depósito'} subtitle={overdue ? 'Preparación sustitutiva autorizada' : tarea?.tarea?.nombre} icon="archivo" wide className="tema-analiza" onClose={onClose} footer={footer}>
     <div className="deposit-flow">
@@ -287,6 +308,9 @@ export function DepositDemoModal({ tarea, fecha, overdue = null, onClose }) {
             <p className={`deposit-readiness-state ${readyForReview ? 'is-ready' : ''}`} role="status">{readyForReview ? 'Listo para revisión' : 'Faltan acciones para enviar'}</p>
             {!readyForReview && <ul id="deposit-submit-blockers" className="deposit-readiness-blockers">{readinessBlockers.map((blocker, index) => <li key={`${blocker.code}-${blocker.closure_entry_id ?? index}`}>{readinessMessage(blocker)}</li>)}</ul>}
           </section>
+          {requiresSubstituteReason && <FormSection title="Envío sustituto" description="Registra el motivo autorizado para este envío.">
+            <Field label="Motivo de envío sustituto" required error={substituteReasonTouched ? fieldErrors['substitute-reason'] : undefined}><input name="substitute-reason" type="text" disabled={!canSubmit} value={substituteReason} onChange={(event) => updateSubstituteReason(event.target.value)} onBlur={() => { setSubstituteReasonTouched(true); validateSubstituteReason() }} /></Field>
+          </FormSection>}
           <FormSection title="Cierres" description="Registra solo los cierres proporcionados por el reporte.">
             {!allSalesCaptured && <p className="deposit-flow-notice" role="status">Captura las ventas de todos los cierres presentados antes de declarar un cierre como no depositado.</p>}
             <div className="deposit-flow-list">

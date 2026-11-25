@@ -349,6 +349,45 @@ describe('DepositDemoModal', () => {
     expect(await screen.findByText('El reporte fue enviado correctamente.')).toBeInTheDocument()
   })
 
+  it('requires and trims a substitute submission reason before a GA can submit an overdue report', async () => {
+    const ready = report({ closures: [capturedClosure({ no_depositado_reason: 'Banco cerrado' })], readiness: { ready_to_submit: true, blockers: [] } })
+    api.submitDepositReport.mockResolvedValue({ report: report({ state: 'submitted', optimistic_version: 2 }) })
+    render(<DepositDemoModal overdue={{ obligationId: 'opaque-obligation', report: ready, access: { can_read_draft: true, can_prepare_draft: true, can_submit: true, submission_mode: 'substitute_special_situation' } }} onClose={vi.fn()} />)
+
+    const reason = await screen.findByLabelText('Motivo de envío sustituto *')
+    const review = screen.getByRole('button', { name: 'Revisar y enviar reporte' })
+    expect(reason).toBeRequired()
+    expect(review).toBeDisabled()
+    fireEvent.change(reason, { target: { value: '   ' } })
+    fireEvent.blur(reason)
+    expect(await screen.findByText('Explica el motivo del envío sustituto.')).toBeInTheDocument()
+    expect(review).toBeDisabled()
+
+    fireEvent.change(reason, { target: { value: '  Cobertura autorizada por ausencia del GS.  ' } })
+    expect(review).toBeEnabled()
+    fireEvent.click(review)
+    fireEvent.click(await screen.findByRole('button', { name: 'Enviar reporte completo' }))
+
+    await waitFor(() => expect(api.submitDepositReport).toHaveBeenCalledWith('opaque-report-id', expect.objectContaining({
+      expected_version: 1,
+      idempotency_key: expect.any(String),
+      substitute_reason: 'Cobertura autorizada por ausencia del GS.',
+    })))
+  })
+
+  it('keeps the ordinary GS submission free of substitute reason fields and payload', async () => {
+    api.openDepositReport.mockResolvedValue({ report: report({ closures: [capturedClosure({ no_depositado_reason: 'Banco cerrado' })], readiness: { ready_to_submit: true, blockers: [] } }) })
+    api.submitDepositReport.mockResolvedValue({ report: report({ state: 'submitted', optimistic_version: 2 }) })
+    renderModal()
+
+    expect(await screen.findByRole('button', { name: 'Revisar y enviar reporte' })).toBeEnabled()
+    expect(screen.queryByLabelText('Motivo de envío sustituto *')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar y enviar reporte' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Enviar reporte completo' }))
+    await waitFor(() => expect(api.submitDepositReport).toHaveBeenCalled())
+    expect(api.submitDepositReport.mock.calls[0][1]).not.toHaveProperty('substitute_reason')
+  })
+
   it('exposes an operational conflict without losing the recoverable report', async () => {
     api.openDepositReport.mockResolvedValue({ report: report({ closures: [capturedClosure({ no_depositado_reason: 'Banco cerrado' })], readiness: { ready_to_submit: true, blockers: [] } }) })
     api.submitDepositReport.mockRejectedValue(Object.assign(new Error('deposit_api_disabled'), { status: 409, detail: 'deposit_api_disabled' }))

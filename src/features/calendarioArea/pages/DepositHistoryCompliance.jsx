@@ -18,7 +18,7 @@ export default function DepositHistoryCompliance({ compliance, branches, period,
   const ceiling = step * Math.ceil(maxValue / step)
   const ticks = Array.from({ length: ceiling / step + 1 }, (_, index) => index * step)
   const missingCalendars = branches.length - rows.length
-  const submittedOverdueReports = (overdueCompliance?.branches ?? []).flatMap((item) => item?.state === 'resolved' && Array.isArray(item.obligations) ? item.obligations.map((obligationId) => ({ obligationId, branch: item })) : [])
+  const submittedOverdueReports = (overdueCompliance?.branches ?? []).flatMap((item) => Array.isArray(item.obligations) ? item.obligations.filter((obligation) => obligation.is_submitted === true).map((obligation) => ({ obligationId: obligation.id, branch: item })) : [])
 
   return <section className="deposit-history-panel deposit-history-compliance" aria-labelledby="deposit-history-compliance-title">
     <div className="deposit-history-panel-header">

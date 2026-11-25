@@ -4,10 +4,21 @@ import { DepositDemoModal } from '../components/DepositDemoModal'
 import { getDepositCompliance, openOverdueDepositReport } from '../services/depositService'
 import './OverdueDepositsPage.css'
 
+function formatExecutionDate(executionDate) {
+  const [year, month, day] = String(executionDate).split('-').map(Number)
+  return new Intl.DateTimeFormat('es-HN', {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, month - 1, day)))
+}
+
 function obligationsFrom(response) {
   return (response?.branches ?? []).flatMap((branch) =>
-    (branch.obligations ?? []).map((obligationId) => ({
-      obligationId,
+    (branch.obligations ?? []).map((obligation) => ({
+      obligationId: obligation.id,
+      executionDate: obligation.execution_date,
+      isSubmitted: obligation.is_submitted === true,
+      canPrepareSubstitute: obligation.can_prepare_substitute === true,
+      substituteEligibility: obligation.substitute_eligibility,
       branchName: branch.name ?? 'Sucursal asignada',
     })),
   )
@@ -47,21 +58,33 @@ export default function OverdueDepositsPage() {
     }
   }
 
+  const pending = obligations.filter((item) => !item.isSubmitted)
+  const eligible = pending.filter((item) => (
+    item.canPrepareSubstitute && item.substituteEligibility === 'special_situation_applicable'
+  ))
+  const notEligible = pending.filter((item) => !eligible.includes(item))
+
   return <main className="tema-analiza tuvet-page overdue-deposits-page">
-    <PageHeader title="Depósitos vencidos" description="Prepara y envía reportes sustitutos autorizados de obligaciones vencidas." />
+    <PageHeader title="Depósitos vencidos" description="Obligaciones vencidas." />
     <div className="overdue-deposits-page__content">
       {error && !loading && <Aviso tipo="error">{error} <button type="button" className="tuvet-btn tuvet-btn-secondary" onClick={load}>Reintentar</button></Aviso>}
       <EstadoCarga loading={loading} error="" onRetry={load} empty={!loading && !error && obligations.length === 0} emptyText="No hay obligaciones vencidas disponibles para preparar.">
         <section className="overdue-deposits-page__list" aria-label="Obligaciones vencidas operativas">
-          {obligations.map((item) => <article className="overdue-deposits-page__row" key={item.obligationId}>
+          {eligible.length > 0 && <><h2>Preparación sustituta</h2>{eligible.map((item) => <article className="overdue-deposits-page__row" key={item.obligationId}>
             <div>
-              <h2>{item.branchName}</h2>
-              <p>Obligación de depósito vencida disponible para preparación sustitutiva.</p>
+              <h3>{item.branchName}</h3>
+              <p>Depósito del {formatExecutionDate(item.executionDate)}</p>
             </div>
             <button type="button" className="tuvet-btn" aria-label={`Preparar depósito vencido de ${item.branchName}`} disabled={openingId === item.obligationId} onClick={() => openObligation(item)}>
               {openingId === item.obligationId ? 'Preparando reporte…' : 'Preparar depósito'}
             </button>
-          </article>)}
+          </article>)}</>}
+          {notEligible.length > 0 && <><h2>Sin preparación sustituta</h2>{notEligible.map((item) => <article className="overdue-deposits-page__row" key={item.obligationId}>
+            <div>
+              <h3>{item.branchName}</h3>
+              <p>Depósito del {formatExecutionDate(item.executionDate)}</p>
+            </div>
+          </article>)}</>}
         </section>
       </EstadoCarga>
     </div>

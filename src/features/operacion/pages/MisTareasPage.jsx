@@ -102,6 +102,8 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
   const [depositTask, setDepositTask] = useState(null)
   const [overdueDeposit, setOverdueDeposit] = useState(null)
   const [overdueObligations, setOverdueObligations] = useState([])
+  const [overdueDepositError, setOverdueDepositError] = useState(null)
+  const [openingOverdueObligationId, setOpeningOverdueObligationId] = useState(null)
   const [revisionGuardiaTask, setRevisionGuardiaTask] = useState(null)
   const [availableFilterActive, setAvailableFilterActive] = useState(false)
   const isMountedRef = useRef(true)
@@ -140,7 +142,12 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
         const response = await getDepositCompliance()
         if (cancelled) return
         setOverdueObligations((response?.branches ?? []).flatMap((branch) =>
-          (branch.obligations ?? []).map((obligationId) => ({ obligationId, branchName: branch.name ?? 'Sucursal asignada' })),
+          (branch.obligations ?? [])
+            .filter((obligation) => obligation.is_submitted !== true)
+            .map((obligation) => ({
+              obligationId: obligation.id,
+              branchName: branch.name ?? 'Sucursal asignada',
+            })),
         ))
       } catch {
         if (!cancelled) setOverdueObligations([])
@@ -150,11 +157,15 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
   }, [perfil])
 
   async function openOverdueRegularization(item) {
+    setOpeningOverdueObligationId(item.obligationId)
+    setOverdueDepositError(null)
     try {
       const bridge = await openOverdueDepositReport(item.obligationId)
       setOverdueDeposit({ ...item, ...bridge })
-    } catch {
-      // The authorized obligation remains available for a later retry.
+    } catch (error) {
+      setOverdueDepositError({ item, message: error?.message || 'No fue posible preparar el reporte vencido.' })
+    } finally {
+      setOpeningOverdueObligationId(null)
     }
   }
 
@@ -679,12 +690,18 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
           <div>
             <h2 id="overdue-deposit-title">Depósitos vencidos</h2>
             <p>Regulariza los depósitos vencidos que siguen bajo tu responsabilidad.</p>
+            {overdueDepositError && <p className="reg-error" role="alert">
+              {overdueDepositError.message}{' '}
+              <button type="button" className="btn-secondary-sm" onClick={() => openOverdueRegularization(overdueDepositError.item)}>
+                Reintentar
+              </button>
+            </p>}
           </div>
           <div className="overdue-deposit-obligation-list">
             {overdueObligations.map((item) => <article className="overdue-deposit-obligation" key={item.obligationId}>
               <p>Depósito vencido de <strong>{item.branchName}</strong></p>
-              <button type="button" className="btn-mistareas-aceptar" onClick={() => openOverdueRegularization(item)} aria-label={`Regularizar depósito vencido de ${item.branchName}`}>
-                Regularizar depósito
+              <button type="button" className="btn-mistareas-aceptar" disabled={openingOverdueObligationId === item.obligationId} onClick={() => openOverdueRegularization(item)} aria-label={`Regularizar depósito vencido de ${item.branchName}`}>
+                {openingOverdueObligationId === item.obligationId ? 'Preparando reporte...' : 'Regularizar depósito'}
               </button>
             </article>)}
           </div>
