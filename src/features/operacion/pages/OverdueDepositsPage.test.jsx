@@ -31,6 +31,17 @@ describe('OverdueDepositsPage', () => {
     expect(await screen.findByRole('dialog', { name: 'Registrar depósito vencido' })).toBeInTheDocument()
   })
 
+  it('uses the standard Analiza page shell and retains the empty operational state', async () => {
+    service.getDepositCompliance.mockResolvedValue({ branches: [] })
+    render(<OverdueDepositsPage />)
+
+    expect(await screen.findByRole('heading', { name: 'Depósitos vencidos' })).toBeVisible()
+    expect(screen.getByText('Prepara y envía reportes sustitutos autorizados de obligaciones vencidas.')).toBeVisible()
+    expect(screen.getByText('No hay obligaciones vencidas disponibles para preparar.')).toBeVisible()
+    expect(document.querySelector('.overdue-deposits-page')).toHaveClass('tema-analiza', 'tuvet-page')
+    expect(document.querySelector('.overdue-deposits-page .tuvet-page-header')).toBeInTheDocument()
+  })
+
   it('keeps an unavailable draft action unavailable exclusively from access', async () => {
     service.openOverdueDepositReport.mockResolvedValue({ report: report({ state: 'draft', closures: [{ id: 'opaque-closure', closure_date: '2026-11-01', sales_captured: false }] }), access: { can_read_draft: false, can_prepare_draft: false, can_submit: false } })
     render(<OverdueDepositsPage />)
