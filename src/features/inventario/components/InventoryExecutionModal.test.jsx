@@ -86,6 +86,43 @@ describe('InventoryExecutionModal', () => {
     })))
   })
 
+  it('edits only the physical stock and expiration cells before sending the correction', async () => {
+    renderModal({ previewRows: [rowWithExpiration], correction: { id: 501, inventory_type: 'inventory_branch', expected_version: 2, can_correct: true, revisions: [] } })
+
+    selectXlsx()
+    await screen.findByText('Vista previa editable')
+    const physicalCell = document.querySelector('.MuiDataGrid-row [data-field="physical_stock"]')
+    const expirationCell = document.querySelector('.MuiDataGrid-row [data-field="expiration_date"]')
+    expect(physicalCell).toBeTruthy()
+    expect(expirationCell).toBeTruthy()
+    fireEvent.doubleClick(physicalCell)
+    fireEvent.change(physicalCell.querySelector('input'), { target: { value: '9' } })
+    fireEvent.keyDown(physicalCell.querySelector('input'), { key: 'Enter' })
+    fireEvent.doubleClick(expirationCell)
+    fireEvent.change(expirationCell.querySelector('input'), { target: { value: '2026-12-20' } })
+    fireEvent.keyDown(expirationCell.querySelector('input'), { key: 'Enter' })
+    fireEvent.change(screen.getByLabelText('Motivo de la corrección'), { target: { value: 'Conteo confirmado' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar corrección' }))
+
+    await waitFor(() => expect(correctInventory).toHaveBeenCalledWith(expect.objectContaining({
+      rows: [expect.objectContaining({ product: 'Arroz', stock: 4, physical_stock: 9, expiration_date: '2026-12-20' })],
+    })))
+  })
+
+  it('presents missing XLSX headers as a structured, readable error and allows replacing the file', async () => {
+    previewInventory.mockRejectedValueOnce(new Error('Codigo Producto Producto Costo Sucursal Punto de Reorden Existencia Existencia Fisica Diferencia Costo por Diferencia Fecha de vencimiento'))
+    renderModal({ correction: { id: 501, inventory_type: 'inventory_branch', expected_version: 2, can_correct: true, revisions: [] } })
+
+    selectXlsx()
+    expect(await screen.findByRole('alert')).toHaveTextContent('El archivo no coincide con la plantilla esperada')
+    expect(screen.getByRole('alert')).toHaveTextContent('Existencia Física')
+    expect(screen.getByRole('alert')).toHaveTextContent('Fecha de vencimiento')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar' }))
+    fireEvent.change(document.querySelector('input[type="file"]'), { target: { files: [new File(['xlsx'], 'replacement.xlsx')] } })
+    await waitFor(() => expect(previewInventory).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'replacement.xlsx' })))
+  })
+
   it('renders initial GA previews with ISO expiration dates', async () => {
     renderModal({ previewRows: [rowWithExpiration], mode: 'area', occurrence: { occurrence_id: 42, task: { mode: 'inventory_area' } } })
 

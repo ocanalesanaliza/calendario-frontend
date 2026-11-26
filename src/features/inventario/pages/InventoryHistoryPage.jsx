@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { DataGrid } from '@mui/x-data-grid'
+import { esES } from '@mui/x-data-grid/locales'
+import { useNavigate } from 'react-router-dom'
 import { Aviso, EstadoCarga, PageHeader } from '../../tuvet/components/TuvetUi'
 import { useAuth } from '../../auth/context/AuthContext'
-import InventoryExecutionModal from '../components/InventoryExecutionModal'
 import { getHistoryDetail, listHistory } from '../inventoryService'
 import './InventoryHistoryPage.css'
 
@@ -67,7 +68,7 @@ export default function InventoryHistoryPage() {
   const [error, setError] = useState('')
   const [detail, setDetail] = useState(null)
   const [selectedRevision, setSelectedRevision] = useState(null)
-  const [correction, setCorrection] = useState(null)
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [type, setType] = useState('')
   const [date, setDate] = useState('')
@@ -117,23 +118,11 @@ export default function InventoryHistoryPage() {
     }
   }
 
-  async function reloadCorrection() {
-    if (!correction) return
-    try {
-      const item = (await getHistoryDetail(correction.id)).submission
-      setDetail(item)
-      setCorrection(item)
-      setSelectedRevision(item.revisions?.at(-1)?.number ?? null)
-    } catch (requestError) {
-      setError(requestError.message)
-    }
-  }
-
   const currentRevision = detail?.revisions?.find((revision) => revision.number === selectedRevision) ?? detail?.revisions?.at(-1)
   const rows = detailRows(currentRevision?.rows)
   const columns = [
     { field: 'code', headerName: 'Código', width: 110 },
-    { field: 'product', headerName: 'Producto', flex: 1, minWidth: 180 },
+    { field: 'product', headerName: 'Producto', flex: 1, minWidth: 180, renderCell: (params) => <span className="inventory-history-product" title={params.value}>{params.value}</span> },
     { field: 'cost', headerName: 'Costo', width: 125, valueFormatter: (value) => formatMoney(value) },
     { field: 'stock', headerName: 'Esperado', width: 105, valueGetter: (_value, row) => row.stock ?? row.system_stock ?? row.expected_stock ?? 0 },
     { field: 'physical_stock', headerName: 'Existencia física', width: 145 },
@@ -164,11 +153,10 @@ export default function InventoryHistoryPage() {
       {visibleHistory.length === 0 ? <p className="tuvet-muted">No hay inventarios que coincidan con los filtros.</p> : <div className="inventory-history-list" role="table" aria-label="Historial de inventarios"><div className="inventory-history-list-head" role="row"><span>Fecha</span><span>Tarea</span><span>Alcance</span><span>Tipo</span><span>Productos</span><span>Faltantes</span><span>Sobrantes</span><span>Impacto neto</span><span>Versión</span><span /></div>{visibleHistory.map((item) => <div className="inventory-history-list-row" role="row" key={item.id}><span>{formatDate(item.execution_date)}</span><strong>{item.task_name}</strong><span>{scopeLabel(item)}</span><span>{label(item.inventory_type)}</span><span>{number.format(item.product_count ?? 0)}</span><span className="inventory-history-negative">{number.format(item.shortage_count ?? 0)}</span><span className="inventory-history-positive">{number.format(item.surplus_count ?? 0)}</span><span>{money.format(item.net_impact ?? 0)}</span><span>v{item.latest_revision}</span><button className="tuvet-btn tuvet-btn-secondary" type="button" onClick={() => void openDetail(item.id)}>Ver detalle</button></div>)}</div>}
     </EstadoCarga>
     {detail && <section className="inventory-history-detail" aria-label="Detalle de inventario">
-      <div className="inventory-history-detail-heading"><div><p className="inventory-history-eyebrow">Detalle de inventario</p><h2>{detail.task_name}</h2><p>{formatDate(detail.execution_date)} · {scopeLabel(detail)} · {label(detail.inventory_type)} · Versión {detail.latest_revision}</p></div><button className="tuvet-btn tuvet-btn-secondary" type="button" onClick={() => setDetail(null)}>Cerrar detalle</button></div>
+      <div className="inventory-history-detail-heading"><div><p className="inventory-history-eyebrow">Detalle de inventario</p><h2>{detail.task_name}</h2><p>{formatDate(detail.execution_date)} · {scopeLabel(detail)} · {label(detail.inventory_type)} · Versión {detail.latest_revision ?? currentRevision?.number ?? '—'}</p></div><button className="tuvet-btn tuvet-btn-secondary" type="button" onClick={() => setDetail(null)}>Cerrar detalle</button></div>
       <div className="inventory-history-timeline" role="tablist" aria-label="Versiones del envío">{detail.revisions?.map((revision) => <button key={revision.number} type="button" role="tab" aria-selected={revision.number === currentRevision?.number} className={revision.number === currentRevision?.number ? 'selected' : ''} onClick={() => setSelectedRevision(revision.number)}>{revision.number === 1 ? 'Envío inicial' : `Corrección ${revision.number - 1}`}</button>)}</div>
-      {currentRevision && <><DetailKpis rows={rows} /><div className="inventory-history-revision-note"><p><strong>{currentRevision.number === 1 ? 'Envío inicial' : `Corrección ${currentRevision.number - 1}`}</strong> · {formatDate(currentRevision.submitted_at)}</p>{currentRevision.comment && <p>Comentario: {currentRevision.comment}</p>}{currentRevision.correction_reason && <p>Motivo de corrección: {currentRevision.correction_reason}</p>}</div><div className="inventory-history-grid"><DataGrid autoHeight disableRowSelectionOnClick rows={rows} columns={columns} pageSizeOptions={[10, 25]} initialState={{ pagination: { paginationModel: { pageSize: 10 } } }} /></div></>}
-      {detail.can_correct === true && <div className="inventory-history-correction"><button className="tuvet-btn" type="button" onClick={() => setCorrection(detail)}>Corregir</button></div>}
+      {currentRevision && <><DetailKpis rows={rows} /><div className="inventory-history-revision-note"><p><strong>{currentRevision.number === 1 ? 'Envío inicial' : `Corrección ${currentRevision.number - 1}`}</strong> · {formatDate(currentRevision.submitted_at)}</p>{currentRevision.comment && <p>Comentario: {currentRevision.comment}</p>}{currentRevision.correction_reason && <p>Motivo de corrección: {currentRevision.correction_reason}</p>}</div><div className="inventory-history-grid"><DataGrid autoHeight disableRowSelectionOnClick density="compact" localeText={esES.components.MuiDataGrid.defaultProps.localeText} rows={rows} columns={columns} pageSizeOptions={[10, 25]} initialState={{ pagination: { paginationModel: { pageSize: 10 } } }} sx={{ border: 0, minWidth: 1000, fontFamily: 'var(--tv-font, Inter, system-ui, sans-serif)', color: 'var(--tv-fg, #172033)', '& .MuiDataGrid-columnHeaders, & .MuiDataGrid-columnHeader': { backgroundColor: 'var(--tv-surface-muted, #f7f9fc)', color: 'var(--tv-subtle, #506175)' }, '& .MuiDataGrid-cell': { borderColor: 'var(--tv-surface-sunken, #dbe3eb)' }, '& .MuiDataGrid-columnHeaderTitle': { fontSize: '.75rem', fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase' }, '& .MuiDataGrid-row:hover': { backgroundColor: 'var(--tv-surface-muted, #f7f9fc)' }, '& .MuiDataGrid-cell:focus, & .MuiDataGrid-columnHeader:focus': { outline: '2px solid var(--tv-primary-accent, #155eef)', outlineOffset: '-2px' } }} /></div></>}
+      {detail.can_correct === true && <div className="inventory-history-correction"><button className="tuvet-btn" type="button" onClick={() => navigate(`/historial-inventarios/${detail.id}/corregir`)}>Corregir</button></div>}
     </section>}
-    {correction && <InventoryExecutionModal occurrence={{ nombre: label(correction.inventory_type) }} mode={correction.inventory_type === 'inventory_area' ? 'area' : 'branch'} correction={correction} onClose={() => setCorrection(null)} onReload={reloadCorrection} onSuccess={() => { setCorrection(null); void load() }} />}
   </section>
 }

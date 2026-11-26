@@ -1,15 +1,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import InventoryHistoryPage from './InventoryHistoryPage'
 
 const { listHistory, getHistoryDetail, useAuth } = vi.hoisted(() => ({ listHistory: vi.fn(), getHistoryDetail: vi.fn(), useAuth: vi.fn() }))
 
 vi.mock('../inventoryService', () => ({ listHistory, getHistoryDetail }))
 vi.mock('../../auth/context/AuthContext', () => ({ useAuth }))
-vi.mock('../components/InventoryExecutionModal', () => ({
-  default: ({ correction }) => <output>correction-version:{correction.expected_version}</output>,
-}))
-
 const submission = {
   id: 501,
   inventory_type: 'inventory_branch',
@@ -37,6 +34,10 @@ const detail = {
 }
 
 describe('InventoryHistoryPage', () => {
+  function renderPage() {
+    return render(<MemoryRouter><InventoryHistoryPage /></MemoryRouter>)
+  }
+
   beforeEach(() => {
     listHistory.mockReset()
     getHistoryDetail.mockReset()
@@ -45,7 +46,7 @@ describe('InventoryHistoryPage', () => {
 
   it('renders operational summaries without JSON, snapshots, or digests', async () => {
     listHistory.mockResolvedValue({ submissions: [submission], filter_context: {} })
-    render(<InventoryHistoryPage />)
+    renderPage()
 
     expect(await screen.findByText('Conteo semanal')).toBeInTheDocument()
     expect(screen.getByLabelText('Resumen del historial visible')).toHaveTextContent('Productos contados12')
@@ -56,7 +57,7 @@ describe('InventoryHistoryPage', () => {
 
   it('does not render a scope filter for GS', async () => {
     listHistory.mockResolvedValue({ submissions: [submission], filter_context: {} })
-    render(<InventoryHistoryPage />)
+    renderPage()
     await screen.findByText('Conteo semanal')
     expect(screen.queryByLabelText('Sucursal')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Área')).not.toBeInTheDocument()
@@ -65,7 +66,7 @@ describe('InventoryHistoryPage', () => {
   it('does not render the inventory type selector for GS', async () => {
     useAuth.mockReturnValue({ perfil: { type: 'gerente_sucursal' } })
     listHistory.mockResolvedValue({ submissions: [submission], filter_context: {} })
-    render(<InventoryHistoryPage />)
+    renderPage()
 
     await screen.findByText('Conteo semanal')
     expect(screen.queryByLabelText('Tipo')).not.toBeInTheDocument()
@@ -74,7 +75,7 @@ describe('InventoryHistoryPage', () => {
 
   it('reloads GA history using only branch_id selected from backend context', async () => {
     listHistory.mockResolvedValue({ submissions: [submission], filter_context: { branches: [{ id: 7, code: 'SC-01', name: 'Sucursal Centro' }] } })
-    render(<InventoryHistoryPage />)
+    renderPage()
     await screen.findByLabelText('Sucursal')
     fireEvent.change(screen.getByLabelText('Sucursal'), { target: { value: '7' } })
     await waitFor(() => expect(listHistory).toHaveBeenLastCalledWith({ branchId: '7' }))
@@ -82,7 +83,7 @@ describe('InventoryHistoryPage', () => {
 
   it('reloads GO history using only area_id selected from backend context', async () => {
     listHistory.mockResolvedValue({ submissions: [submission], filter_context: { areas: [{ id: 3, code: 'A-03', name: 'Área Norte' }] } })
-    render(<InventoryHistoryPage />)
+    renderPage()
     await screen.findByLabelText('Área')
     fireEvent.change(screen.getByLabelText('Área'), { target: { value: '3' } })
     await waitFor(() => expect(listHistory).toHaveBeenLastCalledWith({ areaId: '3' }))
@@ -91,7 +92,7 @@ describe('InventoryHistoryPage', () => {
   it('renders canonical rows and switches revisions in detail', async () => {
     listHistory.mockResolvedValue({ submissions: [submission], filter_context: {} })
     getHistoryDetail.mockResolvedValue({ submission: detail })
-    render(<InventoryHistoryPage />)
+    renderPage()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle' }))
     fireEvent.click(await screen.findByRole('tab', { name: 'Corrección 1' }))
@@ -99,23 +100,28 @@ describe('InventoryHistoryPage', () => {
     expect(screen.getByText('Arroz')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: 'Envío inicial' }))
     expect(await screen.findByText(/Conteo inicial/)).toBeInTheDocument()
+    expect(screen.getByText('Filas por página:')).toBeInTheDocument()
+    expect(screen.getByText('v2')).toBeInTheDocument()
   })
 
-  it('offers correction only from detail when the backend permits it', async () => {
+  it('navigates to the correction screen in the same tab when the backend permits it', async () => {
     listHistory.mockResolvedValue({ submissions: [submission], filter_context: {} })
     getHistoryDetail.mockResolvedValue({ submission: detail })
-    render(<InventoryHistoryPage />)
+    function Location() {
+      return <output data-testid="location">{useLocation().pathname}</output>
+    }
+    render(<MemoryRouter><InventoryHistoryPage /><Location /></MemoryRouter>)
 
     expect(screen.queryByRole('button', { name: 'Corregir' })).not.toBeInTheDocument()
     fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Corregir' }))
-    expect(await screen.findByText('correction-version:2')).toBeInTheDocument()
+    expect(await screen.findByTestId('location')).toHaveTextContent('/historial-inventarios/501/corregir')
   })
 
   it('does not offer correction when the loaded detail lacks backend permission', async () => {
     listHistory.mockResolvedValue({ submissions: [{ ...submission, can_correct: false }], filter_context: {} })
     getHistoryDetail.mockResolvedValue({ submission: { ...detail, can_correct: false } })
-    render(<InventoryHistoryPage />)
+    renderPage()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle' }))
     expect(screen.queryByRole('button', { name: 'Corregir' })).not.toBeInTheDocument()
