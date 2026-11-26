@@ -10,7 +10,10 @@ import { getOperationalAlertsCount } from '../../features/operationalAlerts/serv
 import { clearOrganizationContext } from '../../services/organizationContext'
 import './Layout.css'
 
-const NAV_CATEGORY_KEYS = ['dia-a-dia', 'gestion', 'personas', 'analitica', 'administracion']
+const NAV_CATEGORY_KEYS = [
+  'dia-a-dia', 'gestion', 'personas', 'analitica', 'administracion',
+  'mi-area', 'atencion-hoy', 'gestion-equipo', 'configuracion', 'analisis',
+]
 const MOBILE_QUERY = '(max-width: 900px)'
 
 function Layout() {
@@ -181,7 +184,7 @@ function Layout() {
     navigate('/Login')
   }
 
-  const categorias = [
+  const categoriasNoGA = [
     {
       key: 'dia-a-dia',
       label: 'Mi día a día',
@@ -619,6 +622,63 @@ function Layout() {
       ],
     },
   ]
+
+  const configuracionCategoriasGA = [
+    {
+      key: 'mi-area',
+      label: 'Mi área',
+      items: [
+        { to: '/calendario-area' },
+        { to: '/ausencias-area', label: 'Mis vacaciones' },
+        { to: '/almuerzos', label: 'Almuerzos de mi equipo' },
+      ],
+    },
+    {
+      key: 'atencion-hoy',
+      label: 'Atención hoy',
+      items: [
+        { to: '/solicitudes-pendientes' },
+        { to: '/depositos-vencidos' },
+      ],
+    },
+    {
+      key: 'gestion-equipo',
+      label: 'Gestión del equipo',
+      items: [
+        { to: '/coberturas', label: 'Coberturas temporales' },
+        { to: '/situaciones' },
+        { to: '/usuarios' },
+        { to: '/sucursales' },
+      ],
+    },
+    {
+      key: 'configuracion',
+      label: 'Configuración',
+      items: [{ to: '/plantillas' }],
+    },
+    {
+      key: 'analisis',
+      label: 'Análisis',
+      items: [
+        { to: '/dashboard', label: 'Estado operativo' },
+        { to: '/reportes' },
+        { to: '/analitica/historial-depositos' },
+        { to: '/historial-inventarios' },
+      ],
+    },
+  ]
+  const itemsNoGAPorRuta = new Map(
+    categoriasNoGA.flatMap((categoria) => categoria.items).map((item) => [item.to, item]),
+  )
+  const categorias = esGerenteArea
+    ? configuracionCategoriasGA.map((categoria) => ({
+      ...categoria,
+      items: categoria.items.map(({ to, label }) => ({
+        ...itemsNoGAPorRuta.get(to),
+        ...(label ? { label } : {}),
+      })),
+    }))
+    : categoriasNoGA
 
   // En móvil el panel abierto siempre muestra etiquetas, aunque en escritorio esté contraído.
   const compacto = sidebarCollapsed && !mobileNavOpen

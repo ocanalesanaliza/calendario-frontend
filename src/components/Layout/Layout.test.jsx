@@ -261,7 +261,7 @@ describe('Layout Mis tareas navigation', () => {
     expect(screen.queryByRole('link', { name: 'Conteo de inventario' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Tareas' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Calendario del área' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Mi almuerzo' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Almuerzos de mi equipo' })).toBeInTheDocument()
   })
 
   it('keeps the navigation entries available to a non-area-manager profile with the same capabilities', () => {
@@ -312,19 +312,19 @@ describe('Layout Mis tareas navigation', () => {
   })
 
   it.each([
-    ['GA', { type: 'gerente_area' }, true],
-    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, true],
-    ['active Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, true],
-    ['plain Admin Master', { type: 'admin_master' }, true],
-    ['global Admin Master', { es_admin_maestro: true }, true],
-    ['GS', { type: 'gerente_sucursal' }, false],
-    ['disabled Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: false }, false],
-  ])('uses the area-absence capability to show navigation to %s', (_role, perfil, visible) => {
+    ['GA', { type: 'gerente_area' }, true, 'Mis vacaciones'],
+    ['GO', { type: 'gerente_operaciones', activo: true, habilitado: true }, true, 'Vacaciones y situaciones del área'],
+    ['active Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: true }, true, 'Vacaciones y situaciones del área'],
+    ['plain Admin Master', { type: 'admin_master' }, true, 'Vacaciones y situaciones del área'],
+    ['global Admin Master', { es_admin_maestro: true }, true, 'Vacaciones y situaciones del área'],
+    ['GS', { type: 'gerente_sucursal' }, false, 'Vacaciones y situaciones del área'],
+    ['disabled Systems', { type: 'sistemas', es_cuenta_sistemas: true, activo: true, habilitado: false }, false, 'Vacaciones y situaciones del área'],
+  ])('uses the area-absence capability to show navigation to %s', (_role, perfil, visible, label) => {
     useAuth.mockReturnValue({ perfil, logout: vi.fn() })
     render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
 
-    if (visible) expect(screen.getByTitle('Vacaciones y situaciones del área')).toHaveAttribute('href', '/ausencias-area')
-    else expect(screen.queryByTitle('Vacaciones y situaciones del área')).not.toBeInTheDocument()
+    if (visible) expect(screen.getByTitle(label)).toHaveAttribute('href', '/ausencias-area')
+    else expect(screen.queryByTitle(label)).not.toBeInTheDocument()
   })
 
   it('hides Mis tareas and Solicitudes pendientes for an operations manager while preserving Áreas', () => {
@@ -349,6 +349,80 @@ describe('Layout Mis tareas navigation', () => {
     expect(screen.queryByRole('link', { name: 'Mis tareas' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Solicitudes pendientes' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Áreas' })).toBeInTheDocument()
+  })
+
+  it('organizes the GA navigation into the requested categories and labels', () => {
+    useAuth.mockReturnValue({
+      perfil: {
+        type: 'gerente_area',
+        capabilities: {
+          manage_branches: true,
+          manage_users: true,
+          manage_templates: true,
+          manage_special_situations: true,
+          access_operational_dashboard: true,
+          access_performance_reports: true,
+        },
+      },
+      logout: vi.fn(),
+    })
+
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: 'Expandir menú' }))
+
+    const categoryLabels = [...document.querySelectorAll('.nav-group-header span')].map((element) => element.textContent)
+    expect(categoryLabels).toEqual(['Mi área', 'Atención hoy', 'Gestión del equipo', 'Configuración', 'Análisis'])
+    expect([...document.querySelectorAll('.nav-group-items')].map((group) => [...group.querySelectorAll('a')].map((link) => link.textContent.trim()))).toEqual([
+      ['Calendario del área', 'Mis vacaciones', 'Almuerzos de mi equipo'],
+      ['Solicitudes pendientes', 'Depósitos vencidos'],
+      ['Coberturas temporales', 'Situaciones especiales', 'Usuarios', 'Sucursales'],
+      ['Plantillas'],
+      ['Estado operativo', 'Reportes', 'Historial de depósitos', 'Historial de inventarios'],
+    ])
+  })
+
+  it('keeps the existing non-GA menu grouping and labels', () => {
+    useAuth.mockReturnValue({
+      perfil: { type: 'gerente_sucursal', can_access_my_tasks: true, capabilities: { manage_branches: true } },
+      logout: vi.fn(),
+    })
+
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: 'Expandir menú' }))
+
+    expect([...document.querySelectorAll('.nav-group-header span')].map((element) => element.textContent)).toEqual(['Mi día a día', 'Gestión', 'Analítica'])
+    expect(screen.getByRole('link', { name: 'Mis tareas' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Mis vacaciones' })).not.toBeInTheDocument()
+  })
+
+  it('does not render empty GA categories when optional permissions are absent', () => {
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area', capabilities: {} }, logout: vi.fn() })
+
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: 'Expandir menú' }))
+
+    expect(screen.getByRole('button', { name: 'Mi área' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Atención hoy' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Gestión del equipo' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Configuración' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Análisis' })).toBeInTheDocument()
+  })
+
+  it('shows the GA category labels in the mobile navigation panel', () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })))
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area' }, logout: vi.fn() })
+
+    render(<MemoryRouter><Routes><Route element={<Layout />}><Route path="/" element={<p>Inicio</p>} /></Route></Routes></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir menú' }))
+
+    expect(document.getElementById('menu-lateral')).toHaveClass('sidebar-mobile-open')
+    expect(screen.getByRole('button', { name: 'Mi área' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Atención hoy' })).toBeInTheDocument()
+    vi.unstubAllGlobals()
   })
 
   it.each([
