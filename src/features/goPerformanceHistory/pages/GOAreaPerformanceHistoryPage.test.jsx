@@ -5,9 +5,7 @@ import GOAreaPerformanceHistoryPage from './GOAreaPerformanceHistoryPage'
 const service = vi.hoisted(() => ({
   getGOAuthorizedAreas: vi.fn(), getGOAllAreasPerformanceHistory: vi.fn(), getGOAreaPerformanceHistory: vi.fn(), getGOOccurrences: vi.fn(), getGOOccurrenceDetail: vi.fn(), getGOResponsibilityGaps: vi.fn(),
 }))
-const evaluations = vi.hoisted(() => ({ getGAMonthlyEvaluations: vi.fn(), createGAMonthlyEvaluation: vi.fn(), correctGAMonthlyEvaluation: vi.fn(), getGAMonthlyEvaluationHistory: vi.fn() }))
 vi.mock('../services/goPerformanceHistoryService', () => service)
-vi.mock('../../gaMonthlyEvaluations/services/gaMonthlyEvaluationsService', () => evaluations)
 
 const areas = [
   { id: 7, codigo: 'NORTE', nombre: 'Área Norte', activo: true },
@@ -29,14 +27,12 @@ describe('GOAreaPerformanceHistoryPage', () => {
     service.getGOOccurrences.mockReset()
     service.getGOOccurrenceDetail.mockReset()
     service.getGOResponsibilityGaps.mockReset()
-    Object.values(evaluations).forEach((mock) => mock.mockReset())
     service.getGOAuthorizedAreas.mockResolvedValue({ scope: {}, results: areas })
     service.getGOAllAreasPerformanceHistory.mockResolvedValue({ scope: { mode: 'all_areas' }, results: [row()], next_cursor: null })
     service.getGOAreaPerformanceHistory.mockResolvedValue({ scope: {}, results: [row()], next_cursor: null })
     service.getGOOccurrences.mockResolvedValue({ results: [{ id: 'opaque-occurrence-id', task: { title: 'Inventario mensual' }, origin_date_local: '2026-10-04', attribution_month: '2026-10', frozen_weight: '10', latest_status: 'completed' }] })
     service.getGOOccurrenceDetail.mockResolvedValue({ task: { title: 'Inventario mensual' }, origin_date_local: '2026-10-04', attribution_month: '2026-10', frozen_weight: '10', latest_revision: { status: 'completed', effective_at: '2026-10-05T12:00:00Z' }, revision_history: [{ status: 'pending', effective_at: '2026-10-04T08:00:00Z' }] })
     service.getGOResponsibilityGaps.mockResolvedValue({ results: [{ effective_start: '2026-09-12', detected_at: '2026-09-13T08:00:00Z', status: 'open', opening_reason: 'Sin responsabilidad vigente', opening_provenance: 'Asignación histórica' }], next_cursor: null })
-    evaluations.getGAMonthlyEvaluations.mockResolvedValue({ evaluations: [] })
   })
 
   it('selects Todos by default, requests all-Area history, and renders a safe Área column without aggregation', async () => {
@@ -188,13 +184,13 @@ describe('GOAreaPerformanceHistoryPage', () => {
     expect(document.activeElement).toBe(trigger)
   })
 
-  it('opens the authorized GO evaluation surface using the current GA identifier, without exposing it in the history table', async () => {
+  it('keeps GO→GA monthly evaluation actions out of the read-only history', async () => {
     service.getGOAllAreasPerformanceHistory.mockResolvedValueOnce({ scope: {}, results: [row({ responsibility: { id: 1, manager: { id: 987654, display_name: 'Ana Histórica' } } })], next_cursor: null })
     render(<GOAreaPerformanceHistoryPage />)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Gestionar evaluación mensual' }))
-    expect(await screen.findByRole('dialog', { name: /Evaluación mensual/i })).toBeInTheDocument()
-    expect(evaluations.getGAMonthlyEvaluations).toHaveBeenCalledWith({ gaId: 987654, month: '2026-10' })
+    await screen.findByText('Ana Histórica')
+    expect(screen.queryByRole('button', { name: /evaluar ga|gestionar evaluación/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ver evidencia de ocurrencias' })).toBeInTheDocument()
     expect(document.body.textContent).not.toContain('987654')
   })
 
@@ -211,8 +207,7 @@ describe('GOAreaPerformanceHistoryPage', () => {
 
     expect(await screen.findByText('Provisional')).toBeInTheDocument()
     expect(screen.queryByText(/Provisional · provisional/i)).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Evaluar GA' })).toHaveClass('tuvet-btn')
-    expect(screen.getByRole('button', { name: 'Gestionar evaluación' })).toHaveClass('tuvet-btn')
+    expect(screen.queryByRole('button', { name: /evaluar ga|gestionar evaluación/i })).not.toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Ver evidencia de ocurrencias' })[0]).toHaveClass('tuvet-btn-link')
     expect([...document.querySelectorAll('.go-performance-table tbody td')].map((cell) => cell.dataset.label)).toEqual(['Área', 'Rendimiento', 'Estado', 'Actualizado', 'Acciones', 'Área', 'Rendimiento', 'Estado', 'Actualizado', 'Acciones'])
     expect(screen.getByRole('region', { name: 'Resumen de resultados' })).toHaveTextContent('2 Áreas')
