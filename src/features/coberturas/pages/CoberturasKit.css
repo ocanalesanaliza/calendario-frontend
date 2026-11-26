@@ -1,0 +1,23 @@
+.coberturas-kit { display: flex; flex-direction: column; gap: 1.25rem; }
+.coberturas-kit__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem; }
+.coberturas-kit__resultados, .coberturas-kit__numeric { font-variant-numeric: tabular-nums; }
+.coberturas-kit__resultados { margin: 0; color: var(--tv-muted); font-size: .875rem; white-space: nowrap; }
+.coberturas-kit__table-card { overflow: hidden; }
+.coberturas-kit__table { min-width: 860px; }
+.coberturas-kit__table th:last-child, .coberturas-kit__table td:last-child { text-align: right; }
+.coberturas-kit__actions { display: flex; justify-content: flex-end; gap: .5rem; }
+.coberturas-kit__estado--pendiente { background: var(--tv-warning-soft); color: var(--tv-warning-text); }
+.coberturas-kit__estado--programada { background: var(--tv-primary-soft); color: var(--tv-primary-text); }
+.coberturas-kit__estado--activa, .coberturas-kit__estado--completada { background: var(--tv-success-soft); color: var(--tv-success-text); }
+.coberturas-kit__estado--cancelada { background: var(--tv-danger-soft); color: var(--tv-danger-text); }
+.coberturas-kit__modal .tuvet-modal-body { overflow: visible; }
+.coberturas-kit__form { gap: 1rem; }
+.coberturas-kit__form .tuvet-section-body { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.coberturas-kit__combobox { position: relative; grid-column: 1 / -1; }
+.coberturas-kit__combobox-list { position: absolute; z-index: 2; top: calc(100% + .25rem); right: 0; left: 0; max-height: 13rem; overflow-y: auto; margin: 0; padding: .25rem; list-style: none; border: 1px solid var(--tv-border-strong); border-radius: var(--tv-radius-sm); background: var(--tv-surface); box-shadow: var(--tv-shadow); }
+.coberturas-kit__combobox-list [role="option"], .coberturas-kit__combobox-empty { padding: .625rem .75rem; border-radius: var(--tv-radius-sm); }
+.coberturas-kit__combobox-list [role="option"] { cursor: pointer; }
+.coberturas-kit__combobox-list [role="option"].is-active, .coberturas-kit__combobox-list [role="option"]:hover { background: var(--tv-primary-softer); color: var(--tv-primary-text); }
+.coberturas-kit__combobox-empty { color: var(--tv-muted); }
+.coberturas-kit__weekend-note { grid-column: 1 / -1; margin: 0; }
+@media (max-width: 639px) { .coberturas-kit__toolbar { align-items: flex-start; flex-direction: column; } .coberturas-kit__resultados { white-space: normal; } .coberturas-kit__form .tuvet-section-body { grid-template-columns: 1fr; } .coberturas-kit .tuvet-modal-footer { display: grid; grid-template-columns: 1fr; } .coberturas-kit .tuvet-modal-footer .tuvet-btn { width: 100%; } }

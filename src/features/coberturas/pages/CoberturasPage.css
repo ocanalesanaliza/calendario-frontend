@@ -184,6 +184,19 @@
   background: #f1f5f9; color: #64748b; cursor: not-allowed;
 }
 
+.coverage-combobox { position: relative; }
+.coverage-combobox input { box-sizing: border-box; width: 100%; }
+.coverage-combobox-list {
+  position: absolute; z-index: 1; top: calc(100% + 0.25rem); right: 0; left: 0;
+  max-height: 13rem; overflow-y: auto; margin: 0; padding: 0.25rem;
+  border: 1px solid #cbd5e1; border-radius: 8px; background: #fff;
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.12); list-style: none;
+}
+.coverage-combobox-list [role="option"] { padding: 0.55rem 0.65rem; border-radius: 6px; cursor: pointer; }
+.coverage-combobox-list [role="option"].is-active,
+.coverage-combobox-list [role="option"]:hover { background: #eef2ff; color: #3730a3; }
+.coverage-combobox-empty { padding: 0.55rem 0.65rem; color: #64748b; }
+
 .label-optional { font-weight: 400; color: #94a3b8; font-size: 0.8rem; }
 .label-required { color: #ef4444; }
 

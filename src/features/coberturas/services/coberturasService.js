@@ -16,6 +16,14 @@ export async function getCoberturas(params = {}) {
   return data
 }
 
+export async function getCoberturaCatalogo(fecha) {
+  const query = fecha ? `?fecha=${encodeURIComponent(fecha)}` : ''
+  const res = await apiRequest(`/api/coberturas-temporales/catalogo/${query}`)
+  const data = await res.json()
+  if (!res.ok) throw new Error(parseDetail(data.detail) || 'Error al cargar las opciones de cobertura')
+  return data
+}
+
 export async function createCobertura(body) {
   const res = await apiRequest('/api/coberturas-temporales/', {
     method: 'POST',
