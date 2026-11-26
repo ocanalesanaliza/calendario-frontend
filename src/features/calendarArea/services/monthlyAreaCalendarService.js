@@ -38,7 +38,7 @@ export function createManualCatalogEntry(body, idempotencyKey) {
 }
 
 export function createAdHocActivity(body, idempotencyKey) {
-  return commandCalendarArea('/api/calendar/my-area/ad-hoc-activities/', body, 'No se pudo crear la actividad ad hoc.', idempotencyKey)
+  return commandCalendarArea('/api/calendar/my-area/ad-hoc-activities/', body, 'No se pudo crear la actividad personal.', idempotencyKey)
 }
 
 export function updateManualCatalogEntry(entryId, body, idempotencyKey) {
@@ -62,15 +62,15 @@ export function justifyManualCatalogEntryScopeLoss(entryId, body, idempotencyKey
 }
 
 export function updateAdHocActivity(activityId, body, idempotencyKey) {
-  return patchCalendarArea(`/api/calendar/my-area/ad-hoc-activities/${activityId}/`, body, 'No se pudo actualizar la actividad ad hoc.', idempotencyKey)
+  return patchCalendarArea(`/api/calendar/my-area/ad-hoc-activities/${activityId}/`, body, 'No se pudo actualizar la actividad personal.', idempotencyKey)
 }
 
 export function completeAdHocActivity(activityId, body, idempotencyKey) {
-  return commandCalendarArea(`/api/calendar/my-area/ad-hoc-activities/${activityId}/complete/`, body, 'No se pudo completar la actividad ad hoc.', idempotencyKey)
+  return commandCalendarArea(`/api/calendar/my-area/ad-hoc-activities/${activityId}/complete/`, body, 'No se pudo completar la actividad personal.', idempotencyKey)
 }
 
 export function cancelAdHocActivity(activityId, body, idempotencyKey) {
-  return commandCalendarArea(`/api/calendar/my-area/ad-hoc-activities/${activityId}/cancel/`, body, 'No se pudo cancelar la actividad ad hoc.', idempotencyKey)
+  return commandCalendarArea(`/api/calendar/my-area/ad-hoc-activities/${activityId}/cancel/`, body, 'No se pudo cancelar la actividad personal.', idempotencyKey)
 }
 
 export function closeMonthlyAreaPerformance(body) {

@@ -156,7 +156,7 @@ export function occurrencesToCalendarEvents(occurrences = []) {
 function manualEvent(item, provenance) {
   const statusPresentation = occurrenceStatusPresentation(item.status)
   const title = provenance === 'ad_hoc' ? item.name : taskTitle(item.task, item.id)
-  const provenanceLabel = provenance === 'ad_hoc' ? 'Actividad ad hoc' : 'Tarea manual de catálogo'
+  const provenanceLabel = provenance === 'ad_hoc' ? 'Actividad personal' : 'Tarea manual de catálogo'
   return {
     id: `${provenance}-${item.id}`,
     title,
