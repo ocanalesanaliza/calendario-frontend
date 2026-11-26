@@ -6,6 +6,8 @@ import { useAuth } from '../../auth/context/AuthContext'
 import { DepositDemoModal } from '../components/DepositDemoModal'
 import { getDepositCompliance, openOverdueDepositReport } from '../services/depositService'
 import { RevisionGuardiaModal } from '../components/RevisionGuardiaModal'
+import { EstadoCarga, Icono, PageHeader } from '../../tuvet/components/TuvetUi'
+import '../../tuvet/tuvet.css'
 import './MisTareasPage.css'
 import './MisTareasV2Page.css'
 
@@ -67,7 +69,7 @@ function getTimeInMinutes(value) {
 
 function getTaskPriority(tarea, meta) {
   if (tarea.estado_ui === 'no_disponible' || tarea.estado_ui === 'bloqueada') return 'neutral'
-  if (tarea.estado_ui === 'registrada') return null
+  if (tarea.estado_ui === 'registrada' || tarea.estado_ui === 'cerrada') return null
   if (!meta || meta.fecha_consultada !== meta.fecha_servidor) return null
 
   const serverTime = getTimeInMinutes(meta.hora_servidor)
@@ -84,6 +86,11 @@ function isValidCalendarDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
   const date = new Date(`${value}T00:00:00.000Z`)
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
+}
+
+function formatSpanishDate(value) {
+  if (!isValidCalendarDate(value)) return value || 'Fecha no disponible'
+  return new Intl.DateTimeFormat('es-HN', { dateStyle: 'full' }).format(new Date(`${value}T12:00:00`))
 }
 
 export default function MisTareasPage({ className = 'mis-tareas-page', groupByStartTime = false, selectionUxVariant = false, scanabilityVariant = false, availableFilterVariant = false, priorityVariant = false }) {
@@ -147,6 +154,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
             .map((obligation) => ({
               obligationId: obligation.id,
               branchName: branch.name ?? 'Sucursal asignada',
+              executionDate: obligation.execution_date ?? '',
             })),
         ))
       } catch {
@@ -540,7 +548,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
               />
             )}
             <div className="tarea-card-info tarea-card-info--scanable">
-              <p className="tarea-card-nombre tarea-card-nombre--clamped" title={taskName}>{taskName}</p>
+              <p className="tarea-card-nombre tarea-card-title tarea-card-nombre--clamped" title={taskName}>{taskName}</p>
               <div className="tarea-card-metadata">
                 <p className="tarea-card-hora">{taskSchedule}</p>
                 {statusBadge}
@@ -590,17 +598,8 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
   }
 
   return (
-    <div className={`${className}${selectionUxVariant && seleccionadas.length > 0 ? ' mis-tareas-page--selection-active' : ''}`}>
-      <div className="page-header mis-tareas-header">
-        <div className="mis-tareas-heading">
-          <h1>Mis tareas</h1>
-          {data?.meta && (
-            <p className="mis-tareas-context">
-              {data.meta.fecha_consultada} &mdash; {data.meta.hora_servidor}
-              <span className="jornada-context">Jornada de {data.meta.jornada_servidor === 'tarde' ? 'tarde' : 'mañana'}</span>
-            </p>
-          )}
-        </div>
+    <div className={`tema-analiza tuvet-page ${className}${selectionUxVariant && seleccionadas.length > 0 ? ' mis-tareas-page--selection-active' : ''}`}>
+      <PageHeader title="Mis tareas" description={data?.meta ? <>{formatSpanishDate(data.meta.fecha_consultada)} · {data.meta.hora_servidor} · <span className="jornada-context">Jornada de {data.meta.jornada_servidor === 'tarde' ? 'tarde' : 'mañana'}</span></> : 'Organizá y registrá las tareas de tu jornada.'}>
         <label className="fecha-control">
           <span>Fecha</span>
           <input
@@ -619,7 +618,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
             disabled={busy}
           />
         </label>
-      </div>
+      </PageHeader>
 
       {resumen && (
         <div className="stats-row">
@@ -689,7 +688,8 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
         <section className="overdue-deposit-obligations" aria-labelledby="overdue-deposit-title">
           <div>
             <h2 id="overdue-deposit-title">Depósitos vencidos</h2>
-            <p>Regulariza los depósitos vencidos que siguen bajo tu responsabilidad.</p>
+            <p><Icono nombre="alerta" className="overdue-deposit-icon" /> Regulariza los depósitos vencidos que siguen bajo tu responsabilidad.</p>
+            <strong>Obligación: regularizar el depósito pendiente.</strong>
             {overdueDepositError && <p className="reg-error" role="alert">
               {overdueDepositError.message}{' '}
               <button type="button" className="btn-secondary-sm" onClick={() => openOverdueRegularization(overdueDepositError.item)}>
@@ -699,7 +699,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
           </div>
           <div className="overdue-deposit-obligation-list">
             {overdueObligations.map((item) => <article className="overdue-deposit-obligation" key={item.obligationId}>
-              <p>Depósito vencido de <strong>{item.branchName}</strong></p>
+              <p>Depósito vencido de <strong>{item.branchName}</strong>{item.executionDate ? <> · {formatSpanishDate(item.executionDate)}</> : null}</p>
               <button type="button" className="btn-mistareas-aceptar" disabled={openingOverdueObligationId === item.obligationId} onClick={() => openOverdueRegularization(item)} aria-label={`Regularizar depósito vencido de ${item.branchName}`}>
                 {openingOverdueObligationId === item.obligationId ? 'Preparando reporte...' : 'Regularizar depósito'}
               </button>
@@ -717,7 +717,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
             aria-pressed={jornada === 'manana'}
           >
             Mañana
-            {resumen?.manana && <span className="tab-count">{resumen.manana.total}</span>}
+            {resumen?.manana && <span className="tab-count" aria-label={`${resumen.manana.total} tareas en la mañana`}>{resumen.manana.total}</span>}
           </button>
           <button
             className={`jornada-tab${jornada === 'tarde' ? ' active' : ''}`}
@@ -726,7 +726,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
             aria-pressed={jornada === 'tarde'}
           >
             Tarde
-            {resumen?.tarde && <span className="tab-count">{resumen.tarde.total}</span>}
+            {resumen?.tarde && <span className="tab-count" aria-label={`${resumen.tarde.total} tareas en la tarde`}>{resumen.tarde.total}</span>}
           </button>
         </div>
         <nav className="mis-tareas-view-switcher" aria-label="Versión de Mis tareas">
@@ -810,11 +810,8 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
         </div>
       )}
 
-      {loading ? (
-        <div className="loading-state">Cargando tareas...</div>
-      ) : tareasFiltradas.length === 0 ? (
-        <div className="empty-state">Sin tareas para esta jornada.</div>
-      ) : groupByStartTime ? (
+      <EstadoCarga loading={loading} empty={!loading && tareasFiltradas.length === 0} emptyText="Sin tareas para esta jornada.">
+      {groupByStartTime ? (
         <div className="mis-tareas-time-groups">
           {groupTasksByStartTime(tareasFiltradas).map(({ startTime, tasks }) => {
             const heading = startTime ?? 'Horario no disponible'
@@ -834,6 +831,7 @@ export default function MisTareasPage({ className = 'mis-tareas-page', groupBySt
           {tareasFiltradas.map(renderTaskCard)}
         </div>
       )}
+      </EstadoCarga>
       {depositTask && <DepositDemoModal tarea={depositTask} fecha={data?.meta?.fecha_consultada} sucursal={perfil?.sucursal?.nombre || 'Sucursal asignada'} onClose={() => setDepositTask(null)} />}
       {overdueDeposit && <DepositDemoModal tarea={{ tarea: { nombre: `Depósito vencido de ${overdueDeposit.branchName}` } }} fecha={data?.meta?.fecha_consultada} overdue={{ obligationId: overdueDeposit.obligationId, report: overdueDeposit.report, access: overdueDeposit.access }} onClose={() => setOverdueDeposit(null)} />}
       {revisionGuardiaTask && (

@@ -52,6 +52,8 @@ describe('MisTareasPage deposit demonstrations', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Regularizar depósito vencido de Sucursal Norte' }))
 
     await waitFor(() => expect(openOverdueDepositReport).toHaveBeenCalledWith('opaque-overdue-obligation'))
+    expect(screen.getByRole('heading', { name: 'Depósitos vencidos' })).toBeInTheDocument()
+    expect(screen.getByText('Obligación: regularizar el depósito pendiente.')).toBeInTheDocument()
     expect(openDepositReport).not.toHaveBeenCalled()
     expect(await screen.findByRole('dialog', { name: 'Registrar depósito vencido' })).toBeInTheDocument()
     expect(screen.getByText('No tienes permiso para preparar este reporte vencido.')).toBeInTheDocument()
@@ -209,8 +211,31 @@ describe('MisTareasPage deposit demonstrations', () => {
     expect(await screen.findByText('Disponibles')).toBeInTheDocument()
     expect(screen.getByText('Jornada de mañana')).toBeInTheDocument()
     expect(screen.getByLabelText('Fecha')).toHaveValue('2026-09-05')
-    expect(screen.getByRole('button', { name: 'Mañana1' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Tarde0' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Mañana1 tareas en la mañana' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Tarde0 tareas en la tarde' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('keeps V2 task titles compact and gives closed tasks one primary status', async () => {
+    getMisTareas.mockResolvedValue({
+      ...taskResponse,
+      results: [{
+        ...taskResponse.results[0],
+        disponible_para_registro: false,
+        estado_ui: 'cerrada',
+        estado_ui_label: 'Cerrada',
+        hora_fin_registro: '09:30',
+        motivo_no_disponible: 'Jornada cerrada',
+        tarea: { ...taskResponse.results[0].tarea, nombre: 'Tarea con un título deliberadamente largo para validar el truncado visual de dos líneas en la tarjeta' },
+      }],
+    })
+
+    render(<MemoryRouter><MisTareasV2Page /></MemoryRouter>)
+
+    const title = await screen.findByText(/Tarea con un título deliberadamente largo/i)
+    expect(title).toHaveClass('tarea-card-title')
+    expect(screen.getByText('Cerrada')).toBeInTheDocument()
+    expect(screen.queryByText('Registro vencido')).not.toBeInTheDocument()
+    expect(screen.getByText('Jornada cerrada')).toBeInTheDocument()
   })
 
   it('renders the authorized V1 route with the switcher', async () => {
@@ -409,7 +434,7 @@ describe('MisTareasPage deposit demonstrations', () => {
     fireEvent.click(await screen.findByRole('checkbox', { name: /Seleccionar Disponible mañana/i }))
     expect(screen.getByRole('button', { name: /Registrar 1 tarea/i })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Disponibles/i }))
-    fireEvent.click(screen.getByRole('button', { name: 'Tarde2' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Tarde2 tareas en la tarde' }))
 
     expect(screen.getByRole('status')).toHaveTextContent('Filtro activo: solo tareas disponibles de esta jornada.')
     expect(screen.getByText('Disponible tarde')).toBeInTheDocument()
@@ -510,7 +535,9 @@ describe('MisTareasPage deposit demonstrations', () => {
     expect(urgentCard).toHaveClass('tarea-card--priority-urgent')
     expect(within(expiredCard).getByRole('status')).toHaveTextContent('Registro vencido')
     expect(expiredCard).toHaveClass('tarea-card--priority-expired')
-    expect(within(registeredCard).getByText('Registrada', { selector: '.badge' })).toHaveClass('badge')
+    const registeredBadge = within(registeredCard).getByText('Registrada', { selector: '.badge' })
+    expect(registeredBadge).toHaveClass('badge')
+    expect(registeredBadge.querySelector('svg')).not.toBeInTheDocument()
     expect(within(registeredCard).queryByText('Quedan 20 min')).not.toBeInTheDocument()
 
     unmount()
