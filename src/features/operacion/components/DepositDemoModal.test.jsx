@@ -35,7 +35,7 @@ describe('DepositDemoModal', () => {
     renderModal()
 
     expect(await screen.findByText('Paso activo: Capturar ventas')).toBeInTheDocument()
-    expect(screen.queryByText('Comprobantes')).not.toBeInTheDocument()
+    expect(screen.queryAllByText('Comprobantes')).toHaveLength(0)
     expect(screen.queryByRole('button', { name: 'Agregar comprobante' })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Cierre capturado *')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Declarar no depositado' })).not.toBeInTheDocument()
@@ -53,7 +53,7 @@ describe('DepositDemoModal', () => {
     expect(await screen.findByText('Después de guardar, esta captura no podrá modificarse.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar captura' }))
     await waitFor(() => expect(api.captureDepositClosure).toHaveBeenCalledWith('opaque-report-id', 71, expect.objectContaining({ total_sales: '100.00', cash_sales: '70.00', card_sales: '30.00', expected_version: 1 })))
-    expect(await screen.findByText(/Ventas capturadas: L/)).toBeInTheDocument()
+    expect(await screen.findByText(/Ventas capturadas · Total: L/)).toBeInTheDocument()
   })
 
   it('uses the bridge report and preserves its opaque closure identity during an overdue capture', async () => {
@@ -121,6 +121,7 @@ describe('DepositDemoModal', () => {
   })
 
   it('shows a localized sales discrepancy warning and requires a focused explanation before capture', async () => {
+    api.openDepositReport.mockResolvedValue({ report: report({ readiness: { ready_to_submit: false, blockers: [] } }) })
     renderModal()
     await screen.findByText('Cierre del domingo 01 de noviembre de 2026')
     fireEvent.change(screen.getByLabelText('Ventas totales *'), { target: { value: '100.00' } })
@@ -128,7 +129,11 @@ describe('DepositDemoModal', () => {
     fireEvent.change(screen.getByLabelText('Ventas con tarjeta *'), { target: { value: '20.00' } })
 
     expect(await screen.findByText(/Descuadre de ventas: L 10\.00/)).toBeInTheDocument()
+    expect(screen.queryByText('Resuelto según validación del reporte.')).not.toBeInTheDocument()
     expect(screen.getByText(/Las ventas totales no coinciden con efectivo más tarjeta/)).toBeInTheDocument()
+    const discrepancyPanel = screen.getByTestId('sales-discrepancy-panel')
+    expect(discrepancyPanel).toHaveTextContent('L 100.00 − L 70.00 − L 20.00 = L 10.00 por justificar')
+    expect(within(discrepancyPanel).getByLabelText('Explicación del descuadre *')).toBeInTheDocument()
     const explanation = screen.getByLabelText('Explicación del descuadre *')
     fireEvent.change(explanation, { target: { value: ' \n ' } })
     fireEvent.click(screen.getByRole('button', { name: 'Capturar ventas' }))
@@ -136,6 +141,68 @@ describe('DepositDemoModal', () => {
     expect(await screen.findByText('Explica el descuadre de ventas.')).toBeInTheDocument()
     expect(explanation).toHaveFocus()
     expect(api.captureDepositClosure).not.toHaveBeenCalled()
+  })
+
+  it('presents captured sales as a pending deposit and focuses the receipt form from its closure', async () => {
+    api.openDepositReport.mockResolvedValue({ report: report({
+      readiness: { ready_to_submit: false, blockers: [{ code: 'closure_resolution_missing', closure_entry_id: 71, closure_date: '2026-11-01' }] },
+      closures: [capturedClosure({ deposited_amount: '0.00', outstanding_amount: '4000.00', sales_discrepancy_amount: '0.00' })],
+    }) })
+    renderModal()
+
+    expect(await screen.findByText('Pendiente de depositar: L 4,000.00.')).toBeInTheDocument()
+    expect(screen.queryByText('Descuadre de ventas: L 0.00')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar comprobante' }))
+    expect(screen.getByLabelText('Monto depositado *')).toHaveFocus()
+  })
+
+  it('reveals the receipt form on demand and lets a declaration return to the available actions', async () => {
+    api.openDepositReport.mockResolvedValue({ report: report({
+      readiness: { ready_to_submit: false, blockers: [{ code: 'closure_resolution_missing', closure_entry_id: 71, closure_date: '2026-11-01' }] },
+      closures: [capturedClosure({ deposited_amount: '0.00', outstanding_amount: '4000.00' })],
+    }) })
+    renderModal()
+
+    await screen.findByRole('button', { name: 'Registrar comprobante' })
+    expect(screen.queryByText('Comprobantes')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar comprobante' }))
+    expect(screen.getByLabelText('Monto depositado *')).toHaveFocus()
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar comprobante' }))
+    expect(screen.queryByLabelText('Monto depositado *')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Declarar no depositado' }))
+    expect(screen.getByRole('button', { name: 'Cancelar declaración' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar declaración' }))
+    expect(screen.getByRole('button', { name: 'Registrar comprobante' })).toBeInTheDocument()
+  })
+
+  it('prioritizes an existing receipt that fully covers the pending closure instead of offering conflicting actions', async () => {
+    api.openDepositReport.mockResolvedValue({ report: report({
+      readiness: { ready_to_submit: false, blockers: [{ code: 'closure_resolution_missing', closure_entry_id: 71, closure_date: '2026-11-01' }] },
+      closures: [capturedClosure({ deposited_amount: '0.00', outstanding_amount: '4000.00' })],
+      receipts: [{ id: 81, reference: '27637263', deposited_amount: '4000.00', allocated_amount: '0.00', unallocated_amount: '4000.00', deposited_on: '2026-11-25', allocations: [] }],
+    }) })
+    renderModal()
+
+    expect(await screen.findByText('Comprobante 27637263')).toBeInTheDocument()
+    expect(screen.getByText('Disponible para asignar')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Registrar comprobante' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Declarar no depositado' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Asignar comprobante' })).toBeInTheDocument()
+  })
+
+  it('hides no-deposit declarations after any receipt while preserving the remaining receipt capacity', async () => {
+    api.openDepositReport.mockResolvedValue({ report: report({
+      readiness: { ready_to_submit: false, blockers: [{ code: 'closure_resolution_missing', closure_entry_id: 71, closure_date: '2026-11-01' }] },
+      closures: [capturedClosure({ deposited_amount: '0.00', outstanding_amount: '3500.00' })],
+      receipts: [{ id: 81, reference: 'PARTIAL-1', deposited_amount: '2000.00', allocated_amount: '0.00', unallocated_amount: '2000.00', deposited_on: '2026-11-25', allocations: [] }],
+    }) })
+    renderModal()
+
+    expect(await screen.findByRole('button', { name: 'Registrar comprobante' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Declarar no depositado' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar comprobante' }))
+    expect(screen.getByLabelText('Monto depositado *')).toHaveAttribute('max', '1500.00')
   })
 
   it('sends a per-closure discrepancy explanation without applying it to another closure', async () => {
@@ -195,7 +262,7 @@ describe('DepositDemoModal', () => {
   it('keeps a captured closure sales summary visible and offers no-deposit declaration', async () => {
     api.openDepositReport.mockResolvedValue({ report: report({ closures: [capturedClosure()] }) })
     renderModal()
-    expect(await screen.findByText(/Ventas capturadas: L/)).toBeInTheDocument()
+    expect(await screen.findByText(/Ventas capturadas · Total: L/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Declarar no depositado' })).toBeEnabled()
   })
 
@@ -244,6 +311,7 @@ describe('DepositDemoModal', () => {
     api.addDepositReceipt.mockResolvedValue({ report: { ...captured, optimistic_version: 3, receipts: [{ id: 81, reference: 'REF-1', deposited_amount: '70.00', unallocated_amount: '70.00', deposited_on: '2026-11-02', allocations: [] }] } })
     api.allocateDepositReceipt.mockResolvedValue({ report: { ...captured, optimistic_version: 4, receipts: [{ id: 81, reference: 'REF-1', deposited_amount: '70.00', unallocated_amount: '0.00', deposited_on: '2026-11-02', allocations: [{ id: 91, closure_entry_id: 71, allocated_amount: '70.00' }] }] } })
     renderModal()
+    fireEvent.click(await screen.findByRole('button', { name: 'Registrar comprobante' }))
     await screen.findByLabelText('Monto depositado *')
     fireEvent.change(screen.getByLabelText('Monto depositado *'), { target: { value: '70.00' } })
     fireEvent.change(screen.getByLabelText('Referencia *'), { target: { value: 'REF-1' } })
@@ -257,6 +325,64 @@ describe('DepositDemoModal', () => {
     expect(await screen.findByText('Esta asignación no podrá modificarse.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar asignación' }))
     await waitFor(() => expect(api.allocateDepositReceipt).toHaveBeenCalledWith('opaque-report-id', 81, expect.objectContaining({ closure_entry_id: 71, allocated_amount: '70.00', expected_version: 3 })))
+  })
+
+  it('assigns the available receipt balance when it is lower than the selected closure balance', async () => {
+    api.openDepositReport.mockResolvedValue({ report: report({
+      closures: [capturedClosure({ outstanding_amount: '3500.00' })],
+      receipts: [{ id: 81, reference: 'REF-1', deposited_amount: '2000.00', unallocated_amount: '2000.00', deposited_on: '2026-11-02', allocations: [] }],
+    }) })
+    renderModal()
+
+    fireEvent.change(await screen.findByLabelText('Cierre capturado *'), { target: { value: '71' } })
+    const assignAvailableBalance = screen.getByRole('button', { name: 'Asignar saldo disponible' })
+    expect(assignAvailableBalance).toHaveClass('tuvet-btn-ghost')
+    fireEvent.click(assignAvailableBalance)
+
+    expect(screen.getByLabelText('Monto asignado *')).toHaveValue(2000)
+  })
+
+  it('assigns the selected closure balance when it is lower than the available receipt balance', async () => {
+    api.openDepositReport.mockResolvedValue({ report: report({
+      closures: [capturedClosure({ outstanding_amount: '3500.00' })],
+      receipts: [{ id: 81, reference: 'REF-1', deposited_amount: '4000.00', unallocated_amount: '4000.00', deposited_on: '2026-11-02', allocations: [] }],
+    }) })
+    renderModal()
+
+    fireEvent.change(await screen.findByLabelText('Cierre capturado *'), { target: { value: '71' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Asignar saldo disponible' }))
+
+    expect(screen.getByLabelText('Monto asignado *')).toHaveValue(3500)
+  })
+
+  it('disables the available-balance action until a closure is selected and when the receipt balance is zero', async () => {
+    const availableReport = report({
+      closures: [capturedClosure({ outstanding_amount: '3500.00' })],
+      receipts: [{ id: 81, reference: 'REF-1', deposited_amount: '2000.00', unallocated_amount: '2000.00', deposited_on: '2026-11-02', allocations: [] }],
+    })
+    api.openDepositReport.mockResolvedValue({ report: availableReport })
+    const view = renderModal()
+
+    expect(await screen.findByRole('button', { name: 'Asignar saldo disponible' })).toBeDisabled()
+    view.unmount()
+    api.openDepositReport.mockResolvedValue({ report: { ...availableReport, receipts: [{ ...availableReport.receipts[0], unallocated_amount: '0.00' }] } })
+    renderModal()
+
+    expect(await screen.findByRole('button', { name: 'Asignar saldo disponible' })).toBeDisabled()
+  })
+
+  it('keeps the assigned amount editable after assigning the available balance', async () => {
+    api.openDepositReport.mockResolvedValue({ report: report({
+      closures: [capturedClosure({ outstanding_amount: '3500.00' })],
+      receipts: [{ id: 81, reference: 'REF-1', deposited_amount: '4000.00', unallocated_amount: '4000.00', deposited_on: '2026-11-02', allocations: [] }],
+    }) })
+    renderModal()
+
+    fireEvent.change(await screen.findByLabelText('Cierre capturado *'), { target: { value: '71' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Asignar saldo disponible' }))
+    fireEvent.change(screen.getByLabelText('Monto asignado *'), { target: { value: '3250.00' } })
+
+    expect(screen.getByLabelText('Monto asignado *')).toHaveValue(3250)
   })
 
   it('renders historical pending closures as a separate reconciliation section', async () => {
@@ -358,7 +484,7 @@ describe('DepositDemoModal', () => {
     }) })
     renderModal()
 
-    expect(await screen.findByText('Asignado al cierre viernes 30 de octubre de 2026: L 90.00')).toBeInTheDocument()
+    expect(await screen.findByText(/Asignado al cierre viernes 30 de octubre de 2026:/)).toBeInTheDocument()
   })
 
   it('keeps the daily report experience unchanged when there are no historical closures', async () => {
@@ -373,6 +499,7 @@ describe('DepositDemoModal', () => {
   it('validates incomplete receipt and allocation forms before sending a request', async () => {
     api.openDepositReport.mockResolvedValue({ report: report({ closures: [capturedClosure()] }) })
     renderModal()
+    fireEvent.click(await screen.findByRole('button', { name: 'Registrar comprobante' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Agregar comprobante' }))
     expect(await screen.findByText('Ingresa el monto depositado.')).toBeInTheDocument()
     expect(screen.getByLabelText('Monto depositado *')).toHaveFocus()
@@ -491,12 +618,12 @@ describe('DepositDemoModal', () => {
 
     expect(await screen.findByText('Paso activo: Capturar ventas')).toBeInTheDocument()
     expect(screen.getByText('Paso activo: Capturar ventas')).toBeInTheDocument()
-    expect(screen.getByText('Captura las ventas pendientes para continuar.')).toBeInTheDocument()
+    expect(screen.getByText('Captura las ventas del cierre domingo 01 de noviembre de 2026.')).toBeInTheDocument()
     expect(screen.getByText('Resolver depósitos')).toBeInTheDocument()
     expect(screen.getByText('Revisar y enviar')).toBeInTheDocument()
     expect(screen.getByText('Captura las ventas del cierre domingo 01 de noviembre de 2026.')).toBeInTheDocument()
     expect(screen.getByText('Asigna un comprobante o declara que no hubo depósito para el cierre lunes 02 de noviembre de 2026.')).toBeInTheDocument()
-    expect(screen.getByText('Pendiente de capturar ventas.')).toBeInTheDocument()
+    expect(screen.queryByText('Pendiente de capturar ventas.')).not.toBeInTheDocument()
     expect(screen.queryByText('Ventas capturadas; pendiente de resolver depósito.')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Revisar y enviar reporte' })).not.toBeInTheDocument()
   })
@@ -516,7 +643,7 @@ describe('DepositDemoModal', () => {
     expect(screen.queryByRole('button', { name: 'Asignar comprobante' })).not.toBeInTheDocument()
   })
 
-  it('keeps resolution actions available for a closure with a pending balance', async () => {
+  it('prioritizes assigning an existing receipt that already covers a pending balance', async () => {
     api.openDepositReport.mockResolvedValue({ report: report({
       closures: [capturedClosure({ deposited_amount: '70.00', outstanding_amount: '30.00' })],
       receipts: [{ id: 81, reference: 'REF-1', deposited_amount: '30.00', allocated_amount: '0.00', unallocated_amount: '30.00', deposited_on: '2026-11-02', allocations: [] }],
@@ -524,7 +651,9 @@ describe('DepositDemoModal', () => {
     }) })
     renderModal()
 
-    expect(await screen.findByRole('button', { name: 'Declarar no depositado' })).toBeEnabled()
+    expect(await screen.findByRole('button', { name: 'Asignar comprobante' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Registrar comprobante' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Declarar no depositado' })).not.toBeInTheDocument()
     expect(within(screen.getByLabelText('Cierre capturado *')).getByRole('option', { name: 'domingo 01 de noviembre de 2026' })).toBeInTheDocument()
   })
 
@@ -614,12 +743,13 @@ describe('DepositDemoModal', () => {
     }) })
     renderModal()
 
-    expect(await screen.findByText(/Ventas en efectivo: L 100\.00/)).toBeInTheDocument()
-    expect(screen.getByText(/Monto aplicado\/depositado: L 40\.00/)).toBeInTheDocument()
-    expect(screen.getByText(/Diferencia pendiente de depósito: L 987\.65/)).toBeInTheDocument()
+    expect(await screen.findByText('Efectivo esperado')).toBeInTheDocument()
+    expect(screen.getByText('Monto aplicado')).toBeInTheDocument()
+    expect(screen.getByText('Pendiente de depósito')).toBeInTheDocument()
+    expect(screen.getByText('L 987.65')).toBeInTheDocument()
     expect(screen.getByText(/Descuadre de ventas: L 10\.00/)).toBeInTheDocument()
     expect(screen.getByText('Explicación del descuadre: Ajuste de caja')).toBeInTheDocument()
-    expect(screen.queryByText(/Diferencia pendiente de depósito: L 60\.00/)).not.toBeInTheDocument()
+    expect(screen.queryByText('L 60.00')).not.toBeInTheDocument()
   })
 
   it('does not invent financial amounts for a closure without captured sales', async () => {
@@ -641,11 +771,12 @@ describe('DepositDemoModal', () => {
     }) })
     renderModal()
 
-    expect(await screen.findByText(/Monto depositado: L 70\.00/)).toBeInTheDocument()
-    expect(screen.getByText(/Monto asignado: L 7\.00/)).toBeInTheDocument()
-    expect(screen.getByText(/Monto disponible: L 456\.78/)).toBeInTheDocument()
-    expect(screen.getByText(/Asignado al cierre domingo 01 de noviembre de 2026: L 7\.00/)).toBeInTheDocument()
-    expect(screen.queryByText(/Monto disponible: L 63\.00/)).not.toBeInTheDocument()
+    expect(await screen.findByText('Monto depositado')).toBeInTheDocument()
+    expect(screen.getAllByText('Monto asignado')).toHaveLength(2)
+    expect(screen.getByText('Disponible para asignar')).toBeInTheDocument()
+    expect(screen.getByText('L 456.78')).toBeInTheDocument()
+    expect(screen.getByText(/Asignado al cierre domingo 01 de noviembre de 2026:/)).toBeInTheDocument()
+    expect(screen.queryByText('L 63.00')).not.toBeInTheDocument()
   })
 
   it('uses backend amounts in allocation confirmation while preserving cancellation and payload', async () => {
