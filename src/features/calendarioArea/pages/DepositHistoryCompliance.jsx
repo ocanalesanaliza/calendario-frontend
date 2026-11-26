@@ -7,9 +7,12 @@ const SERIES = [
   { key: 'submitted', label: 'Enviados' },
   { key: 'missing', label: 'No enviados' },
 ]
+const REPORTS_PAGE_SIZE = 10
 
 export default function DepositHistoryCompliance({ compliance, branches, period, onOpenBranch, overdueCompliance, openingOverdueId, onOpenSubmittedOverdueReport }) {
   const [query, setQuery] = useState('')
+  const [reportQuery, setReportQuery] = useState('')
+  const [reportPage, setReportPage] = useState(0)
   const rows = complianceRows(compliance, branches)
   const visible = rows.filter(({ branch }) => branchName(branch).toLocaleLowerCase('es').includes(query.trim().toLocaleLowerCase('es')))
   const totals = rows.reduce((sum, row) => ({ expected: sum.expected + row.expected, submitted: sum.submitted + row.submitted, missing: sum.missing + row.missing }), { expected: 0, submitted: 0, missing: 0 })
@@ -19,6 +22,12 @@ export default function DepositHistoryCompliance({ compliance, branches, period,
   const ticks = Array.from({ length: ceiling / step + 1 }, (_, index) => index * step)
   const missingCalendars = branches.length - rows.length
   const submittedOverdueReports = (overdueCompliance?.branches ?? []).flatMap((item) => Array.isArray(item.obligations) ? item.obligations.filter((obligation) => obligation.is_submitted === true).map((obligation) => ({ obligationId: obligation.id, branch: item })) : [])
+  const visibleOverdueReports = submittedOverdueReports.filter(({ branch }) => branchName(branch).toLocaleLowerCase('es').includes(reportQuery.trim().toLocaleLowerCase('es')))
+  const reportPageCount = Math.ceil(visibleOverdueReports.length / REPORTS_PAGE_SIZE)
+  const currentReportPage = Math.min(reportPage, Math.max(reportPageCount - 1, 0))
+  const pageReports = visibleOverdueReports.slice(currentReportPage * REPORTS_PAGE_SIZE, (currentReportPage + 1) * REPORTS_PAGE_SIZE)
+  const reportStart = visibleOverdueReports.length ? currentReportPage * REPORTS_PAGE_SIZE + 1 : 0
+  const reportEnd = Math.min((currentReportPage + 1) * REPORTS_PAGE_SIZE, visibleOverdueReports.length)
 
   return <section className="deposit-history-panel deposit-history-compliance" aria-labelledby="deposit-history-compliance-title">
     <div className="deposit-history-panel-header">
@@ -47,6 +56,6 @@ export default function DepositHistoryCompliance({ compliance, branches, period,
       </>}
       <p className="deposit-history-chart-note">Esperados según el calendario de cada sucursal. Los días que aún no vencen no se cuentan como no enviados.</p>
     </>}
-    {submittedOverdueReports.length > 0 && <section aria-labelledby="submitted-overdue-reports-title"><h3 id="submitted-overdue-reports-title">Reportes vencidos enviados</h3><p>Los detalles financieros están disponibles solo después del envío confirmado por el servidor.</p><div className="deposit-history-closure-list">{submittedOverdueReports.map(({ obligationId, branch }) => <article className="deposit-history-closure-row" key={obligationId}><div className="deposit-history-closure-content"><h4>{branchName(branch)}</h4><button type="button" className="tuvet-btn tuvet-btn-secondary" disabled={openingOverdueId === obligationId} onClick={() => onOpenSubmittedOverdueReport?.(obligationId)} aria-label={`Ver reporte vencido enviado de ${branchName(branch)}`}>{openingOverdueId === obligationId ? 'Cargando reporte…' : 'Ver reporte enviado'}</button></div></article>)}</div></section>}
+    {submittedOverdueReports.length > 0 && <section className="deposit-history-overdue-reports" aria-labelledby="submitted-overdue-reports-title"><header className="deposit-history-overdue-reports-header"><span className="deposit-history-overdue-reports-icon" aria-hidden="true"><Icono nombre="archivo" /></span><div><p className="deposit-history-overdue-reports-eyebrow">Seguimiento posterior al vencimiento</p><h3 id="submitted-overdue-reports-title">Reportes vencidos enviados</h3><p>Los detalles financieros están disponibles solo después del envío confirmado por el servidor.</p></div></header><div className="deposit-history-overdue-reports-tools"><strong>{submittedOverdueReports.length} {submittedOverdueReports.length === 1 ? 'reporte enviado' : 'reportes enviados'}</strong><label className="deposit-history-search"><Icono nombre="buscar" /><span className="tuvet-visually-hidden">Buscar reporte vencido por sucursal o código</span><input type="search" value={reportQuery} onChange={(event) => { setReportPage(0); setReportQuery(event.target.value) }} placeholder="Buscar sucursal o código" /></label></div>{pageReports.length === 0 ? <p className="deposit-history-empty">No hay reportes enviados que coincidan con la búsqueda.</p> : <div className="deposit-history-overdue-report-list">{pageReports.map(({ obligationId, branch }) => <article className="deposit-history-overdue-report-row" key={obligationId}><div><strong>{branchName(branch)}</strong></div><span className="deposit-history-status deposit-history-status--reconciled">Enviado</span><button type="button" className="deposit-history-text-button" disabled={openingOverdueId === obligationId} onClick={() => onOpenSubmittedOverdueReport?.(obligationId)} aria-label={`Ver reporte vencido enviado de ${branchName(branch)}`}>{openingOverdueId === obligationId ? 'Cargando reporte…' : 'Ver reporte enviado'} <span aria-hidden="true">→</span></button></article>)}</div>}{visibleOverdueReports.length > REPORTS_PAGE_SIZE && <nav className="deposit-history-pagination" aria-label="Paginación de reportes vencidos"><span aria-live="polite">{reportStart}–{reportEnd} de {visibleOverdueReports.length} reportes</span><div><button type="button" onClick={() => setReportPage((current) => current - 1)} disabled={currentReportPage === 0}>Anterior</button><button type="button" onClick={() => setReportPage((current) => current + 1)} disabled={currentReportPage >= reportPageCount - 1}>Siguiente página de reportes</button></div></nav>}</section>}
   </section>
 }

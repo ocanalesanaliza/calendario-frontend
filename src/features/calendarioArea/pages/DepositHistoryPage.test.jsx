@@ -35,6 +35,18 @@ describe('DepositHistoryPage', () => {
     expect(screen.queryByRole('button', { name: /Revisar y enviar reporte/ })).not.toBeInTheDocument()
   })
 
+  it('groups submitted overdue reports in a clearly labelled follow-up section', async () => {
+    api.getDepositHistory.mockResolvedValue({ summary: {}, branches: [{ id: 'opaque-branch-id', code: 'NTE', name: 'Sucursal Norte' }] })
+    api.getDepositHistoryCompliance.mockResolvedValue({ branches: [{ id: 'opaque-branch-id', code: 'NTE', name: 'Sucursal Norte', state: 'resolved', obligations: [{ id: 'opaque-obligation-id', is_submitted: true }] }] })
+
+    render(<DepositHistoryPage />)
+
+    const section = await screen.findByRole('region', { name: 'Reportes vencidos enviados' })
+    expect(within(section).getByText('Seguimiento posterior al vencimiento')).toBeInTheDocument()
+    expect(within(section).getByText('Los detalles financieros están disponibles solo después del envío confirmado por el servidor.')).toBeInTheDocument()
+    expect(within(section).getByRole('button', { name: 'Ver reporte vencido enviado de NTE · Sucursal Norte' })).toBeInTheDocument()
+  })
+
   it('does not offer a draft overdue report or any preparation action', async () => {
     api.getDepositHistory.mockResolvedValue({ summary: {}, branches: [{ id: 'opaque-branch-id', code: 'NTE', name: 'Sucursal Norte' }] })
     api.getDepositHistoryCompliance.mockResolvedValue({ branches: [{ id: 'opaque-branch-id', code: 'NTE', name: 'Sucursal Norte', state: 'pending', obligations: [{ id: 'opaque-draft-obligation-id', is_submitted: false }] }] })

@@ -14,7 +14,8 @@ const compliance = { branches: [
 
 function setup(extraHistory = {}, extraBranches = branches) {
   const open = vi.fn()
-  render(<DepositHistoryOverview history={{ ...history, ...extraHistory }} branches={extraBranches} period="1–30 de noviembre de 2026" onOpenBranch={open} />)
+  const { overdueCompliance, ...historyOverrides } = extraHistory
+  render(<DepositHistoryOverview history={{ ...history, ...historyOverrides }} branches={extraBranches} period="1–30 de noviembre de 2026" onOpenBranch={open} overdueCompliance={overdueCompliance} />)
   return open
 }
 
@@ -78,6 +79,33 @@ describe('DepositHistoryOverview', () => {
     fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar sucursal o código' }), { target: { value: 'no existe' } })
     expect(within(financial).getByText('No hay sucursales que coincidan con estos filtros.')).toBeInTheDocument()
     expect(screen.getByText('L 3,000.00')).toBeInTheDocument()
+  })
+
+  it('paginates long branch lists after filtering and resets to the first page for a search', () => {
+    const manyBranches = Array.from({ length: 12 }, (_, index) => ({ id: `branch-${index + 1}`, code: `B-${String(index + 1).padStart(2, '0')}`, name: `Sucursal ${index + 1}`, total_sales: '0', cash_sales: '0', deposited_amount: '0', outstanding_amount: '0' }))
+    setup({}, manyBranches)
+    const financial = screen.getByRole('table', { name: /Comparativa financiera/ })
+
+    expect(within(financial).getAllByRole('row')).toHaveLength(11)
+    expect(screen.getByText('1–10 de 12 sucursales')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente página' }))
+    expect(within(financial).getAllByRole('row')).toHaveLength(3)
+    expect(screen.getByText('11–12 de 12 sucursales')).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar sucursal o código' }), { target: { value: 'Sucursal 1' } })
+    expect(within(financial).getAllByRole('row')).toHaveLength(5)
+    expect(screen.queryByRole('button', { name: 'Siguiente página' })).not.toBeInTheDocument()
+  })
+
+  it('renders submitted overdue reports as a searchable, paginated compact list', () => {
+    const overdueCompliance = { branches: Array.from({ length: 12 }, (_, index) => ({ id: `overdue-${index + 1}`, code: `OV-${index + 1}`, name: `Sucursal vencida ${index + 1}`, obligations: [{ id: `obligation-${index + 1}`, is_submitted: true }] })) }
+    setup({ overdueCompliance }, branches)
+
+    expect(screen.getByText('12 reportes enviados')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /Ver reporte vencido enviado/ })).toHaveLength(10)
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente página de reportes' }))
+    expect(screen.getAllByRole('button', { name: /Ver reporte vencido enviado/ })).toHaveLength(2)
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar reporte vencido por sucursal o código' }), { target: { value: '12' } })
+    expect(screen.getByText(/OV-12 · Sucursal vencida 12/)).toBeInTheDocument()
   })
 
   it('does not infer missing submissions or turn absent financial amounts into zero', () => {
