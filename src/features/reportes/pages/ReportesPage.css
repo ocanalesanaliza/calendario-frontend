@@ -2,6 +2,7 @@
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  max-width: 920px;
 }
 
 .rp-header h1 {
@@ -19,11 +20,42 @@
 .rp-filtros-card {
   background: #fff;
   border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 1rem 1.25rem;
+  border-radius: 16px;
+  padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 1.25rem;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+}
+.rp-card-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: #1e293b;
+}
+.rp-card-header p {
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+.rp-fieldset {
+  border: 0;
+  border-top: 1px solid #e2e8f0;
+  margin: 0;
+  min-width: 0;
+  padding: 1rem 0 0;
+}
+.rp-fieldset legend {
+  padding: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.rp-fieldset-delivery { padding-bottom: 0.1rem; }
+.rp-fieldset-delivery .rp-filtro-check { padding-top: 0.55rem; }
+.rp-filtros-row {
+  padding-top: 0.55rem;
 }
 .rp-filtros-row {
   display: flex;
@@ -71,6 +103,20 @@
 .rp-filtros-actions {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 1rem;
+}
+.rp-selection-summary {
+  margin: 0;
+  color: #475569;
+  font-size: 0.875rem;
+}
+.rp-action-buttons {
+  display: flex;
+  align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
 }
@@ -86,17 +132,17 @@
 .rp-btn-ver:disabled { opacity: 0.55; cursor: not-allowed; }
 .rp-btn-ver svg { width: 15px; height: 15px; }
 
-.rp-btn-pdf {
+.rp-btn-secondary {
   display: inline-flex; align-items: center; gap: 0.4rem;
   padding: 0.55rem 1.1rem;
-  background: #ef4444; color: #fff;
-  border: none; border-radius: 8px;
+  background: #fff; color: #475569;
+  border: 1px solid #cbd5e1; border-radius: 8px;
   font-size: 0.875rem; font-weight: 600; cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, border-color 0.15s;
 }
-.rp-btn-pdf:hover:not(:disabled) { background: #dc2626; }
-.rp-btn-pdf:disabled { opacity: 0.55; cursor: not-allowed; }
-.rp-btn-pdf svg { width: 15px; height: 15px; }
+.rp-btn-secondary:hover:not(:disabled) { background: #f8fafc; border-color: #94a3b8; }
+.rp-btn-secondary:disabled { opacity: 0.55; cursor: not-allowed; }
+.rp-btn-secondary svg { width: 15px; height: 15px; }
 
 .rp-error {
   font-size: 0.83rem; color: #ef4444;
@@ -107,6 +153,96 @@
   font-size: 0.83rem; color: #166534;
   background: #dcfce7; border: 1px solid #bbf7d0;
   border-radius: 8px; padding: 0.45rem 0.8rem;
+}
+
+@media (max-width: 640px) {
+  .rp-filtros-card { padding: 1rem; }
+  .rp-filtros-actions, .rp-action-buttons { align-items: stretch; width: 100%; }
+  .rp-action-buttons button { justify-content: center; flex: 1; }
+}
+
+/* Reportes (Analiza): consume el kit y sus tokens, no una paleta local. */
+.tema-analiza.reportes-page { max-width: 1440px; width: 100%; margin-inline: auto; }
+.tema-analiza.reportes-page .rp-filtros-card {
+  background: var(--tv-surface);
+  border-color: var(--tv-border);
+  border-radius: var(--tv-radius-lg);
+  box-shadow: var(--tv-shadow-sm);
+}
+.tema-analiza.reportes-page .rp-card-header h2 { color: var(--tv-fg); font-size: 1rem; }
+.tema-analiza.reportes-page .rp-card-header p,
+.tema-analiza.reportes-page .rp-selection-summary { color: var(--tv-muted); }
+.tema-analiza.reportes-page .rp-fieldset,
+.tema-analiza.reportes-page .rp-filtros-actions { border-color: var(--tv-border); }
+.tema-analiza.reportes-page .rp-fieldset legend,
+.tema-analiza.reportes-page .rp-filtro-group label { color: var(--tv-fg); }
+.tema-analiza.reportes-page .rp-filtro-group input,
+.tema-analiza.reportes-page .rp-filtro-group select {
+  min-height: var(--tv-target);
+  border-color: var(--tv-border);
+  border-radius: var(--tv-radius-sm);
+  background: var(--tv-surface);
+  color: var(--tv-fg);
+  font: inherit;
+  transition: border-color var(--tv-dur-fast) var(--tv-ease), box-shadow var(--tv-dur-fast) var(--tv-ease);
+}
+.tema-analiza.reportes-page .rp-filtro-group input:hover,
+.tema-analiza.reportes-page .rp-filtro-group select:hover { border-color: var(--tv-border-strong); }
+.tema-analiza.reportes-page .rp-filtro-group input:focus-visible,
+.tema-analiza.reportes-page .rp-filtro-group select:focus-visible {
+  border-color: var(--tv-primary-accent);
+  box-shadow: 0 0 0 3px var(--tv-ring);
+  outline: none;
+}
+.tema-analiza.reportes-page .rp-filtro-check { color: var(--tv-text); }
+.tema-analiza.reportes-page .rp-filtro-check input { width: 18px; height: 18px; accent-color: var(--tv-primary); }
+.tema-analiza.reportes-page .rp-btn-ver {
+  min-height: var(--tv-target);
+  border-radius: var(--tv-radius-sm);
+  background: var(--tv-primary);
+  color: var(--tv-surface);
+  transition: background var(--tv-dur-fast) var(--tv-ease);
+}
+.tema-analiza.reportes-page .rp-btn-ver:hover:not(:disabled) { background: var(--tv-primary-hover); }
+.tema-analiza.reportes-page .rp-btn-secondary {
+  min-height: var(--tv-target);
+  border-color: var(--tv-border-strong);
+  border-radius: var(--tv-radius-sm);
+  background: var(--tv-surface);
+  color: var(--tv-text);
+  transition: background var(--tv-dur-fast) var(--tv-ease), border-color var(--tv-dur-fast) var(--tv-ease);
+}
+.tema-analiza.reportes-page .rp-btn-secondary:hover:not(:disabled) { background: var(--tv-surface-muted); border-color: var(--tv-border-strong); }
+
+/* En escritorio, la configuración usa el ancho disponible como una barra de trabajo. */
+@media (min-width: 901px) {
+  .tema-analiza.reportes-page .rp-filtros-card {
+    display: grid;
+    grid-template-columns: minmax(360px, 1.4fr) minmax(220px, .8fr);
+    align-items: end;
+    column-gap: 1.5rem;
+    row-gap: 1rem;
+  }
+  .tema-analiza.reportes-page .rp-filtros-card--scope {
+    grid-template-columns: minmax(300px, 1.15fr) minmax(240px, .9fr) minmax(220px, .75fr);
+  }
+  .tema-analiza.reportes-page .rp-card-header,
+  .tema-analiza.reportes-page .rp-filtros-actions { grid-column: 1 / -1; }
+  .tema-analiza.reportes-page .rp-fieldset {
+    align-self: stretch;
+    border-top: 0;
+    border-left: 1px solid var(--tv-border);
+    padding: 0 0 0 1.5rem;
+  }
+  .tema-analiza.reportes-page .rp-fieldset-period { border-left: 0; padding-left: 0; }
+  .tema-analiza.reportes-page .rp-filtros-row { padding-top: .75rem; }
+  .tema-analiza.reportes-page .rp-filtros-actions {
+    margin-top: .25rem;
+    padding-top: 1.25rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tema-analiza.reportes-page * { transition-duration: .01ms !important; }
 }
 
 /* ── Resultado ── */
