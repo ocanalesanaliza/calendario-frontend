@@ -94,6 +94,12 @@ export default function ReportesPage() {
   const [successMsg, setSuccessMsg]       = useState('')
 
   useEffect(() => {
+    if (!successMsg) return undefined
+    const timeoutId = window.setTimeout(() => setSuccessMsg(''), 20_000)
+    return () => window.clearTimeout(timeoutId)
+  }, [successMsg])
+
+  useEffect(() => {
     if (esAdmin) getGerentes().then(setGerentes).catch(() => {})
   }, [esAdmin])
 

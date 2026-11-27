@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import ReportesPage from './ReportesPage'
 
 const { useAuth, getGerentes, getUsuarios, generarReporteJson, generarReportePdf } = vi.hoisted(() => ({
@@ -19,6 +19,11 @@ vi.mock('../services/reportesService', () => ({
 }))
 
 describe('ReportesPage', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
   it('groups report generation controls by period, scope, and delivery', async () => {
     useAuth.mockReturnValue({ perfil: { type: 'admin_master' } })
     getGerentes.mockResolvedValue([])
@@ -63,5 +68,22 @@ describe('ReportesPage', () => {
 
     expect(await screen.findByText(rankingTitle('5 con mayor rendimiento'))).toBeInTheDocument()
     expect(screen.getByText(rankingTitle('5 con menor rendimiento'))).toBeInTheDocument()
+  })
+
+  it('clears the PDF download confirmation after 20 seconds', async () => {
+    vi.useFakeTimers()
+    useAuth.mockReturnValue({ perfil: { type: 'gerente_area' } })
+    getUsuarios.mockResolvedValue([])
+    generarReportePdf.mockResolvedValue({ blob: new Blob(['pdf']), filename: 'reporte.pdf', correos: 0 })
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:reporte'), revokeObjectURL: vi.fn() })
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+
+    render(<ReportesPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Descargar PDF' }))
+
+    await act(async () => {})
+    expect(screen.getByText('PDF descargado.')).toBeInTheDocument()
+    act(() => vi.advanceTimersByTime(20_000))
+    expect(screen.queryByText('PDF descargado.')).not.toBeInTheDocument()
   })
 })
