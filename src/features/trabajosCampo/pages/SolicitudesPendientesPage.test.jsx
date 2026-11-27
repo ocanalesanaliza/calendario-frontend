@@ -58,10 +58,10 @@ const ownCoverage = { id_cobertura: 31, fecha: '2026-10-25', jornada_label: 'Jor
 const weekdayCoverage = { id_cobertura: 33, fecha: '2026-10-26', jornada_label: 'Mañana', estado: 'pendiente', usuario_reemplazo: { id_usuario: 7, nombre: 'GS Uno' }, sucursal_destino: { nombre: 'Sucursal Sur' } }
 const anotherCoverage = { id_cobertura: 32, fecha: '2026-10-26', jornada_label: 'Jornada completa', estado: 'pendiente', usuario_reemplazo: { id_usuario: 8, nombre: 'GS Dos' }, sucursal_destino: { nombre: 'Sucursal Norte' } }
 
-function setup(profile, coverages = [], coverageRefreshes = []) {
+function setup(profile, coverages = [], coverageRefreshes = [], ownRequests = {}) {
   useAuth.mockReturnValue({ perfil: profile })
-  getTrabajosCampo.mockResolvedValue({ results: [fieldWork] })
-  getSolicitudesVacacion.mockResolvedValue({ results: [vacation] })
+  getTrabajosCampo.mockResolvedValue({ results: ownRequests.fieldWork ?? [fieldWork] })
+  getSolicitudesVacacion.mockResolvedValue({ results: ownRequests.vacations ?? [vacation] })
   getCoberturas.mockResolvedValueOnce({ results: coverages })
   coverageRefreshes.forEach((items) => getCoberturas.mockResolvedValueOnce({ results: items }))
   render(<MemoryRouter><SolicitudesPendientesPage /></MemoryRouter>)
@@ -88,9 +88,11 @@ describe('SolicitudesPendientesPage', () => {
   ])('%s receives the administrative pending and history tabs', async (_role, profile) => {
     setup(profile)
 
-    const pendingTab = await screen.findByRole('button', { name: 'Pendientes' })
+    const pendingTab = await screen.findByRole('tab', { name: 'Pendientes' })
+    expect(document.querySelector('.solicitudes-pendientes-page')).toHaveClass('tema-analiza', 'tuvet-page')
+    expect(screen.getByRole('heading', { name: 'Solicitudes pendientes' }).closest('.tuvet-page-header')).toBeInTheDocument()
     expect(pendingTab).toHaveClass('active')
-    expect(screen.getByRole('button', { name: 'Historial de solicitudes' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Historial de solicitudes' })).toBeInTheDocument()
     expect(await screen.findByText('Trabajo de campo pendiente')).toBeInTheDocument()
     expect(screen.getByText('Vacaciones programadas pendientes')).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: 'Aceptar' })).toHaveLength(2)
@@ -104,29 +106,56 @@ describe('SolicitudesPendientesPage', () => {
     setup({ type: 'gerente_sucursal', id: 7 })
 
     expect(await screen.findByText('Mis solicitudes de trabajo de campo')).toBeInTheDocument()
-    expect(screen.getByText('Vacaciones programadas')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Pendientes' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Historial de solicitudes' })).not.toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: 'Cancelar solicitud' })).toHaveLength(2)
+    expect(screen.queryByRole('tab', { name: 'Pendientes' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'Historial de solicitudes' })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /Trabajo de campo/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: /Vacaciones/ })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /Coberturas/ })).toBeInTheDocument()
+    const cancelButtons = screen.getAllByRole('button', { name: 'Cancelar solicitud' })
+    expect(cancelButtons).toHaveLength(1)
+    expect(cancelButtons[0].parentElement).toHaveClass('campo-enviada-actions')
+    expect(cancelButtons[0].parentElement).toContainElement(screen.getAllByText('Pendiente')[0])
+    fireEvent.click(screen.getByRole('tab', { name: /Vacaciones/ }))
+    expect(await screen.findByText('Vacaciones programadas')).toBeInTheDocument()
+    expect(screen.queryByText('Mis solicitudes de trabajo de campo')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Aceptar' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Rechazar' })).not.toBeInTheDocument()
+  })
+
+  it('summarizes, filters, and progressively reveals GS requests by status with readable dates', async () => {
+    const accepted = { ...fieldWork, id_trabajo_campo: 12, fecha: '2026-11-27', jornada: 'manana', estado: 'aceptado', estado_label: 'Aceptada' }
+    const cancelled = { ...fieldWork, id_trabajo_campo: 13, fecha: '2026-11-28', jornada: 'tarde', estado: 'cancelado', estado_label: 'Cancelada' }
+    setup({ type: 'gerente_sucursal', id: 7 }, [], [], { fieldWork: [fieldWork, accepted, cancelled] })
+
+    await screen.findByRole('button', { name: 'Todas (3)' })
+    expect(screen.queryByLabelText(/Resumen de Mis solicitudes de trabajo de campo/)).not.toBeInTheDocument()
+    expect(screen.getByText('20 oct 2026 · Mañana')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Cancelar solicitud' })).toHaveLength(1)
+
+    const acceptedFilter = screen.getByRole('button', { name: 'Aceptadas (1)' })
+    fireEvent.click(acceptedFilter)
+    expect(acceptedFilter).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('27 nov 2026 · Mañana')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancelar solicitud' })).not.toBeInTheDocument()
   })
 
   it('shows the logged-in GS pending weekday and Sunday coverage alongside existing own-request sections', async () => {
     setup({ type: 'gerente_sucursal', id: 7 }, [ownCoverage, weekdayCoverage, anotherCoverage])
 
+    fireEvent.click(await screen.findByRole('tab', { name: /Coberturas/ }))
     const coverageSection = await screen.findByRole('heading', { name: 'Coberturas pendientes' })
     expect(screen.getByText(/Sucursal Centro/)).toBeInTheDocument()
     expect(screen.getByText(/Sucursal Sur/)).toBeInTheDocument()
     expect(screen.queryByText(/Sucursal Norte/)).not.toBeInTheDocument()
     expect(within(coverageSection.closest('.solicitudes-section')).getAllByText('Pendiente de tu aceptación')).toHaveLength(2)
-    expect(screen.getByText('Mis solicitudes de trabajo de campo')).toBeInTheDocument()
-    expect(screen.getByText('Vacaciones programadas')).toBeInTheDocument()
+    expect(screen.queryByText('Mis solicitudes de trabajo de campo')).not.toBeInTheDocument()
+    expect(screen.queryByText('Vacaciones programadas')).not.toBeInTheDocument()
   })
 
   it('accepts own pending coverage and removes it after refreshing the list', async () => {
     setup({ type: 'gerente_sucursal', id: 7 }, [ownCoverage], [[]])
 
+    fireEvent.click(await screen.findByRole('tab', { name: /Coberturas/ }))
     const section = (await screen.findByRole('heading', { name: 'Coberturas pendientes' })).closest('.solicitudes-section')
     fireEvent.click(within(section).getByRole('button', { name: 'Aceptar' }))
 
@@ -138,6 +167,7 @@ describe('SolicitudesPendientesPage', () => {
   it('rejects own pending coverage with a reason and removes it after refreshing the list', async () => {
     setup({ type: 'gerente_sucursal', id: 7 }, [ownCoverage], [[]])
 
+    fireEvent.click(await screen.findByRole('tab', { name: /Coberturas/ }))
     const section = (await screen.findByRole('heading', { name: 'Coberturas pendientes' })).closest('.solicitudes-section')
     fireEvent.click(within(section).getByRole('button', { name: 'Rechazar' }))
     const dialog = screen.getByRole('dialog', { name: 'Rechazar solicitud' })
@@ -159,7 +189,7 @@ describe('SolicitudesPendientesPage', () => {
         : { results: [historyRequest], count: 11, total_pages: 2 }
     ))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Historial de solicitudes' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Historial de solicitudes' }))
 
     expect(await screen.findByText('GS Uno')).toBeInTheDocument()
     expect(screen.getByText('Aceptada')).toBeInTheDocument()

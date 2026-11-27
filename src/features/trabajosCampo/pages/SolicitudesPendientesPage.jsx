@@ -16,6 +16,8 @@ import {
 import { aceptarCobertura, getCoberturas, rechazarCobertura } from '../../coberturas/services/coberturasService'
 import TrabajoCampoModal from '../components/TrabajoCampoModal'
 import VacacionModal from '../../vacacionesProgramadas/components/VacacionModal'
+import { Aviso, EstadoCarga, Icono, PageHeader } from '../../tuvet/components/TuvetUi'
+import '../../tuvet/tuvet.css'
 import './SolicitudesPendientesPage.css'
 
 const GENERIC_ERROR = 'No se pudieron cargar las solicitudes. Intenta nuevamente.'
@@ -25,6 +27,30 @@ const ESTADO_CAMPO_BADGE = {
   rechazado: 'badge-red',
   cancelado: 'badge-tipo',
   vencida: 'badge-orange',
+}
+const OWN_REQUEST_PAGE_SIZE = 8
+const OWN_REQUEST_STATUSES = [['all', 'Todas'], ['pending', 'Pendientes'], ['accepted', 'Aceptadas'], ['cancelled', 'Canceladas']]
+
+function requestStatus(request) {
+  const value = String(request.estado ?? request.status ?? '').toLowerCase()
+  if (['pendiente', 'pending'].includes(value)) return 'pending'
+  if (['aceptado', 'aceptada', 'accepted', 'approved'].includes(value)) return 'accepted'
+  if (['cancelado', 'cancelada', 'cancelled'].includes(value)) return 'cancelled'
+  return value
+}
+
+function formatRequestDate(date) {
+  if (!date) return 'Fecha no disponible'
+  const [year, month, day] = String(date).slice(0, 10).split('-').map(Number)
+  if (!year || !month || !day) return String(date)
+  return new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(year, month - 1, day))).replace('.', '')
+}
+
+function requestDateLabel(request) {
+  const date = request.fecha ?? request.fecha_inicio
+  const range = request.fecha_fin && request.fecha_fin !== date ? `${formatRequestDate(date)} al ${formatRequestDate(request.fecha_fin)}` : formatRequestDate(date)
+  const jornada = request.jornada_label ?? (request.jornada === 'manana' ? 'Mañana' : request.jornada === 'tarde' ? 'Tarde' : '')
+  return jornada ? `${range} · ${jornada}` : range
 }
 
 export default function SolicitudesPendientesPage() {
@@ -84,32 +110,44 @@ function DecisionRequestsView() {
     }
   }
 
+  function handleTabKeyDown(event) {
+    if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return
+    event.preventDefault()
+    const nextTab = event.key === 'ArrowRight'
+      ? (tab === 'pendientes' ? 'historial' : 'pendientes')
+      : (tab === 'pendientes' ? 'historial' : 'pendientes')
+    setTab(nextTab)
+    event.currentTarget.parentElement?.querySelector(`[data-tab="${nextTab}"]`)?.focus()
+  }
+
   return (
-    <div className="solicitudes-pendientes-page">
-      <div className="page-header"><div><h1>Solicitudes pendientes</h1><p>Trabajo de campo y vacaciones programadas que te han solicitado</p></div></div>
-      <div className="tab-bar">
-        <button className={`tab-btn${tab === 'pendientes' ? ' active' : ''}`} onClick={() => setTab('pendientes')}>Pendientes</button>
-        <button className={`tab-btn${tab === 'historial' ? ' active' : ''}`} onClick={() => setTab('historial')}>Historial de solicitudes</button>
+    <main className="tema-analiza tuvet-page solicitudes-pendientes-page">
+      <PageHeader title="Solicitudes pendientes" description="Trabajo de campo y vacaciones programadas que te han solicitado" />
+      <div className="tab-bar" role="tablist" aria-label="Solicitudes">
+        <button id="solicitudes-pendientes-tab" data-tab="pendientes" className={`tab-btn${tab === 'pendientes' ? ' active' : ''}`} role="tab" aria-selected={tab === 'pendientes'} aria-controls="solicitudes-pendientes-panel" onKeyDown={handleTabKeyDown} onClick={() => setTab('pendientes')}>Pendientes</button>
+        <button id="solicitudes-historial-tab" data-tab="historial" className={`tab-btn${tab === 'historial' ? ' active' : ''}`} role="tab" aria-selected={tab === 'historial'} aria-controls="solicitudes-historial-panel" onKeyDown={handleTabKeyDown} onClick={() => setTab('historial')}>Historial de solicitudes</button>
       </div>
+      <div role="tabpanel" id={`solicitudes-${tab}-panel`} aria-labelledby={`solicitudes-${tab}-tab`}>
       {tab === 'pendientes' ? <>
-        {error && <p role="alert">{error}</p>}
-        {loading ? <Loading /> : <>
+        {error && <Aviso tipo="error">{error}</Aviso>}
+        {loading ? <EstadoCarga loading /> : <>
           <RequestSection title="Trabajo de campo pendiente" requests={fieldWork} kind="fieldWork" idKey="id_trabajo_campo" action={action} onApprove={(id) => decide('fieldWork', id, 'approve')} onReject={(id) => setRejection({ kind: 'fieldWork', id })} />
           <RequestSection title="Vacaciones programadas pendientes" requests={vacations} kind="vacation" idKey="id_solicitud_vacacion" action={action} onApprove={(id) => decide('vacation', id, 'approve')} onReject={(id) => setRejection({ kind: 'vacation', id })} />
         </>}
       </> : <HistorialSolicitudes />}
+      </div>
       {rejection && <RejectionReasonDialog onClose={() => setRejection(null)} onConfirm={async (reason) => {
         const succeeded = await decide(rejection.kind, rejection.id, 'reject', reason)
         if (succeeded) setRejection(null)
       }} />}
-    </div>
+    </main>
   )
 }
 
 function RequestSection({ title, requests, kind, idKey, action, onApprove, onReject }) {
   return <section className="solicitudes-section">
     <div className="solicitudes-section-header"><h2>{title}</h2></div>
-    {requests.length === 0 ? <div className="empty-state">No tienes solicitudes pendientes.</div> : <div className="campo-solicitudes">
+    {requests.length === 0 ? <EmptyState message="No tienes solicitudes pendientes." /> : <div className="campo-solicitudes">
       {requests.map((request) => {
         const id = request[idKey]
         const isFieldWork = kind === 'fieldWork'
@@ -156,7 +194,7 @@ function HistorialSolicitudes() {
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
       <input type="text" placeholder="Buscar por nombre, email o motivo..." value={busqueda} onChange={(event) => { setBusqueda(event.target.value); setPage(1) }} />
     </div></div>
-    {loading ? <Loading /> : data.results.length === 0 ? <div className="empty-state">No hay solicitudes en el historial.</div> : <div className="campo-enviadas-list">
+    {loading ? <EstadoCarga loading /> : data.results.length === 0 ? <EmptyState message={busqueda ? `Sin resultados para «${busqueda}».` : 'No hay solicitudes en el historial.'} /> : <div className="campo-enviadas-list">
       {data.results.map((request) => <div key={request.id_trabajo_campo} className="campo-enviada-row">
         <div className="campo-enviada-info"><p className="campo-enviada-nombre">{request.usuario?.nombre}</p><p className="campo-enviada-meta">{request.fecha} · {request.jornada === 'manana' ? 'Mañana' : 'Tarde'}{request.motivo ? ` · ${request.motivo}` : ''}</p></div>
         <span className={`badge ${ESTADO_CAMPO_BADGE[request.estado] ?? 'badge-tipo'}`}>{request.estado_label}</span>
@@ -200,6 +238,7 @@ function BranchManagerRequestsView() {
   const [fieldWork, setFieldWork] = useState([])
   const [vacations, setVacations] = useState([])
   const [coverages, setCoverages] = useState([])
+  const [activeSection, setActiveSection] = useState('field-work')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [fieldWorkModalOpen, setFieldWorkModalOpen] = useState(false)
@@ -255,13 +294,31 @@ function BranchManagerRequestsView() {
     }
   }
 
-  return <div className="solicitudes-pendientes-page">
-    <div className="page-header"><div><h1>Solicitudes pendientes</h1><p>Tu trabajo de campo y vacaciones programadas</p></div></div>
-    {error && <p role="alert">{error}</p>}
-    {loading ? <Loading /> : <>
-      <OwnRequestSection title="Mis solicitudes de trabajo de campo" requests={fieldWork} idKey="id_trabajo_campo" onNew={() => setFieldWorkModalOpen(true)} onCancel={(id) => cancel(cancelarTrabajoCampo, id)} />
-      <OwnRequestSection title="Vacaciones programadas" requests={vacations} idKey="id_solicitud_vacacion" onNew={() => setVacationModalOpen(true)} onCancel={(id) => cancel(cancelarSolicitudVacacion, id)} />
-      <CoverageRequestSection requests={coverages} action={coverageAction} onAccept={(id) => decideCoverage(id, 'accept')} onReject={(id) => setCoverageRejection(id)} />
+  function handleSectionTabKeyDown(event) {
+    if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return
+    event.preventDefault()
+    const sections = ['field-work', 'vacations', 'coverages']
+    const currentIndex = sections.indexOf(activeSection)
+    const offset = event.key === 'ArrowRight' ? 1 : -1
+    const nextSection = sections[(currentIndex + offset + sections.length) % sections.length]
+    setActiveSection(nextSection)
+    event.currentTarget.parentElement?.querySelector(`[data-gs-tab="${nextSection}"]`)?.focus()
+  }
+
+  return <main className="tema-analiza tuvet-page solicitudes-pendientes-page">
+    <PageHeader title="Solicitudes pendientes" description="Gestioná tu trabajo de campo, vacaciones y coberturas." />
+    {error && <Aviso tipo="error">{error}</Aviso>}
+    {loading ? <EstadoCarga loading /> : <>
+      <div className="sp-request-tabs" role="tablist" aria-label="Tipo de solicitud">
+        <button id="gs-field-work-tab" data-gs-tab="field-work" className={activeSection === 'field-work' ? 'active' : ''} role="tab" aria-selected={activeSection === 'field-work'} aria-controls="gs-field-work-panel" onKeyDown={handleSectionTabKeyDown} onClick={() => setActiveSection('field-work')}>Trabajo de campo <span>{fieldWork.length}</span></button>
+        <button id="gs-vacations-tab" data-gs-tab="vacations" className={activeSection === 'vacations' ? 'active' : ''} role="tab" aria-selected={activeSection === 'vacations'} aria-controls="gs-vacations-panel" onKeyDown={handleSectionTabKeyDown} onClick={() => setActiveSection('vacations')}>Vacaciones <span>{vacations.length}</span></button>
+        <button id="gs-coverages-tab" data-gs-tab="coverages" className={activeSection === 'coverages' ? 'active' : ''} role="tab" aria-selected={activeSection === 'coverages'} aria-controls="gs-coverages-panel" onKeyDown={handleSectionTabKeyDown} onClick={() => setActiveSection('coverages')}>Coberturas <span>{coverages.length}</span></button>
+      </div>
+      <div role="tabpanel" id={`gs-${activeSection}-panel`} aria-labelledby={`gs-${activeSection}-tab`}>
+        {activeSection === 'field-work' && <OwnRequestSection title="Mis solicitudes de trabajo de campo" requests={fieldWork} idKey="id_trabajo_campo" onNew={() => setFieldWorkModalOpen(true)} onCancel={(id) => cancel(cancelarTrabajoCampo, id)} />}
+        {activeSection === 'vacations' && <OwnRequestSection title="Vacaciones programadas" requests={vacations} idKey="id_solicitud_vacacion" onNew={() => setVacationModalOpen(true)} onCancel={(id) => cancel(cancelarSolicitudVacacion, id)} />}
+        {activeSection === 'coverages' && <CoverageRequestSection requests={coverages} action={coverageAction} onAccept={(id) => decideCoverage(id, 'accept')} onReject={(id) => setCoverageRejection(id)} />}
+      </div>
     </>}
     {fieldWorkModalOpen && <TrabajoCampoModal onClose={() => setFieldWorkModalOpen(false)} onSuccess={() => { setFieldWorkModalOpen(false); loadRequests() }} />}
     {vacationModalOpen && <VacacionModal onClose={() => setVacationModalOpen(false)} onSuccess={() => { setVacationModalOpen(false); loadRequests() }} />}
@@ -269,19 +326,43 @@ function BranchManagerRequestsView() {
       const succeeded = await decideCoverage(coverageRejection, 'reject', reason)
       if (succeeded) setCoverageRejection(null)
     }} />}
-  </div>
+  </main>
 }
 
 function OwnRequestSection({ title, requests, idKey, onNew, onCancel }) {
+  const [filter, setFilter] = useState('all')
+  const [visibleCount, setVisibleCount] = useState(OWN_REQUEST_PAGE_SIZE)
+  const counts = requests.reduce((summary, request) => {
+    const status = requestStatus(request)
+    if (status in summary) summary[status] += 1
+    return summary
+  }, { pending: 0, accepted: 0, cancelled: 0 })
+  const filteredRequests = filter === 'all' ? requests : requests.filter((request) => requestStatus(request) === filter)
+  const visibleRequests = filteredRequests.slice(0, visibleCount)
+
+  function selectFilter(nextFilter) {
+    setFilter(nextFilter)
+    setVisibleCount(OWN_REQUEST_PAGE_SIZE)
+  }
+
   return <section className="solicitudes-section"><div className="solicitudes-section-header"><h2>{title}</h2><button className="btn-primary" onClick={onNew}>Nueva solicitud</button></div>
-    {requests.length === 0 ? <div className="empty-state">No has enviado solicitudes.</div> : <div className="campo-enviadas-list">{requests.map((request) => <div key={request[idKey]} className="campo-enviada-row"><div className="campo-enviada-info"><p className="campo-enviada-nombre">{request.fecha ?? request.fecha_inicio}</p><p className="campo-enviada-meta">{request.motivo || 'Sin motivo indicado'}</p></div><span className="badge">{request.estado_label}</span>{request.estado === 'pendiente' && <button className="campo-cancel-btn" aria-label="Cancelar solicitud" title="Cancelar solicitud" onClick={() => onCancel(request[idKey])}>✕</button>}</div>)}</div>}
+    <div className="sp-status-filters" aria-label={`Filtrar ${title} por estado`}>
+      {OWN_REQUEST_STATUSES.map(([status, label]) => {
+        const count = status === 'all' ? requests.length : counts[status]
+        return <button key={status} type="button" aria-pressed={filter === status} className={filter === status ? 'active' : ''} onClick={() => selectFilter(status)}>{label} ({count})</button>
+      })}
+    </div>
+    {requests.length === 0 ? <EmptyState message="No has enviado solicitudes." /> : filteredRequests.length === 0 ? <EmptyState message="No hay solicitudes con este estado." /> : <><div className="campo-enviadas-list">{visibleRequests.map((request) => {
+      const status = requestStatus(request)
+      return <div key={request[idKey]} className={`campo-enviada-row ${status === 'pending' ? 'is-pending' : 'is-muted'}`}><div className="campo-enviada-info"><p className="campo-enviada-nombre">{requestDateLabel(request)}</p><p className="campo-enviada-meta">{request.motivo || 'Sin motivo indicado'}</p></div><div className="campo-enviada-actions"><span className={`badge ${ESTADO_CAMPO_BADGE[request.estado] ?? 'badge-tipo'}`}>{request.estado_label}</span>{status === 'pending' && <button className="campo-cancel-btn" aria-label="Cancelar solicitud" title="Cancelar solicitud" onClick={() => onCancel(request[idKey])}><Icono nombre="cerrar" /></button>}</div></div>
+    })}</div>{visibleCount < filteredRequests.length && <button type="button" className="sp-show-more" onClick={() => setVisibleCount((count) => count + OWN_REQUEST_PAGE_SIZE)}>Ver más</button>}</>}
   </section>
 }
 
 function CoverageRequestSection({ requests, action, onAccept, onReject }) {
   return <section className="solicitudes-section">
     <div className="solicitudes-section-header"><h2>Coberturas pendientes</h2></div>
-    {requests.length === 0 ? <div className="empty-state">No tienes coberturas pendientes.</div> : <div className="campo-solicitudes">
+    {requests.length === 0 ? <EmptyState message="No tienes coberturas pendientes." /> : <div className="campo-solicitudes">
       {requests.map((coverage) => {
         const id = coverage.id_cobertura
         return <div key={id} className="campo-solicitud-card">
@@ -293,6 +374,6 @@ function CoverageRequestSection({ requests, action, onAccept, onReject }) {
   </section>
 }
 
-function Loading() {
-  return <div className="loading-state"><div className="loading-bar"><div className="loading-bar-fill" /></div><span>Cargando...</span></div>
+function EmptyState({ message }) {
+  return <div className="sp-empty-state"><Icono nombre="vacio" /><p>{message}</p></div>
 }

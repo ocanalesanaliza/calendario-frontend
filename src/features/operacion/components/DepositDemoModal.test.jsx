@@ -335,7 +335,7 @@ describe('DepositDemoModal', () => {
     renderModal()
 
     fireEvent.change(await screen.findByLabelText('Cierre capturado *'), { target: { value: '71' } })
-    const assignAvailableBalance = screen.getByRole('button', { name: 'Asignar saldo disponible' })
+    const assignAvailableBalance = screen.getByRole('button', { name: 'Usar saldo disponible' })
     expect(assignAvailableBalance).toHaveClass('tuvet-btn-ghost')
     fireEvent.click(assignAvailableBalance)
 
@@ -350,7 +350,7 @@ describe('DepositDemoModal', () => {
     renderModal()
 
     fireEvent.change(await screen.findByLabelText('Cierre capturado *'), { target: { value: '71' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Asignar saldo disponible' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Usar saldo disponible' }))
 
     expect(screen.getByLabelText('Monto asignado *')).toHaveValue(3500)
   })
@@ -363,12 +363,12 @@ describe('DepositDemoModal', () => {
     api.openDepositReport.mockResolvedValue({ report: availableReport })
     const view = renderModal()
 
-    expect(await screen.findByRole('button', { name: 'Asignar saldo disponible' })).toBeDisabled()
+    expect(await screen.findByRole('button', { name: 'Usar saldo disponible' })).toBeDisabled()
     view.unmount()
     api.openDepositReport.mockResolvedValue({ report: { ...availableReport, receipts: [{ ...availableReport.receipts[0], unallocated_amount: '0.00' }] } })
     renderModal()
 
-    expect(await screen.findByRole('button', { name: 'Asignar saldo disponible' })).toBeDisabled()
+    expect(await screen.findByRole('button', { name: 'Usar saldo disponible' })).toBeDisabled()
   })
 
   it('keeps the assigned amount editable after assigning the available balance', async () => {
@@ -379,7 +379,7 @@ describe('DepositDemoModal', () => {
     renderModal()
 
     fireEvent.change(await screen.findByLabelText('Cierre capturado *'), { target: { value: '71' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Asignar saldo disponible' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Usar saldo disponible' }))
     fireEvent.change(screen.getByLabelText('Monto asignado *'), { target: { value: '3250.00' } })
 
     expect(screen.getByLabelText('Monto asignado *')).toHaveValue(3250)
