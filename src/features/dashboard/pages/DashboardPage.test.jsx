@@ -316,6 +316,28 @@ describe('DashboardPage: Status del día', () => {
     expect(apiRequest).toHaveBeenLastCalledWith(urlEsperada({ buscar: 'Ana' }))
   })
 
+  it('distingue una carga fallida de una respuesta exitosa sin resultados', async () => {
+    apiRequest.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+
+    const { unmount } = render(
+      <MemoryRouter initialEntries={['/dashboard']}>
+        <Routes>
+          <Route path="/dashboard" element={<DashboardPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(screen.queryByText('Sin resultados para los filtros aplicados.')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument()
+
+    unmount()
+    renderDashboard([])
+
+    expect(await screen.findByText('Sin resultados para los filtros aplicados.')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('espera 300 ms de tecleo antes de buscar y hace una sola petición', async () => {
     vi.useFakeTimers()
     try {
@@ -354,27 +376,31 @@ describe('DashboardPage: Status del día', () => {
     expect(screen.getByText('1 resultado')).toBeInTheDocument()
   })
 
-  it('dibuja el resumen de área como franja con el rendimiento a un decimal', async () => {
-    renderDashboard([dia()], {
+  it('agrupa los GS por gerente de área al verlos todos y permite expandir cada grupo', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'admin_maestro', es_admin_maestro: true } })
+    renderDashboard([
+      dia({ id_usuario: 12, nombre_usuario: 'GS Ana', gerente_area: { id_gerente_area: 7, nombre: 'Karla Méndez' } }),
+      dia({ id_usuario: 13, nombre_usuario: 'GS Beto', gerente_area: { id_gerente_area: 8, nombre: 'Lesby Díaz' } }),
+    ], {
       requiere_filtro: false,
       mensaje: '',
-      resumen_areas: [{
-        gerente_area: { id_gerente_area: 7, nombre: 'Karla Méndez' },
-        fecha_inicio: '2026-11-01',
-        fecha_fin: '2026-11-13',
-        usuarios_count: 10,
-        rendimiento_mes: '41.20',
-      }],
+      resumen_areas: [
+        { gerente_area: { id_gerente_area: 7, nombre: 'Karla Méndez' }, fecha_inicio: '2026-11-01', fecha_fin: '2026-11-13', usuarios_count: 10, rendimiento_mes: '41.20' },
+        { gerente_area: { id_gerente_area: 8, nombre: 'Lesby Díaz' }, fecha_inicio: '2026-11-01', fecha_fin: '2026-11-13', usuarios_count: 9, rendimiento_mes: '32.10' },
+      ],
     })
 
-    const franja = (await screen.findByText('Karla Méndez')).closest('.area-summary')
+    fireEvent.click(await screen.findByLabelText('Ver todos los GS'))
 
-    expect(within(franja).getByText('Resumen del área · del 1 al 13 de noviembre')).toBeInTheDocument()
-    expect(within(franja).getByText('Rendimiento del mes')).toBeInTheDocument()
-    expect(within(franja).getByText('41,2 %')).toBeInTheDocument()
-    expect(within(franja).getByText('GS en el área')).toBeInTheDocument()
-    expect(within(franja).getByText('10')).toBeInTheDocument()
-    expect(document.querySelector('.page-sub')).toHaveTextContent('áreas de Karla Méndez')
+    const karlaGroup = await screen.findByRole('button', { name: /Karla Méndez.*10 GS.*41,2 %/ })
+    expect(karlaGroup).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: 'Ver rendimiento de GS Ana' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Ver rendimiento de GS Beto' })).not.toBeInTheDocument()
+
+    const lesbyGroup = screen.getByRole('button', { name: /Lesby Díaz.*9 GS.*32,1 %/ })
+    fireEvent.click(lesbyGroup)
+    expect(lesbyGroup).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: 'Ver rendimiento de GS Beto' })).toBeInTheDocument()
   })
 
   it('la línea de sucursal no repite el área del administrador', async () => {

@@ -7,7 +7,6 @@ import {
   clasificarEstado,
   formatearFecha,
   formatearPorcentaje,
-  formatearRango,
   hoyLocal,
   ordenarTarjetas,
   textoExcepcion,
@@ -83,6 +82,28 @@ function iconoPie(estado) {
   return 'calendario'
 }
 
+function areaId(area, fallback) {
+  return String(area?.id_gerente_area ?? fallback)
+}
+
+function groupUsersByArea(users, summaries) {
+  const groups = summaries.map((summary, index) => ({
+    id: areaId(summary.gerente_area, `summary-${index}`),
+    summary,
+    users: [],
+  }))
+  const byAreaId = new Map(groups.map((group) => [group.id, group]))
+  const unassigned = []
+
+  users.forEach((user) => {
+    const group = byAreaId.get(areaId(user.gerente_area, 'unassigned'))
+    if (group) group.users.push(user)
+    else unassigned.push(user)
+  })
+  if (unassigned.length) groups.push({ id: 'unassigned', summary: { gerente_area: { nombre: 'Sin gerente de área' }, usuarios_count: unassigned.length }, users: unassigned })
+  return groups.filter((group) => group.users.length > 0)
+}
+
 export default function DashboardPage() {
   const { perfil } = useAuth()
   const navigate = useNavigate()
@@ -98,6 +119,7 @@ export default function DashboardPage() {
   const [idGerenteArea, setIdGerenteArea] = useState('')
   const [verTodos, setVerTodos]     = useState(false)
   const [gerentes, setGerentes]     = useState([])
+  const [expandedAreaId, setExpandedAreaId] = useState(null)
   const claveCarga = [fecha, buscarDebounced, filtroOp, filtroEstado, esAdmin, idGerenteArea, verTodos, revision].join(':')
   const loading = carga.clave !== claveCarga
   const results = loading ? [] : carga.results
@@ -105,6 +127,7 @@ export default function DashboardPage() {
   const meta = loading ? META_VACIA : carga.meta
   const error = loading ? '' : carga.error
   const tarjetas = ordenarTarjetas(results)
+  const areaGroups = verTodos ? groupUsersByArea(tarjetas, meta.resumen_areas) : []
 
   useEffect(() => {
     if (esAdmin) getGerentes().then(setGerentes).catch(() => {})
@@ -166,7 +189,7 @@ export default function DashboardPage() {
   const subPartes = []
   if (fechaTexto) subPartes.push({ texto: fechaTexto, fuerte: true })
   if (!loading) subPartes.push({ texto: `${count} gerente${count === 1 ? '' : 's'} de sucursal` })
-  if (!loading && nombresAreas.length > 0) subPartes.push({ texto: `áreas de ${nombresAreas.join(', ')}` })
+  if (!loading && !verTodos && nombresAreas.length > 0) subPartes.push({ texto: `áreas de ${nombresAreas.join(', ')}` })
 
   return (
     <div className="dashboard-page tema-analiza">
@@ -259,7 +282,7 @@ export default function DashboardPage() {
                 </select>
               </div>
               <label className="filtro-check">
-                <input type="checkbox" checked={verTodos} onChange={(e) => setVerTodos(e.target.checked)} />
+                <input type="checkbox" checked={verTodos} onChange={(e) => { setVerTodos(e.target.checked); setExpandedAreaId(null) }} />
                 Ver todos los GS
               </label>
             </>
@@ -272,35 +295,6 @@ export default function DashboardPage() {
           )}
         </div>
       </section>
-
-      {meta.resumen_areas.length > 0 && (
-        <div className="resumen-areas">
-          {meta.resumen_areas.map((r, indice) => {
-            const rango = formatearRango(r.fecha_inicio, r.fecha_fin)
-            return (
-              <div key={r.gerente_area?.id_gerente_area ?? indice} className="area-summary">
-                <span className="area-summary-avatar" aria-hidden="true">
-                  {r.gerente_area?.nombre?.charAt(0).toUpperCase() ?? '?'}
-                </span>
-                <div className="area-summary-who">
-                  <span className="area-summary-nombre">{r.gerente_area?.nombre}</span>
-                  <small>Resumen del área{rango ? ` · ${rango}` : ''}</small>
-                </div>
-                <div className="area-summary-metrics">
-                  <div>
-                    Rendimiento del mes
-                    <strong>{formatearPorcentaje(r.rendimiento_mes)}</strong>
-                  </div>
-                  <div>
-                    GS en el área
-                    <strong>{r.usuarios_count}</strong>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
 
       {loading ? (
         <div className="dashboard-grid" aria-busy="true">
@@ -329,6 +323,23 @@ export default function DashboardPage() {
         <div className="empty-state">{TEXTO_REQUIERE_FILTRO}</div>
       ) : results.length === 0 ? (
         <div className="empty-state">Sin resultados para los filtros aplicados.</div>
+      ) : areaGroups.length > 0 ? (
+        <div className="area-groups" aria-label="Gerentes de sucursal agrupados por área">
+          {areaGroups.map((group) => {
+            const manager = group.summary.gerente_area ?? {}
+            const expanded = expandedAreaId === null ? group.id === areaGroups[0].id : expandedAreaId === group.id
+            const panelId = `area-group-${group.id}`
+            return <section key={group.id} className="area-group">
+              <button type="button" className="area-group-toggle" aria-expanded={expanded} aria-controls={panelId} onClick={() => setExpandedAreaId(expanded ? '' : group.id)}>
+                <span className="area-group-avatar" aria-hidden="true">{manager.nombre?.charAt(0).toUpperCase() ?? '?'}</span>
+                <span className="area-group-who"><strong>{manager.nombre}</strong><span>{group.summary.usuarios_count ?? group.users.length} GS</span></span>
+                <span className="area-group-metric"><span>Rendimiento mensual</span><strong>{formatearPorcentaje(group.summary.rendimiento_mes)}</strong></span>
+                <span className="area-group-chevron" aria-hidden="true">{expanded ? '⌃' : '⌄'}</span>
+              </button>
+              {expanded && <div id={panelId} className="dashboard-grid area-group-grid">{group.users.map((user, index) => <UserCard key={user.id_usuario ?? index} user={user} onVerRendimiento={(idUsuario) => navigate(`/rendimiento?id_usuario=${idUsuario}`)} />)}</div>}
+            </section>
+          })}
+        </div>
       ) : (
         <div className="dashboard-grid">
           {tarjetas.map((u, i) => (
