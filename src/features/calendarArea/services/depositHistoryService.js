@@ -12,10 +12,11 @@ async function request(path, options = { method: 'GET' }, fallback = 'No fue pos
   throw error
 }
 
-function rangeQuery({ from, to } = {}) {
+function rangeQuery({ from, to, area_id: areaId } = {}) {
   const params = new URLSearchParams()
   if (from) params.set('from', from)
   if (to) params.set('to', to)
+  if (areaId) params.set('area_id', areaId)
   const query = params.toString()
   return query ? `?${query}` : ''
 }
@@ -28,8 +29,8 @@ export function getDepositHistoryBranch(branchId, range) {
   return request(`${BASE}sucursales/${branchId}/${rangeQuery(range)}`)
 }
 
-export function getDepositHistoryClosure(closureId) {
-  return request(`${BASE}cierres/${closureId}/`)
+export function getDepositHistoryClosure(closureId, params = {}) {
+  return request(`${BASE}cierres/${closureId}/${rangeQuery(params)}`)
 }
 
 export function getDepositHistoryCompliance() {

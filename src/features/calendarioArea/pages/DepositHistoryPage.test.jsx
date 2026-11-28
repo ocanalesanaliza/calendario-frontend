@@ -161,6 +161,30 @@ describe('DepositHistoryPage', () => {
     expect(api.getDepositHistory).toHaveBeenLastCalledWith({ from: '2026-01-01', to: queriedRange.to })
   })
 
+  it('preserves the selected Area through branch and closure drill-downs', async () => {
+    api.getDepositHistory.mockResolvedValue({
+      summary: {}, areas: [{ id: 'opaque-area', code: 'NORTH', name: 'North' }],
+      branches: [{ id: 'north', code: 'NTE', name: 'Sucursal Norte' }],
+    })
+    api.getDepositHistoryBranch.mockResolvedValue({
+      branch: { code: 'NTE' }, closures: [{ id: 'closure', closure_date: '2026-11-02' }],
+    })
+    api.getDepositHistoryClosure.mockResolvedValue({ closure: { closure_date: '2026-11-02' }, receipts: [] })
+    render(<DepositHistoryPage />)
+
+    await screen.findByText('Sucursal Norte')
+    fireEvent.change(screen.getByLabelText('Área'), { target: { value: 'opaque-area' } })
+    fireEvent.submit(screen.getByRole('form', { name: 'Rango del historial de depósitos' }))
+    await screen.findByText('Sucursal Norte')
+    fireEvent.click(screen.getByRole('button', { name: 'Ver cierres de NTE Sucursal Norte' }))
+    await screen.findByText('Cierres de NTE')
+    fireEvent.click(screen.getByRole('button', { name: /Ver detalle del cierre/ }))
+
+    expect(api.getDepositHistory).toHaveBeenLastCalledWith(expect.objectContaining({ area_id: 'opaque-area' }))
+    expect(api.getDepositHistoryBranch).toHaveBeenCalledWith('north', expect.objectContaining({ area_id: 'opaque-area' }))
+    expect(api.getDepositHistoryClosure).toHaveBeenCalledWith('closure', { area_id: 'opaque-area' })
+  })
+
   it('loads the previous month from a quick range without additional branch requests', async () => {
     api.getDepositHistory.mockResolvedValue({ summary: {}, branches: [{ id: 'north', code: 'NTE', name: 'Sucursal Norte' }] })
     render(<DepositHistoryPage />)

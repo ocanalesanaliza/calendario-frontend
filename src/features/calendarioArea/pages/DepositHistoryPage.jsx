@@ -98,6 +98,8 @@ export default function DepositHistoryPage() {
   const [range, setRange] = useState(localMonthRange)
   const [draftRange, setDraftRange] = useState(localMonthRange)
   const [preset, setPreset] = useState('month')
+  const [areaId, setAreaId] = useState('')
+  const [draftAreaId, setDraftAreaId] = useState('')
   const [history, setHistory] = useState(null)
   const [overdueCompliance, setOverdueCompliance] = useState(null)
   const [branch, setBranch] = useState(null)
@@ -109,8 +111,9 @@ export default function DepositHistoryPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  async function loadHistory(nextRange = range) {
+  async function loadHistory(nextRange = range, nextAreaId = draftAreaId) {
     setRange(nextRange)
+    setAreaId(nextAreaId)
     setLoading(true)
     setError('')
     setBranch(null)
@@ -118,7 +121,8 @@ export default function DepositHistoryPage() {
     setClosure(null)
     setSelectedClosure(null)
     try {
-      const [nextHistory, nextOverdueCompliance] = await Promise.all([getDepositHistory(nextRange), getDepositHistoryCompliance().catch(() => null)])
+      const params = { ...nextRange, ...(nextAreaId ? { area_id: nextAreaId } : {}) }
+      const [nextHistory, nextOverdueCompliance] = await Promise.all([getDepositHistory(params), getDepositHistoryCompliance().catch(() => null)])
       setHistory(nextHistory)
       setOverdueCompliance(nextOverdueCompliance)
     } catch (requestError) {
@@ -140,14 +144,14 @@ export default function DepositHistoryPage() {
     } else nextRange = localMonthRange(now)
     setPreset(value)
     setDraftRange(nextRange)
-    void loadHistory(nextRange)
+    void loadHistory(nextRange, areaId)
   }
 
   useEffect(() => {
     let active = true
     void Promise.resolve().then(async () => {
       try {
-        const [data, nextOverdueCompliance] = await Promise.all([getDepositHistory(range), getDepositHistoryCompliance().catch(() => null)])
+        const [data, nextOverdueCompliance] = await Promise.all([getDepositHistory({ ...range, ...(areaId ? { area_id: areaId } : {}) }), getDepositHistoryCompliance().catch(() => null)])
         if (active) {
           setHistory(data)
           setOverdueCompliance(nextOverdueCompliance)
@@ -170,7 +174,7 @@ export default function DepositHistoryPage() {
     setClosure(null)
     setSelectedClosure(null)
     try {
-      setBranch(await getDepositHistoryBranch(item.id, range))
+      setBranch(await getDepositHistoryBranch(item.id, { ...range, ...(areaId ? { area_id: areaId } : {}) }))
     } catch (requestError) {
       setBranch(null)
       setError(safeError(requestError))
@@ -184,7 +188,7 @@ export default function DepositHistoryPage() {
     setError('')
     setSelectedClosure(item)
     try {
-      setClosure(await getDepositHistoryClosure(item.id))
+      setClosure(await (areaId ? getDepositHistoryClosure(item.id, { area_id: areaId }) : getDepositHistoryClosure(item.id)))
     } catch (requestError) {
       setClosure(null)
       setError(safeError(requestError))
@@ -213,6 +217,7 @@ export default function DepositHistoryPage() {
   }
 
   const branches = history?.branches ?? history?.sucursales ?? history?.results ?? []
+  const areas = history?.areas ?? []
   const closures = branch?.closures ?? branch?.cierres ?? branch?.results ?? []
   const closureData = closure?.closure ?? closure
   const currentBranch = branch?.branch ?? selectedBranch
@@ -223,10 +228,11 @@ export default function DepositHistoryPage() {
 
   return <main className="tema-analiza tuvet-page deposit-history-page" data-testid="deposit-history-layout" data-responsive-breakpoints="375 768 1024 1440">
     <PageHeader title="Historial de depósitos" description="Consulta y compara los cierres y su conciliación por sucursal." />
-    <form className="deposit-history-filters" onSubmit={(event) => { event.preventDefault(); setPreset(''); void loadHistory(draftRange) }} aria-label="Rango del historial de depósitos">
+    <form className="deposit-history-filters" onSubmit={(event) => { event.preventDefault(); setPreset(''); void loadHistory(draftRange, draftAreaId) }} aria-label="Rango del historial de depósitos">
       <fieldset className="deposit-history-presets" disabled={loading}><legend className="tuvet-visually-hidden">Rangos rápidos</legend>{[['week', 'Últimos 7 días'], ['month', 'Este mes'], ['previous', 'Mes anterior']].map(([value, label]) => <button key={value} type="button" className={`deposit-history-chip${preset === value ? ' is-active' : ''}`} aria-pressed={preset === value} onClick={() => choosePreset(value)}>{label}</button>)}</fieldset>
       <label htmlFor="deposit-history-from">Desde<input id="deposit-history-from" type="date" required max={draftRange.to || undefined} disabled={loading} value={draftRange.from} onChange={(event) => { setPreset(''); setDraftRange((current) => ({ ...current, from: event.target.value })) }} /></label>
       <label htmlFor="deposit-history-to">Hasta<input id="deposit-history-to" type="date" required min={draftRange.from || undefined} disabled={loading} value={draftRange.to} onChange={(event) => { setPreset(''); setDraftRange((current) => ({ ...current, to: event.target.value })) }} /></label>
+      {areas.length > 0 && <label htmlFor="deposit-history-area">Área<select id="deposit-history-area" disabled={loading} value={draftAreaId} onChange={(event) => setDraftAreaId(event.target.value)}><option value="">Todas las áreas visibles</option>{areas.map((area) => <option key={area.id} value={area.id}>{[area.code, area.name].filter(Boolean).join(' · ')}</option>)}</select></label>}
       <button type="submit" className="tuvet-btn" disabled={loading}>{loading ? 'Cargando…' : 'Consultar historial'}</button>
       <p className="deposit-history-period"><Icono nombre="calendario" /> <span>Período consultado: <strong>{formatRange(range)}</strong></span></p>
     </form>

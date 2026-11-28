@@ -172,8 +172,8 @@ export function OverdueDepositsRoute({ children }) {
 
 export function DepositHistoryRoute({ children }) {
   const { perfil } = useAuth()
-  const { isAreaManager, isOperationsManager } = getProfileCapabilities(perfil)
-  if (!isAreaManager && !isOperationsManager) return <Navigate to="/" replace />
+  const { isAreaManager, isOperationsManager, isAdminMaster } = getProfileCapabilities(perfil)
+  if (!isAreaManager && !isOperationsManager && !isAdminMaster) return <Navigate to="/" replace />
   return children
 }
 

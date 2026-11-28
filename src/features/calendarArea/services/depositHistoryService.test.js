@@ -29,4 +29,17 @@ describe('depositHistoryService', () => {
 
     await expect(getDepositHistory({ from: '2026-11-01', to: '2026-11-30' })).rejects.toMatchObject({ status: 404 })
   })
+
+  it('propagates the selected opaque Area through summary, branch, and closure requests', async () => {
+    apiRequest.mockReset()
+    apiRequest.mockResolvedValue(jsonResponse({ branches: [] }))
+
+    await getDepositHistory({ from: '2026-11-01', to: '2026-11-30', area_id: 'opaque-area' })
+    await getDepositHistoryBranch('opaque-branch', { from: '2026-11-01', to: '2026-11-30', area_id: 'opaque-area' })
+    await getDepositHistoryClosure('opaque-closure', { area_id: 'opaque-area' })
+
+    expect(apiRequest).toHaveBeenNthCalledWith(1, '/api/depositos/ga/historial/?from=2026-11-01&to=2026-11-30&area_id=opaque-area', { method: 'GET' })
+    expect(apiRequest).toHaveBeenNthCalledWith(2, '/api/depositos/ga/historial/sucursales/opaque-branch/?from=2026-11-01&to=2026-11-30&area_id=opaque-area', { method: 'GET' })
+    expect(apiRequest).toHaveBeenNthCalledWith(3, '/api/depositos/ga/historial/cierres/opaque-closure/?area_id=opaque-area', { method: 'GET' })
+  })
 })

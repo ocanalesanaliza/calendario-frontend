@@ -17,7 +17,14 @@
 .deposit-history-chip:hover { background: var(--tv-surface-muted); border-color: var(--tv-primary); }
 .deposit-history-chip.is-active { background: var(--tv-primary); border-color: var(--tv-primary); color: white; }
 .deposit-history-page .deposit-history-filters label { display: grid; gap: .35rem; color: var(--tv-text); font-size: .8rem; font-weight: 600; }
-.deposit-history-page .deposit-history-filters input { width: 10.5rem; min-height: 2.75rem; padding: .5rem .65rem; border: 1px solid var(--tv-border-strong); border-radius: var(--tv-radius-sm); background: var(--tv-surface); color: var(--tv-fg); font: inherit; color-scheme: light; }
+.deposit-history-page .deposit-history-filters input,
+.deposit-history-page .deposit-history-filters select { width: 10.5rem; min-height: 2.75rem; padding: .5rem .65rem; border: 1px solid var(--tv-border-strong); border-radius: var(--tv-radius-sm); background: var(--tv-surface); color: var(--tv-fg); font: inherit; color-scheme: light; }
+.deposit-history-page .deposit-history-filters input:hover,
+.deposit-history-page .deposit-history-filters select:hover { border-color: var(--tv-primary); }
+.deposit-history-page .deposit-history-filters input:focus-visible,
+.deposit-history-page .deposit-history-filters select:focus-visible { outline: none; border-color: var(--tv-primary-accent); box-shadow: 0 0 0 3px var(--tv-ring); }
+.deposit-history-page .deposit-history-filters input:disabled,
+.deposit-history-page .deposit-history-filters select:disabled { cursor: not-allowed; opacity: .45; }
 .deposit-history-page .deposit-history-filters .tuvet-btn { min-height: 2.75rem; }
 .deposit-history-page .deposit-history-period { display: flex; align-items: center; flex-basis: 100%; gap: .5rem; margin: 0; color: var(--tv-muted); font-size: .8rem; }
 .deposit-history-period .tuvet-icon { width: 1rem; height: 1rem; }

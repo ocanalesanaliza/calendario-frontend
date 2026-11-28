@@ -336,6 +336,7 @@ describe('DepositHistoryRoute', () => {
   it.each([
     ['GA', { type: 'gerente_area' }],
     ['GO', { type: 'gerente_operaciones' }],
+    ['Admin Master', { type: 'admin_master' }],
   ])('allows %s to consult deposit history', async (_role, perfil) => {
     useAuth.mockReturnValue({ perfil })
     render(<MemoryRouter initialEntries={['/analitica/historial-depositos']}><Routes><Route path="/" element={<p>Inicio</p>} /><Route path="/analitica/historial-depositos" element={<DepositHistoryRoute><p>Historial autorizado</p></DepositHistoryRoute>} /></Routes></MemoryRouter>)
@@ -352,9 +353,13 @@ describe('DepositHistoryRoute', () => {
 describe('Deposit history navigation', () => {
   beforeEach(() => useAuth.mockReset())
 
-  it('shows the analytics entry to GA and GO, but not GS', () => {
+  it('shows the analytics entry to GA, GO, and Admin Master, but not GS', () => {
     useAuth.mockReturnValue({ perfil: { type: 'gerente_area', nombre: 'GA' }, logout: vi.fn() })
     const { rerender } = render(<MemoryRouter><Layout /></MemoryRouter>)
+    expect(screen.getByRole('link', { name: /Historial de depósitos/i })).toHaveAttribute('href', '/analitica/historial-depositos')
+
+    useAuth.mockReturnValue({ perfil: { type: 'admin_master', nombre: 'AM' }, logout: vi.fn() })
+    rerender(<MemoryRouter><Layout /></MemoryRouter>)
     expect(screen.getByRole('link', { name: /Historial de depósitos/i })).toHaveAttribute('href', '/analitica/historial-depositos')
 
     useAuth.mockReturnValue({ perfil: { type: 'gerente_operaciones', nombre: 'GO' }, logout: vi.fn() })
