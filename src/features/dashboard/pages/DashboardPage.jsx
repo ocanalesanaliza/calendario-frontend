@@ -107,7 +107,7 @@ function groupUsersByArea(users, summaries) {
 export default function DashboardPage() {
   const { perfil } = useAuth()
   const navigate = useNavigate()
-  const esAdmin = perfil?.es_admin_maestro === true
+  const esAdmin = perfil?.es_admin_maestro === true || perfil?.type === 'admin_master'
 
   const [carga, setCarga]           = useState({ clave: null, results: [], count: 0, meta: META_VACIA, error: '' })
   const [revision, setRevision]     = useState(0)

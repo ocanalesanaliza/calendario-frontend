@@ -429,4 +429,15 @@ describe('DashboardPage: Status del día', () => {
     expect(within(card).queryByText(/Lesby Díaz/)).toBeNull()
     expect(screen.getByLabelText('Ver todos los GS')).toBeInTheDocument()
   })
+
+  it('permite ver todos los GS a un Admin Master territorial', async () => {
+    useAuth.mockReturnValue({ perfil: { type: 'admin_master', es_admin_maestro: false } })
+    renderDashboard()
+
+    expect(await screen.findByLabelText('Ver todos los GS')).toBeInTheDocument()
+    expect(screen.getByLabelText('Gerente de área')).toBeInTheDocument()
+    fireEvent.click(screen.getByLabelText('Ver todos los GS'))
+    expect(await screen.findByText('GS Ana')).toBeInTheDocument()
+    expect(apiRequest).toHaveBeenLastCalledWith(urlEsperada({ todos: 'true' }))
+  })
 })
